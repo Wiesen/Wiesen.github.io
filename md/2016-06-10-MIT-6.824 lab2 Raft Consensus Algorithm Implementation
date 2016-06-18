@@ -80,31 +80,31 @@ Leader Election and Heartbeat
  - 当两个 log 的最后一条 entry 的 term 不同，则 **later** term is more up-to-date；
  - 当两个 log 的最后一条 entry 的 term 相同，则 whichever log is **longer** is more up-to-date
 
-	// RequestVote RPC handler.
-	func (rf *Raft) RequestVote(args RequestVoteArgs, reply *RequestVoteReply) {
-	  if rf.currentTerm > args.Term {
-	  	reply.Term = rf.currentTerm
-	  	reply.VoteGranted = false
-	  	return
-	  }
-	  if rf.currentTerm < args.Term {
-	  	rf.currentTerm = args.Term
-	  	rf.votedFor = -1
-	  	rf.chanRole <- Follower
-	  }
-	  reply.Term = args.Term
-	  if rf.votedFor != -1 && rf.votedFor != args.CandidateId {
-	  	reply.VoteGranted = false
-	  } else if rf.logTable[len(rf.logTable)-1].Term > args.LastLogTerm {
-	  	reply.VoteGranted = false 	//! different term
-	  } else if len(rf.logTable)-1 > args.LastLogIndex && rf.logTable[len(rf.logTable)-1].Term == args.LastLogTerm { 
-	  	reply.VoteGranted = false   //! same term but different index
-	  }else {
-	  	reply.VoteGranted = true
-	  	rf.votedFor = args.CandidateId
-	  	rf.chanGrantVote <- true
-	  }
-	}
+		// RequestVote RPC handler.
+		func (rf *Raft) RequestVote(args RequestVoteArgs, reply *RequestVoteReply) {
+		  if rf.currentTerm > args.Term {
+		  	reply.Term = rf.currentTerm
+		  		reply.VoteGranted = false
+		  	return
+		  }
+		  if rf.currentTerm < args.Term {
+		  	rf.currentTerm = args.Term
+		  	rf.votedFor = -1
+		  	rf.chanRole <- Follower
+		  }
+		  reply.Term = args.Term
+		  if rf.votedFor != -1 && rf.votedFor != args.CandidateId {
+		  	reply.VoteGranted = false
+		  } else if rf.logTable[len(rf.logTable)-1].Term > args.LastLogTerm {
+		  	reply.VoteGranted = false 	//! different term
+		  } else if len(rf.logTable)-1 > args.LastLogIndex && rf.logTable[len(rf.logTable)-1].Term == args.LastLogTerm { 
+		  	reply.VoteGranted = false   //! same term but different index
+		  }else {
+		  	reply.VoteGranted = true
+		  	rf.votedFor = args.CandidateId
+		  	rf.chanGrantVote <- true
+		  }
+		}
 
 3. Heartbeat 的 sender 和 handler
 
@@ -122,7 +122,7 @@ Leader Election and Heartbeat
 	    	    }
         }
  
- 一个机器接收到不含 log entry 的 AppendEntries RPC（也就是 heartbeat）时，需要决定是否更新自身的 term 和 leaderId。
+ 一个机器接收到不含 log entry 的 AppendEntries RPC（也就是 heartbeat）时，需要决定是否更新自身的 term 和 leaderId：
  - 如果 AppendEntries RPC 中的 `term T < currentTerm`，则 reply 中返回 `currentTerm` 让发送方更新；
  - 如果 RequstVote RPC 中的 `term T > currentTerm`，则需要更新 `currentTerm` 和 `leaderId`，转换为 Follower 状态，并且 reset election timeout；
  
@@ -167,6 +167,7 @@ Log Replication
  当 Leader 的 log 比某 server 长时，亦即是 `len(rf.logTable) - 1 >= rf.nextIndex[server]`，则需要发送 entry，并且直到该 server's log has caught up leader's log。
  
  有一点要**注意**的是：Leader 在对某 server 进行上述的连续发送时间或者等待 reply 的时间可能会大于 heartbeat timeout，因此触发 AppendEntries RPC；或者在上述时间内 client 向 Leader 提交了新的 log，这时候再次触发了 AppendEntries RPC。然而 Leader 本身已经在向该 server 发送 AppendEntries RPC，这时候对该 server 进行 heartbeat 是多余的。 
+ 
  本文检测 Leader 是否在向某 server 发送 AppendEntries RPC，若是则直接退出不再重复操作。这里设计为 Leader 为每一 server 维护一个带有**一个缓存**的 channel，要对某 server 进行 AppendEntries RPC 必须先 read channel。
  
  最后如果 RPC failed 则直接退出，否则收到 AppendEntries RPC 的 reply 时：
