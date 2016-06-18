@@ -1,7 +1,7 @@
 $(function() {
   var $D = $(document),
       $main = $('#main'),
-      username = 'Wiesen',
+      username = 'wiesen',
       version = '0.2.3',
       gistListTpl = $('#gist-list-tpl').html(),
       gistDetailTpl = $('#gist-detail-tpl').html(),
