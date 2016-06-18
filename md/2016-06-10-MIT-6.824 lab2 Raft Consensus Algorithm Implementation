@@ -1,12 +1,12 @@
 Raft 将一致性问题分为了三个相对独立的子问题，分别是：
-- **Leader election**：当前 leader 崩溃时，集群中必须选举出一个新的 leader；
-- **Log replication**：leader 必须接受来自 clients 的 log entries，并且将其 replicate 到集群机器中，强制其余 logs 与其保持一致；
-- **Safety**：Raft 中最关键的 safety property 是 State Machine Safety Property，亦即是，当任一机器 apply 了某一特定 log entry 到其 state machine 中，则其余服务器都不可能 apply 了一个 index 相同但 command 不同的 log。
+- Leader election：当前 leader 崩溃时，集群中必须选举出一个新的 leader；
+- Log replication：leader 必须接受来自 clients 的 log entries，并且将其 replicate 到集群机器中，强制其余 logs 与其保持一致；
+- Safety：Raft 中最关键的 safety property 是 State Machine Safety Property，亦即是，当任一机器 apply 了某一特定 log entry 到其 state machine 中，则其余服务器都不可能 apply 了一个 index 相同但 command 不同的 log。
 
 差不多依据上述划分，6.824 中 Raft 的实现指导逻辑还是挺清晰的，其中 safety property 由 Leader election 和 Log replication 共同承担，并且将 Persistence 作为最后一部分。实现过程主要分为：
-- **Leader Election and Heartbeats**：首先令 Raft 能够在不存在故障的情景下选举出一个 leader，并且稳定保持状态；
-- **Log Replication**：其次令 Raft 能够保持一个 consistent 并且 replicated 的 log；
-- **Persistence**：最后令 Raft 能够持久化保存 persistent state，这样在重启后可以进行恢复。
+- Leader Election and Heartbeats：首先令 Raft 能够在不存在故障的情景下选举出一个 leader，并且稳定保持状态；
+- Log Replication：其次令 Raft 能够保持一个 consistent 并且 replicated 的 log；
+- Persistence：最后令 Raft 能够持久化保存 persistent state，这样在重启后可以进行恢复。
 
 其中，本文主要参考 Raft paper，其中的 **figure 2** 作用很大。本文实现**大量依赖 channel 实现消息传递和线程同步**。仍然存在**少量 bug**，主要是 fail to pass unreliable test case，有待继续优化（主要是分布式调试无从下手）。
 
