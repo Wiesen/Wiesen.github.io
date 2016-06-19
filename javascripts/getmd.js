@@ -1,4 +1,4 @@
-var showdown  = require('showdown'),
+var showdown  = require('showdown');
 var path = decodeURIComponent(location.hash.substr(2));
 var page = 1;
 if(location.search.substr(1,19)=='_escaped_fragment_='){
