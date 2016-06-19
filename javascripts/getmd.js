@@ -1,3 +1,4 @@
+var showdown  = require('showdown'),
 var path = decodeURIComponent(location.hash.substr(2));
 var page = 1;
 if(location.search.substr(1,19)=='_escaped_fragment_='){
@@ -5,7 +6,7 @@ if(location.search.substr(1,19)=='_escaped_fragment_='){
 }
 if(path == '/'){path = ''; window.history.replacetate(null, '', '/');page=1;}
 else if(path && !location.search){window.history.replaceState(null, '', (isroot?'':('/'+repos))+'/#!'+path);}
-var converter = new Showdown.converter();
+var converter = new showdown.converter();
 var content = document.getElementById('content');
 var dis = document.getElementById('disqus_thread');
 var loading = document.getElementById('loading');
@@ -106,7 +107,7 @@ function loadXMLDoc(url){
 						encoded = true;
 					};
 					blog_text = filterJekyllHeader(blog_text);
-					var converter = new Showdown.converter();
+					var converter = new showdown.converter();
 					content.innerHTML = '<div id="content_inner"><div id="back_home"><a href="/" onclick="home();return false;">'+sitetitle+'</a><span>&nbsp;›&nbsp;</span></div><div id="post_title">' + decodeUtf8(getPostName(path)) + (encoded?Base64.decode('PHN1cCBzdHlsZT0iZm9udC1zaXplOjAuNWVtO3ZlcnRpY2FsLWFsaWduOiBzdXBlcjsiIHRpdGxlPSLmraTmlofnq6Dlt7Looqvph43mlrDnvJbnoIHku6XourLpgb/lrqHmn6UiPuKYmuiiq+e8lueggeeahOWGheWuuTwvc3VwPg=='):'') + '</div>' + converter.makeHtml(blog_text) + '<div class="date">Posted at ' + pdate + '</div></div>';
 					if(dis){
 						dis.style.display = 'block';
