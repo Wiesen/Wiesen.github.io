@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>Flat Datacenter Storage Paper Review &middot; Wiesen&#39;s Blog</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="http://wiesen.github.io/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="http://wiesen.github.io/img/favicon.ico" type="image/x-icon" />
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+  <a class="pure-menu-heading brand" href="http://wiesen.github.io/">Wiesen</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/about/"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/contact/"><i class='fa fa-phone fa-fw'></i>Contact</a>
+      
+        </li>
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://facebook.com/100010837531785" target="_blank"><i class="fa fa-facebook-square fa-fw"></i>Facebook</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/Wiesen" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+
+<div class="header">
+  <h1>Flat Datacenter Storage Paper Review</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+    <i class="fa fa-calendar fa-fw"></i>
+    <time>30 Mar 2016, 21:33</time>
+  </div>
+
+  
+
+  
+  
+  
+  <div>
+    <i class="fa fa-folder fa-fw"></i>
+    
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/distributed-system">Distributed System</a>
+    
+  </div>
+  
+  
+
+  
+
+</div>
+
+  
+
+<p>A review for paper Nightingale E B, Elson J, Fan J, et al. Flat datacenter storage[C]//Presented as part of the 10th USENIX Symposium on Operating Systems Design and Implementation (OSDI 12). 2012: 1-15.</p>
+
+<h1 id="introduction">Introduction</h1>
+
+<p>What is FDS?</p>
+
+<ul>
+<li>Flat Datacenter Storage (FDS) is a high-performance, fault-tolerant, large-scale, <strong>locality-oblivious</strong> blob store.</li>
+<li>Using a novel combination of <strong>full bisection bandwidth networks</strong>, <strong>data and metadata striping</strong>, and** flow control**, FDS multiplexes an application’s large-scale I/O across the available throughput and latency budget of every disk in a cluster.</li>
+</ul>
+
+<p>How is the Performance?</p>
+
+<ul>
+<li>2 GByte/sec per client.</li>
+<li>Recover from lost disk (92 GB) in 6.2 seconds.</li>
+<li>It sets the world-record for disk-to-disk sorting in 2012 for MinuteSort: 1,033 disks and 256 computers (136 tract servers, 120 clients), 1,401 Gbyte in 59.4s.</li>
+</ul>
+
+<h1 id="architecture">Architecture</h1>
+
+<p>High-level design &ndash; a common pattern</p>
+
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/fds-flat.png" alt="comparison" /></p>
+
+<p>Right distributed model - GFS &amp; HDFS: Data is either on a local disk or a remote disk.</p>
+
+<ul>
+<li>Move the computation to data. Location awareness adds <strong>complexity</strong>.</li>
+<li>Why move? Because remote data access is slow.</li>
+<li>Why slow? Because the network is oversubscribed.</li>
+</ul>
+
+<p>Left distributed model &ndash; FDS: Object storage assuming no oversubscription. Data is <em>all</em> remote.</p>
+
+<ul>
+<li>Separates the storage from computation.</li>
+<li>No local vs. remote disk distinction</li>
+<li>simpler work schedulers</li>
+<li>simpler programming models</li>
+</ul>
+
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/fds-architectures.png" alt="architecture" /></p>
+
+<p>Above it&rsquo;s the architecture of FDS:</p>
+
+<ul>
+<li>Lots of clients, and lots of storage servers (&ldquo;tractservers&rdquo;)</li>
+<li>Partition the data, and master (&ldquo;metadata server&rdquo;) controls partitioning</li>
+<li>Replica groups for reliability</li>
+</ul>
+
+<h1 id="deisign-overview">Deisign Overview</h1>
+
+<h2 id="how-to-store-data-blobs-and-tracts">How to store data? &ndash; Blobs and Tracts</h2>
+
+<ol>
+<li><p>Data is logically stored in blobs.</p>
+
+<ul>
+<li>A blob is a byte sequence named with a 128-bit GUID.</li>
+<li>Blobs can be <em>any length</em> up to the system’s storage capacity.</li>
+<li>Blobs are divided into <strong>tracts</strong>.</li>
+</ul></li>
+
+<li><p>Tracts are the units responsible for read and write</p>
+
+<ul>
+<li>Tracts are <em>sized</em> such that random and sequential access achieves nearly the same throughput.</li>
+<li>The tract size is set when the cluster is created based upon cluster hardware.(64kb~8MB)</li>
+<li>All tracts’ metadata is <strong>cached in memory</strong>, eliminating many disk accesses.</li>
+</ul></li>
+
+<li><p>Every disk is managed by a process called a tractserver:</p>
+
+<ul>
+<li>Services read and write requests from clients.</li>
+<li>Lay out tracts <strong>directly to disk by using the raw disk interface</strong>.</li>
+<li>Provides API, and the API features are follow:
+
+<ul>
+<li>Tract reads are not guaranteed to arrive in order of issue. Writes are not guaranteed to be committed in   order of issue.</li>
+<li>Tractserver writes are <em>atomic</em>: a write is either committed or failed completely.</li>
+<li>Calls are <em>asynchronous</em>: using callback, allows deep pipelining to achieve good performance.</li>
+<li><em>Weak</em> consistency to clients</li>
+</ul></li>
+</ul></li>
+</ol>
+
+<h2 id="how-to-organize-and-manage-metadata-deterministic-data-placement">How to organize and manage metadata? &ndash; Deterministic data placement</h2>
+
+<ol>
+<li><p>Many systems solve this problem using a metadata server that stores the location of data blocks.</p>
+
+<ul>
+<li>Advantage: allowing maximum flexibility of data placement and visibility into the system’s state.</li>
+<li>Drawbacks: the metadata server is a central point of failure, usually implemented as a replicated state machine.</li>
+</ul></li>
+
+<li><p>FDS uses a metadata server, but it&rsquo;s role is simple and limited:  <strong>tract locator table</strong> (<strong>TLT</strong>):</p>
+
+<ul>
+<li>collect a list of the system’s active tractservers and distribute it to clients.</li>
+<li>With <em>k-way</em> replication, each entry has the address of <em>k</em> tractservers.</li>
+<li>Weighted by disk speed</li>
+<li>Only update when cluster changes</li>
+</ul></li>
+
+<li><p>Compute a tract index to read or write, which is designed to both be deterministic and produce uniform disk utilization: <em>Tract_Locator</em> = TLT[(Hash(<em>GUID</em>) + <em>Tract</em>) % len(TLT)]</p>
+
+<ul>
+<li><strong>Hash(<em>GUID</em>)</strong>: Randomize blob&rsquo;s tractserver, even if GUIDs aren&rsquo;t random (uses SHA-1)</li>
+<li><strong><em>Tract</em></strong>: adds tract number outside the hash, so large blobs use all TLT entries uniformly</li>
+</ul></li>
+
+<li><p>Compute a tract index for Blob metadata, which enable to distribute Blob metadata: <em>Tract_Locator</em> = TLT[(Hash(<em>GUID</em>) - 1) % len(TLT)]</p>
+
+<ul>
+<li>The metadata server isn&rsquo;t a single point failure.</li>
+<li>Parallelized operation can be servied in parallel by independent tractservers.</li>
+</ul></li>
+
+<li><p>To summarize, FDS metadata scheme has following properties:</p>
+
+<ul>
+<li>The metadata server is in the critical path <em>only</em> when a client process starts.</li>
+<li>The TLT can be <em>cached long-term</em>, eliminating all traffic to the metadata server under normal conditions.</li>
+<li>TLT contains random permutations of the list of tractservers, which make sequential reads and writes parallel.</li>
+</ul></li>
+</ol>
+
+<h2 id="what-kind-of-application-will-will-not-benefic-from-fds-dynamic-work-allocation">What kind of application will /will not benefic from FDS? &ndash; Dynamic Work Allocation</h2>
+
+<ul>
+<li>Since <strong>storage and compute are no longer colocated</strong>, the assignment of work to worker can be done <em>dynamically</em> at fine granularity <em>during</em> task execution, which enables FDS to <strong>mitigate stragglers</strong>.</li>
+<li>The <strong>best practice</strong> for FDS applications is to centrally (or, at large scale, hierarchically) give small units of work to each worker as it nears completion of its previous unit.</li>
+<li>Such a scheme is <strong>not practical</strong> in systems where the assignment of work to workers is fixed in advance by the requirement that data be resident at a particular worker before the job begins.</li>
+</ul>
+
+<h1 id="replication-and-failure-recovery">Replication and Failure Recovery</h1>
+
+<h2 id="replication">Replication</h2>
+
+<ul>
+<li>Serialized Blob operation <em>Create</em>, <em>Delete</em>, <em>Extend</em>: client writes to primary, primary executes a <strong>two-phase commit</strong> with replicas.</li>
+<li>Write to <em>all</em> replicas, read from <em>random</em> replica</li>
+<li>Supports per-blob <strong>variable replication</strong></li>
+</ul>
+
+<h2 id="failure-recovery">Failure recovery</h2>
+
+<ul>
+<li>each ertry in TLT has a <strong>version number</strong> to control update, and <em>all</em> operations as well.</li>
+<li>Transient failures: <strong>partial failure recovery</strong> that complete failure recovery or use other replicas to recover the writes that the returning tractserver missed.</li>
+<li>Cascading tractserver failures: fill more slots in the TLT</li>
+<li>Concurrent tractserver failures: detected as missing TLT entries, and execute normal failure recovery protocol.</li>
+<li>Metadata server failures: using Paxos leader election</li>
+</ul>
+
+<h2 id="replicated-data-layout">Replicated data layout</h2>
+
+<ul>
+<li>The selection of which k disks appear has an important impact on both durability and recovery speed</li>
+<li>A better TLT has <em>O(n^2)</em> entries, so each possible pair of disks appears in anentry of the TLT.
+
+<ul>
+<li>First, performance during recovery involves <em>every disk</em> in the cluster.</li>
+<li>a triple disk failure within the recovery window has only about a <em>2/n</em> chance of causing permanent data loss.</li>
+<li>adding more replicas decreases the probability of data loss.</li>
+</ul></li>
+</ul>
+
+<h2 id="cluster-growth">Cluster growth</h2>
+
+<ul>
+<li>Rebalances the assignment of TLT entries so that both existing data and new workloads are uniformly distributed.</li>
+<li>These assignments happen in two phases (<code>pending</code> and <code>commits</code>).</li>
+<li>If a new tractserver fails while its TLT entries are pending, increments the TLT entry version and expunges it.</li>
+<li>new tractservers must read from the existing tractserver with a superset of the data required.</li>
+</ul>
+
+<h1 id="networking">Networking</h1>
+
+<ul>
+<li>Network bandwidth = disk bandwidth</li>
+<li>Full bisection bandwidth is stochastic</li>
+<li>Short flows good for ECMP</li>
+<li>TCP <em>hates</em> short flows, but RTS/CTS to mitigate incast</li>
+<li>FDS works <em>great</em> for Blob Storate on CLOS networks.</li>
+</ul>
+
+<hr />
+
+<p>Reference：</p>
+
+<blockquote>
+<p><a href="http://www.binospace.com/index.php/flat-datacenter-storage-system-analysis/">Flat DataCenter Storage之系统分析</a></p>
+
+<p><a href="http://cs.stackexchange.com/questions/23163/how-does-fds-flat-datacenter-storage-make-optimizations-around-locality-unnece">How does FDS (flat datacenter storage) make optimizations around locality unnecessary?</a></p>
+
+<p><a href="https://www.youtube.com/watch?v=YbOjxCxtMpU">Youtube video</a></p>
+</blockquote>
+
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="http://wiesen.github.io/post/Chain-Replication-Paper-Review/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="http://wiesen.github.io/post/Chain-Replication-Paper-Review/">Chain Replication Paper Review</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="http://wiesen.github.io/post/%E5%BE%AE%E8%BD%AF2016%E6%A0%A1%E6%8B%9B%E5%9C%A8%E7%BA%BF%E7%AC%94%E8%AF%95%E9%A2%98%E8%A7%A3/">微软2016校招在线笔试题解</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="http://wiesen.github.io/post/%E5%BE%AE%E8%BD%AF2016%E6%A0%A1%E6%8B%9B%E5%9C%A8%E7%BA%BF%E7%AC%94%E8%AF%95%E9%A2%98%E8%A7%A3/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'yangwj';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="http://wiesen.github.io/js/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-73790691-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

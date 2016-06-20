@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>Chain Replication Paper Review &middot; Wiesen&#39;s Blog</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="http://wiesen.github.io/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="http://wiesen.github.io/img/favicon.ico" type="image/x-icon" />
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+  <a class="pure-menu-heading brand" href="http://wiesen.github.io/">Wiesen</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/about/"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/contact/"><i class='fa fa-phone fa-fw'></i>Contact</a>
+      
+        </li>
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://facebook.com/100010837531785" target="_blank"><i class="fa fa-facebook-square fa-fw"></i>Facebook</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/Wiesen" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+
+<div class="header">
+  <h1>Chain Replication Paper Review</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+    <i class="fa fa-calendar fa-fw"></i>
+    <time>19 Mar 2016, 21:33</time>
+  </div>
+
+  
+
+  
+  
+  
+  <div>
+    <i class="fa fa-folder fa-fw"></i>
+    
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/distributed-system">Distributed System</a>
+    
+  </div>
+  
+  
+
+  
+
+</div>
+
+  
+
+<p>本文是读完 Van Renesse R, Schneider F B. Chain Replication for Supporting High Throughput and Availability[C]//OSDI. 2004. 的总结。</p>
+
+<h2 id="summary">Summary</h2>
+
+<p>Chain replication is a new approach to coordinating clusters of fail-stop storage servers.</p>
+
+<p>Chain replication 采用 ROWAA (read one, write all available) 方法, 具有良好的 Scalability.</p>
+
+<p>该方法目的是, <strong>不以牺牲强一致性为代价来实现高吞吐和高可用</strong>, 从而提供分布式存储服务.</p>
+
+<h2 id="a-storage-service-interface">A Storage Service Interface</h2>
+
+<p><strong>Clients</strong> 发送 query 或 update 操作 request</p>
+
+<p><strong>The storage service</strong> 为每个 request 生成 reply 发送会 client 告知其已经接收或已经处理完成, 从而 client 可以得知某 request 是否接收成功以及是否处理完成.</p>
+
+<p>Client request type:</p>
+
+<ul>
+<li><code>query(objId, opts) -&gt; value</code>: retrieve current value of <em>opts</em> of <em>objId</em></li>
+<li><code>update(objId, newVal, opts) -&gt; value</code>: update <em>opts</em> of <em>objId</em> with <em>newVal</em></li>
+</ul>
+
+<p>Client&rsquo;s view of an object:</p>
+
+<pre><code>State is:
+    Hist[objId]: history of all updates to objId
+    Pending[objId]: set of pending requests for objId
+Transitions are:
+    T1: Client request r arrives: 
+        Pending[objId] += {r}
+    // 一个 client request 接收失败 = server 忽略了该 client request
+    T2: Client request r ∈ Pending[objId] ignored: 
+        Pending[objId] -= {r}
+    T3: Client request r ∈ Pending[objId] processed: 
+        Pending[objId] -= {r}
+        if r = query(objId, opts) then 
+            reply according options opts based on Hist[objId]
+        else if r = update(objId, newVal, opts) then
+            Hist[objId] := Hist[objId] · r
+            reply according options opts based on Hist[objId]
+</code></pre>
+
+<h2 id="chain-replication-protocol">Chain Replication Protocol</h2>
+
+<p><strong>1. Assumptions: 所有服务器均假设为 fail-stop</strong></p>
+
+<ul>
+<li>each server halts in response to a failure</li>
+<li>a server’s halted state can be detected by the environment</li>
+</ul>
+
+<p><strong>2. Protocol Details</strong></p>
+
+<p>在 chain replication 中, 所有 servers 根据 <em>objID</em> 线性排列从而组成一个链表.
+<img src="http://7vij5d.com1.z0.glb.clouddn.com/the%20chain.png" width="400"/></p>
+
+<ul>
+<li>所有 update 操作由 HEAD 结点接收并开始处理, 然后按照FIFO顺序向链表中的下一个节点传递, 直到该 update 操作被 TAIL 节点处理.</li>
+<li>所有 query 操作由 TAIL 结点接收并处理.</li>
+<li>所有 query 操作 / update 操作的确认由 TAIL 结点处理 (即发送 reply 给 client).
+<br /></li>
+</ul>
+
+<p><strong>3. Coping with Server Failures</strong></p>
+
+<p>论文中构建一个 <em>master</em> server, 其主要功能如下 (为区分本文将其余负责数据存储的 server 称为 <em>data</em> server):</p>
+
+<ul>
+<li>检测其余 <em>data</em> servers 的失败</li>
+<li>在链表新增或删除节点时, 通知 <em>data</em> servers 更新 predecessor 及 successor</li>
+<li>告知 client 链表的 HEAD 节点和 TAIL 节点</li>
+</ul>
+
+<p>论文中假设 <em>master</em> server 永不崩溃。而实际上该论文的 prototype 利用 Paxos 协调 <em>master</em> server 的各个 replicas 从而 behave in aggregate like a single process that does not fail, 以此避免单点故障.</p>
+
+<p>下面仅讨论 <em>data</em> server 故障, 即如何在链表中的节点出现故障时保证存储服务的强一致性.主要分为以下头节点, 尾节点和中间节点三种情况.</p>
+
+<p>论文中阐述了两个性质:</p>
+
+<ul>
+<li><strong>Update Propagation Invariant (更新传递不变性)</strong>. 意即对于编号 <em>i</em> 和 <em>j</em>, 若有: <img src="http://latex.codecogs.com/gif.latex?i%20%5Cle%20j" alt="fomula" /> (例如 <em>i</em> 是 <em>j</em> 的 predecessor), 则有:  successor 的 update 操作序列 是 predecessor 的前缀 —— <img src="http://latex.codecogs.com/gif.latex?Hist%5Ej_%7BobjID%7D%20%5Cpreceq%20Hist%5Ei_%7BobjID%7D" alt="fomula" /> (该性质根据链表节点间 update 操作由 FIFO 传递得出)</li>
+<li><strong>Inprocess Requests Invariant (上下文请求不变性)</strong>. 每个 server <em>i</em> 维护一个列表 <img src="http://www.forkosh.com/mathtex.cgi?Sent_i}">, 其中存储着 server <em>i</em> 已经处理并传递给 successor 节点但可能未被 tail 节点处理的 update requests. 当 tail 节点处理了一个 update request <em>r</em> 后会发送确认 <em>ack&reg;</em> 给 predecessor, server <em>i</em> 接收 <em>ack&reg;</em> 后将 <em>r</em> 从 <img src="http://www.forkosh.com/mathtex.cgi?Sent_i}"> 中删除, 然后依次向前传递. 据此, 若有: <img src="http://latex.codecogs.com/gif.latex?Hist%7B%5Ei_%7BobjID%7D%7D%20%3D%20Hist%7B%5Ej_%7BobjID%7D%7D%20%5Coplus%20Sent_i" alt="fomula" /> (根据 tail 节点接收到的 request 必定已被其所有 predecessors 接收到这一事实得出)</li>
+</ul>
+
+<p><strong>Head 节点故障停止</strong>: 将 Head 节点从链表中移除, 其 successor 节点称为新的 Head 节点. 旧 Head 节点已经传递的 update 操作继续传递, 而丢失的 update 操作可视为 server 忽略了该 update (如前所述等同于server 接收该 client request 失败), 因此对应的 client request 将无法接收到 reply, 此时 client 会 resend request. 不影响存储服务的强一致性.</p>
+
+<p><strong>Tail 节点故障停止</strong>: 将 Tail 节点从链表中移除, 其前继 Tail- 节点称为新的 Tail 节点. 由于 <img src="http://latex.codecogs.com/gif.latex?Tail%5E-%20%3C%20Tail%20%5Cto%20Hist%7B%5E%7Btail%7D_%7BobjID%7D%7D%20%5Cpreceq%20Hist%7B%5E%7BTail%5E-%7D_%7BobjID%7D%7D" alt="fomula" />, 从用户的角度看即数据变新变多了, 因此并不影响存储服务的读一致性.</p>
+
+<p><strong>中间节点故障停止</strong>: 将故障节点 S 从链表中移除, 然后 <em>master</em> server 首先通知故障节点的后继 S+ 节点新的链表配置, 然后通知前继 S- 节点连接后继 S+ 节点并要求其处理 <img src="http://www.forkosh.com/mathtex.cgi?Sent^-}"> 中的 update request, 后序 update 操作继续传递下去, 因此也不影响存储服务的强一致性.</p>
+
+<p><strong>扩展链表</strong>: 当越来越多故障节点被移除, 链表将会缩短, 同时容错性下降.因此当链表变短时应当向链表中添加新的 servers. 理论上可以在链表的任何位置添加新 server, 但最简单的方法是在结尾添加 T+ 节点. 首先 T+ 通过复制 <img src="http://www.forkosh.com/mathtex.cgi? Hist{^T_{objID}}"> 到 <img src="http://www.forkosh.com/mathtex.cgi? Hist{^{T^+}_{objID}}"> 完成初始化, 然后 T+ 节点一边处理由 T 节点 forward 过来的 query request 一边处理 <img src="http://www.forkosh.com/mathtex.cgi?Sent^T}">, 最后 T+ 正式作为新的 tail 节点.</p>
+
+<h2 id="comparision-to-primary-backup-protocols">Comparision to Primary/Backup Protocols</h2>
+
+<p>Chain replication 是 primary/backup 方法的一种改进, 实际上是一种副本管理的状态机方法.</p>
+
+<p>在 primary/backup 方法中, 有一个 <em>primary</em> server, 负责序列化 client requests (从而保证强一致性), 然后将序列化的 client requests 或 resulting updates 分散发送到各个 <em>backup</em> servers, 等待接收非故障 <em>backups</em> 的确认信息, 最后发送 reply 给 client. 当 <em>primary</em> server 故障停止, 其中一个 <em>backup</em> server 将提升为 <em>primary</em> server.</p>
+
+<p>相比 primary/backup 方法, Chain replication 的不同如下:</p>
+
+<ul>
+<li>client requests 由两个 replicas 处理, 即 head 节点负责序列化处理 update request, tail 节点并行处理 query requests, 降低了 query requests 的 latency.</li>
+<li>Chain replication 只能串行传递 update requests, 因此发送 reply 的 latency 与 the sum of server latencies 成比例.</li>
+</ul>
+
+<p>当出现 server 故障停止时, Chain replication 和 primary/backup 方法的主要时延都是检测 server failure, 其次是 recovery.</p>
+
+<h2 id="simulation-experiments">Simulation Experiments</h2>
+
+<p>论文在四种情况下进行实验:</p>
+
+<ul>
+<li>Single Chain, No Failures</li>
+<li>Multiple Chains, No Failures</li>
+<li>Effects of Failures on Throughput</li>
+<li>Large Scale Replication of Critical Data</li>
+</ul>
+
+<h2 id="additional-application">Additional: Application</h2>
+
+<p>在 <a href="https://www.usenix.org/legacy/events/usenix09/tech/full_papers/terrace/terrace.pdf">CRAQ</a> 论文中介绍了基于 chain replication 的 CRAQ 系统, 该系统扩展了 chain replication protocol, 使链表上的所有节点均可处理 query 操作, 提高系统的吞吐, 同时仍然提供强一致性保证.</p>
+
+<p>微软云计算平台 <a href="http://sigops.org/sosp/sosp11/current/2011-Cascais/printable/11-calder.pdf">Windows Azure</a>、<a href="http://sigops.org/sosp/sosp11/current/2011-Cascais/printable/11-calder.pdf">FDS</a> 都使用 chain replication protocol 提供强一致性保证.</p>
+
+<hr />
+
+<p><strong>Reference</strong></p>
+
+<blockquote>
+<p><a href="https://www.youtube.com/watch?v=nEbD-qutsKo">https://www.youtube.com/watch?v=nEbD-qutsKo</a></p>
+
+<p><a href="http://blog.csdn.net/yfkiss/article/details/13772669">http://blog.csdn.net/yfkiss/article/details/13772669</a></p>
+
+<p><a href="http://blog.xiaoheshang.info/?p=883">http://blog.xiaoheshang.info/?p=883</a></p>
+</blockquote>
+
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="http://wiesen.github.io/post/%E5%BF%AB%E9%80%9F%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="http://wiesen.github.io/post/%E5%BF%AB%E9%80%9F%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/">快速排序笔记</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="http://wiesen.github.io/post/Flat-Datacenter-Storage-Paper-Review/">Flat Datacenter Storage Paper Review</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="http://wiesen.github.io/post/Flat-Datacenter-Storage-Paper-Review/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'yangwj';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="http://wiesen.github.io/js/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-73790691-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

@@ -1,0 +1,723 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Distributed System on Wiesen&#39;s Blog</title>
+    <link>http://wiesen.github.io/topics/distributed-system/</link>
+    <description>Recent content in Distributed System on Wiesen&#39;s Blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2016. All rights reserved.</copyright>
+    <lastBuildDate>Fri, 10 Jun 2016 21:32:46 +0800</lastBuildDate>
+    <atom:link href="http://wiesen.github.io/topics/distributed-system/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>MIT 6.824 lab2 Raft Consensus Algorithm Implementation</title>
+      <link>http://wiesen.github.io/post/MIT-6.824-lab2-Raft-Consensus-Algorithm-Implementation/</link>
+      <pubDate>Fri, 10 Jun 2016 21:32:46 +0800</pubDate>
+      
+      <guid>http://wiesen.github.io/post/MIT-6.824-lab2-Raft-Consensus-Algorithm-Implementation/</guid>
+      <description>
+
+&lt;p&gt;Raft 将一致性问题分为了三个相对独立的子问题，分别是：&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Leader election&lt;/strong&gt;：当前 leader 崩溃时，集群中必须选举出一个新的 leader；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Log replication&lt;/strong&gt;：leader 必须接受来自 clients 的 log entries，并且将其 replicate 到集群机器中，强制其余 logs 与其保持一致；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Safety&lt;/strong&gt;：Raft 中最关键的 safety property 是 State Machine Safety Property，亦即是，当任一机器 apply 了某一特定 log entry 到其 state machine 中，则其余服务器都不可能 apply 了一个 index 相同但 command 不同的 log。&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;差不多依据上述划分，6.824 中 Raft 的实现指导逻辑还是挺清晰的，其中 safety property 由 Leader election 和 Log replication 共同承担，并且将 Persistence 作为最后一部分。实现过程主要分为：&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Leader Election and Heartbeats：首先令 Raft 能够在不存在故障的情景下选举出一个 leader，并且稳定保持状态；&lt;/li&gt;
+&lt;li&gt;Log Replication：其次令 Raft 能够保持一个 consistent 并且 replicated 的 log；&lt;/li&gt;
+&lt;li&gt;Persistence：最后令 Raft 能够持久化保存 persistent state，这样在重启后可以进行恢复。&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;其中，本文主要参考 Raft paper，其中的 &lt;strong&gt;figure 2&lt;/strong&gt; 作用很大。本文实现&lt;strong&gt;大量依赖 channel 实现消息传递和线程同步&lt;/strong&gt;。&lt;/p&gt;
+
+&lt;p&gt;仍然存在&lt;strong&gt;少量 bug&lt;/strong&gt;，主要是 fail to pass unreliable test case，有待继续优化（主要是分布式调试无从下手）。&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&#34;https://github.com/Wiesen/MIT-6.824/blob/master/2016/raft/raft.go&#34;&gt;Code Link&lt;/a&gt;&lt;/p&gt;
+
+&lt;h2 id=&#34;leader-election-and-heartbeat&#34;&gt;Leader Election and Heartbeat&lt;/h2&gt;
+
+&lt;p&gt;实现 Leader Election，主要是需要完成以下三个功能：&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Role Transfer：state machine &amp;amp; election timer&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;首先实现 Raft 的 sate machine，所有 server 都应当在初始化 Raft peer 时开启一个单独的线程来维护状态，令其在 Follower，Candidate，Leader 三个状态之间进行转换。&lt;/p&gt;
+
+&lt;p&gt;有一点&lt;strong&gt;注意&lt;/strong&gt;的是，&lt;code&gt;nextIndex[]&lt;/code&gt; 和 &lt;code&gt;matchindex[]&lt;/code&gt; 需要在 election 后进行 reinitialize。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;func (rf *Raft) changeRole(role Role) {
+    rf.mu.Lock()
+    defer rf.mu.Unlock()
+    rf.role = role
+    switch rf.role {
+    case Leader:
+        rf.reinitialize()    // reinitialized after election
+        go rf.runAsLeader()
+    case Candidate:
+        go rf.runAsCandidate()
+    case Follower:
+        go rf.runAsFollower()
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;此外，定时器 election timer 的作用十分关键，所有 server 都应当在初始化 Raft peer 时开启一个单独的线程来维护 election timer。&lt;/p&gt;
+
+&lt;p&gt;当 election timer 超时时，机器将会转换至 Candidate 状态。另外在以下三种情况下将会 reset 定时器：收到合法的 heartbeat message；投票给除自身以外的 candidate；自身启动election（本文视为转换为 Candidate 状态）。&lt;/p&gt;
+
+&lt;p&gt;同样有一点需要注意，需要确保不同机器上的 timer 异步，也就是不会同时触发，否则所有机器都会自投票导致无法选举 leader。在 golang 中通过以时间作为种子投入到随机发生器中：&lt;code&gt;rand.Seed(time.Now().UnixNano())&lt;/code&gt;&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;func (rf *Raft) startElectTimer() {
+    floatInterval := int(RaftElectionTimeoutHigh - RaftElectionTimeoutLow)
+    timeout := time.Duration(rand.Intn(floatInterval)) + RaftElectionTimeoutLow
+    electTimer := time.NewTimer(timeout)
+    for {
+        select {
+        case &amp;lt;- rf.chanHeartbeat: // received valid heartbeat message
+            rf.resetElectTimer(electTimer)
+        case &amp;lt;- rf.chanGrantVote: // voted for other server 
+            rf.resetElectTimer(electTimer)
+        case &amp;lt;-electTimer.C:      // fired election  
+            rf.chanRole &amp;lt;- Candidate
+            rf.resetElectTimer(electTimer)
+        }
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;RequstVote RPC 的 sender 和 handler&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;完成 Raft 的 sate machine后，开始实现 Raft 中的 RequestVote 操作，使得能够选举出一个 leader。&lt;/p&gt;
+
+&lt;p&gt;机器处于 Candidate 状态时应当启动 election：&lt;code&gt;currentTerm++&lt;/code&gt; -&amp;gt; &lt;code&gt;votedFor = me&lt;/code&gt; -&amp;gt; &lt;code&gt;sendRequestVote()&lt;/code&gt;。其中 &lt;code&gt;sendRequestVote()&lt;/code&gt; 应当异步，也就是并发给其余机器发送 RequstVote。&lt;/p&gt;
+
+&lt;p&gt;当出现以下情况，当前 election 过程终结：&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;获得大多数机器的投票 -&amp;gt; 转换为 Leader 状态；&lt;/li&gt;
+&lt;li&gt;接受到的 reply 中 &lt;code&gt;term T &amp;gt; currentTerm&lt;/code&gt; -&amp;gt; 更新 &lt;code&gt;currentTerm&lt;/code&gt;，转换为 Follower 状态；&lt;/li&gt;
+&lt;li&gt;election timer 超时 -&amp;gt; 终结当前 election，并且启动新一轮 election，保持 Candidate 状态；
+&lt;br /&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;一个机器接收到 RequstVote RPC，需要决定是否投票：&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;如果 RequstVote RPC 中的 &lt;code&gt;term T &amp;lt; currentTerm&lt;/code&gt;，直接返回 false 拒绝投票即可；&lt;/li&gt;
+&lt;li&gt;如果 RequstVote RPC 中的 &lt;code&gt;term T &amp;gt; currentTerm&lt;/code&gt;，则需要更新 &lt;code&gt;currentTerm&lt;/code&gt;，转换为 Follower 状态；&lt;/li&gt;
+&lt;li&gt;如果该机器在 &lt;code&gt;currentTerm&lt;/code&gt; 已经投票，则直接返回 false 拒绝投票；&lt;/li&gt;
+&lt;li&gt;否则在满足 &amp;ldquo;Candidate&amp;rsquo;s log is at least as up-to-date as receiver&amp;rsquo;s log&amp;rdquo; 时返回 true 投票，并且 reset election timeout；
+&lt;br /&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;所谓 &lt;strong&gt;“up-to-date”&lt;/strong&gt; 简单来说就是：比较两个 log 中的最后一条 entry 的 &lt;code&gt;index&lt;/code&gt; 和 &lt;code&gt;term&lt;/code&gt;：&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;当两个 log 的最后一条 entry 的 term 不同，则 &lt;strong&gt;later&lt;/strong&gt; term is more up-to-date；&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;当两个 log 的最后一条 entry 的 term 相同，则 whichever log is &lt;strong&gt;longer&lt;/strong&gt; is more up-to-date&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;// RequestVote RPC handler.
+func (rf *Raft) RequestVote(args RequestVoteArgs, reply *RequestVoteReply) {
+  if rf.currentTerm &amp;gt; args.Term {
+    reply.Term = rf.currentTerm
+        reply.VoteGranted = false
+    return
+  }
+  if rf.currentTerm &amp;lt; args.Term {
+    rf.currentTerm = args.Term
+    rf.votedFor = -1
+    rf.chanRole &amp;lt;- Follower
+  }
+  reply.Term = args.Term
+  if rf.votedFor != -1 &amp;amp;&amp;amp; rf.votedFor != args.CandidateId {
+    reply.VoteGranted = false
+  } else if rf.logTable[len(rf.logTable)-1].Term &amp;gt; args.LastLogTerm {
+    reply.VoteGranted = false   //! different term
+  } else if len(rf.logTable)-1 &amp;gt; args.LastLogIndex &amp;amp;&amp;amp; rf.logTable[len(rf.logTable)-1].Term == args.LastLogTerm { 
+    reply.VoteGranted = false   //! same term but different index
+  }else {
+    reply.VoteGranted = true
+    rf.votedFor = args.CandidateId
+    rf.chanGrantVote &amp;lt;- true
+  }
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Heartbeat 的 sender 和 handler&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;最后实现 Raft 中的 Heartbeat 操作，能够令 Leader 稳定保持状态。&lt;/p&gt;
+
+&lt;p&gt;机器处于 Leader 状态时应当启动 heartbeat，而其实际上就是不含 log entry 的 AppendEntries（只需要检测某一机器的 log 是否最新）。&lt;/p&gt;
+
+&lt;p&gt;其中 &lt;code&gt;sendHeartbeat()&lt;/code&gt; 应当异步，也就是并发给其余机器发送 heartbeat。每一个 heartbeat 线程利用 timer 来周期性地触发操作。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;func (rf *Raft) sendHeartbeat(server int) {
+    for rf.getRole() == Leader {
+                rf.doAppendEntries(server)  // later explain in Log Replication
+                heartbeatTimer.Reset(RaftHeartbeatPeriod)
+                &amp;lt;-heartbeatTimer.C
+        }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;一个机器接收到不含 log entry 的 AppendEntries RPC（也就是 heartbeat）时，需要决定是否更新自身的 term 和 leaderId：&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;如果 AppendEntries RPC 中的 &lt;code&gt;term T &amp;lt; currentTerm&lt;/code&gt;，则 reply 中返回 &lt;code&gt;currentTerm&lt;/code&gt; 让发送方更新；&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;如果 RequstVote RPC 中的 &lt;code&gt;term T &amp;gt; currentTerm&lt;/code&gt;，则需要更新 &lt;code&gt;currentTerm&lt;/code&gt; 和 &lt;code&gt;leaderId&lt;/code&gt;，转换为 Follower 状态，并且 reset election timeout；&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;// temporary AppendEntries RPC handler.
+func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply) {
+if args.Term &amp;lt; rf.currentTerm {
+    reply.Term = rf.currentTerm
+    reply.Success = false
+    return
+}
+//! update current term and only one leader granted in one term
+if rf.currentTerm &amp;lt; args.Term {
+    rf.currentTerm = args.Term
+    rf.votedFor = -1
+    rf.leaderId = args.LeaderId
+    rf.chanRole &amp;lt;- Follower
+}
+rf.chanHeartbeat &amp;lt;- true
+reply.Term = args.Term
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;log-replication&#34;&gt;Log Replication&lt;/h2&gt;
+
+&lt;p&gt;完成了 Leader election 后，下一步是令 Raft 保持一个 consistent 并且 replicated 的 log。&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;AppendEntries RPC sender&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;在 Raft 中，只有 leader 允许添加 log，并且通过发送含有log 的 AppendEntries RPC 给其余机器令其 log 保持一致。&lt;/p&gt;
+
+&lt;p&gt;除了 heartbeat 时会发送 AppendEntries RPC 外，当 Leader 收到 client 的 Request 后也有进行 replica 操作，同样是异步并发提升性能。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;func (rf *Raft) Replica() {
+// replica log
+for server := range rf.peers {
+    if server != rf.me {
+        go rf.doAppendEntries(server)
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;接下来主要是 &lt;code&gt;doAppendEntries(server int)&lt;/code&gt; 的实现细节。&lt;/p&gt;
+
+&lt;p&gt;当 Leader 的 log 比某 server 长时，亦即是 &lt;code&gt;len(rf.logTable) - 1 &amp;gt;= rf.nextIndex[server]&lt;/code&gt;，则需要发送 entry，并且直到该 server&amp;rsquo;s log has caught up leader&amp;rsquo;s log。&lt;/p&gt;
+
+&lt;p&gt;有一点要&lt;strong&gt;注意&lt;/strong&gt;的是：Leader 在对某 server 进行上述的连续发送时间或者等待 reply 的时间可能会大于 heartbeat timeout，因此触发 AppendEntries RPC；或者在上述时间内 client 向 Leader 提交了新的 log，这时候再次触发了 AppendEntries RPC。然而 Leader 本身已经在向该 server 发送 AppendEntries RPC，这时候对该 server 进行 heartbeat 是多余的。&lt;/p&gt;
+
+&lt;p&gt;本文检测 Leader 是否在向某 server 发送 AppendEntries RPC，若是则直接退出不再重复操作。这里设计为 Leader 为每一 server 维护一个带有&lt;strong&gt;一个缓存&lt;/strong&gt;的 channel，要对某 server 进行 AppendEntries RPC 必须先 read channel。&lt;/p&gt;
+
+&lt;p&gt;最后如果 RPC failed 则直接退出，否则收到 AppendEntries RPC 的 reply 时：&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;首先判断是否 &lt;code&gt;reply.Term &amp;gt; args.Term&lt;/code&gt;，若是则 Leader 需要更新自身 currentTerm，并且转换为 Follower 状态。&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;接着如果 args 中带有 log entry，则 &lt;code&gt;reply.Success&lt;/code&gt; 会指示是否添加成功。如果成功则更新 &lt;code&gt;rf.matchIndex[server]&lt;/code&gt; 和 &lt;code&gt;rf.nextIndex[server]&lt;/code&gt;；否则 &lt;code&gt;rf.nextIndex[server]--&lt;/code&gt; 直至等于 &lt;code&gt;rf.matchIndex[server]&lt;/code&gt;（后续优化）。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;func (rf *Raft) doAppendEntries(server int) {
+    select {
+    case &amp;lt;- rf.chanAppend[server]:
+    default:return
+    }
+    isAppend := true
+    for isAppend &amp;amp;&amp;amp; rf.getRole() == Leader {
+        var args AppendEntriesArgs
+        // Set the basic arguments of arg
+        ...
+        if (len(rf.logTable) - 1 &amp;gt;= rf.nextIndex[server]) {
+            args.Entries = append(args.Entries, rf.logTable[rf.nextIndex[server]])
+        } else {
+            isAppend = false
+        }
+        // Copy with reply
+        var reply AppendEntriesReply
+        if rf.sendAppendEntries(server, args, &amp;amp;reply) {
+            if reply.Term &amp;gt; args.Term {
+                rf.currentTerm = args.Term
+                rf.votedFor = -1
+                rf.chanRole &amp;lt;- Follower
+                break
+            }
+            if isAppend {
+                if reply.Success {
+                    rf.matchIndex[server] = rf.nextIndex[server]
+                    rf.nextIndex[server]++
+                } else {
+                    // later explain in AppendEntries RPC optimization
+                    if reply.FailIndex &amp;gt; rf.matchIndex[server] {
+                      rf.nextIndex[server] = reply.FailIndex
+                    } else {
+                        rf.nextIndex[server] = rf.matchIndex[server] + 1
+                    }     
+                }
+            }
+        } else {
+            break
+        }
+    }
+    rf.chanAppend[server] &amp;lt;- true
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;AppendEntries RPC handler&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;一个机器接收到含有 log entry 的 AppendEntries RPC，前一部分跟处理 heartbeat 一样，剩下的部分则是决定是否更新自身的 log。&lt;/p&gt;
+
+&lt;p&gt;剩下根据 Raft paper 中的 figure 2 按部就班实现就好了 【好像并没有什么值得特别提的……&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;AppendEntries RPC optimization&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;这一部分主要是优化 AppendEntries RPC，当发生拒绝 append 时减少 master 需要发送 RPC 的次数。虽然 Raft paper 中怀疑这个优化操作是否有必要，但 lab2 中有些 unreliable test case 偏偏需要你实现这个优化操作……&lt;/p&gt;
+
+&lt;p&gt;首先需要在 struct AppendEntriesReply 中添加两个数据：&lt;code&gt;FailIndex int, FailTerm int&lt;/code&gt;，分别用于指示 conflicting entry 所在 term 以及在该 term 中存储的 first index；&lt;/p&gt;
+
+&lt;p&gt;在 handler 的优化如下：如果 log unmatched，首先记录 &lt;code&gt;FailTerm&lt;/code&gt;，然后从当前 conflicting entry 开始向前扫描，直到到达前一个 term，记录下 &lt;code&gt;FailIndex&lt;/code&gt;；&lt;/p&gt;
+
+&lt;p&gt;在 sender 的优化如下：当 append 失败时，如果 &lt;code&gt;FailIndex &amp;gt; matchIndex[server]&lt;/code&gt;，则 &lt;code&gt;nextIndex[server]&lt;/code&gt; 直接退至 &lt;code&gt;FailIndex&lt;/code&gt;，减少了需要尝试 append 的 RPC 次数；否则 &lt;code&gt;nextIndex[server]&lt;/code&gt; 退回到 &lt;code&gt;matchIndex[server] + 1&lt;/code&gt;。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;STEP 4. Apply committed entries to local service replica&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;对于 Leader 而言，需要不断检测当前 term 的 log entry 的 replica 操作是否完成，然后进行 commit 操作。&lt;/p&gt;
+
+&lt;p&gt;当超过半数的机器已经完成 replica 操作，则 Leader 认为该条 log entry 可以 commit。&lt;/p&gt;
+
+&lt;p&gt;一旦当前 term 的某条 log entry L 是通过上述方式 commit 的，则根据 Raft 的 &lt;strong&gt;Log Matching Property&lt;/strong&gt;，Leader 可以 commit 先于 L 添加到 log 的所有 entry。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;func (rf *Raft) updateLeaderCommit() {
+    oldIndex := rf.getCommitIndex()
+    newIndex := oldIndex
+    for i := len(rf.logTable)-1; i&amp;gt;oldIndex &amp;amp;&amp;amp; rf.logTable[i].Term==rf.getCurrentTerm(); i-- {
+        countServer := 1
+        for server := range rf.peers {
+            if server != rf.me &amp;amp;&amp;amp; rf.matchIndex[server] &amp;gt;= i {
+                countServer++
+            }
+        }
+        if countServer &amp;gt; len(rf.peers) / 2 {
+            newIndex = i
+            break
+        }
+    }
+    if oldIndex == newIndex {
+        return
+    }
+    //! update the log added in previous term
+    for i := oldIndex + 1; i &amp;lt;= newIndex; i++ {
+        rf.chanCommitted &amp;lt;- ApplyMsg{Index:i, Command:rf.logTable[i].Command}
+    }
+    rf.setCommitIndex(newIndex)
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;对于 Follower 而言，只需要根据 AppendEntries RPC 中的 &lt;code&gt;leaderCommit&lt;/code&gt; 值及其自身的 &lt;code&gt;commitIndex&lt;/code&gt; 值，然后 commit 之中的 entry 即可。&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;persistence&#34;&gt;Persistence&lt;/h2&gt;
+
+&lt;p&gt;最后一步是持久化保存 persistent state，不过在 lab2 仅是通过 &lt;code&gt;persister&lt;/code&gt; object 来保存，并没有真正使用到磁盘。实现了这一部分后可以稳定地 pass 掉关于 Persist 的 test case。&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Read persist&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;在 Make Raft peer 时读取 persister。&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Write persist&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;修改了 Raft 的 persistent state 后应当及时写至 persister，主要是在以下几个地方插入 write：&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;启动了 election 修改了自身的 persistent state后；&lt;/li&gt;
+&lt;li&gt;受到了 RequestVote RPC 和 AppendEntries RPC 的 reply，得知需要更新自身的 persistent state 后；&lt;/li&gt;
+&lt;li&gt;RequestVote RPC handler 和 AppendEntries RPC handler 处理完毕后；&lt;/li&gt;
+&lt;li&gt;Leader 收到 client 的请求命令，添加到自身的 log 后。&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;defect&#34;&gt;Defect&lt;/h2&gt;
+
+&lt;p&gt;本文还有些不足，有待后续优化。主要是&lt;strong&gt;不能稳定地&lt;/strong&gt; pass &lt;code&gt;TestUnreliableAgree()&lt;/code&gt; + &lt;strong&gt;不能&lt;/strong&gt; pass &lt;code&gt;TestFigure8Unreliable()&lt;/code&gt;&lt;/p&gt;
+
+&lt;p&gt;To Be Continue&amp;hellip;&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Flat Datacenter Storage Paper Review</title>
+      <link>http://wiesen.github.io/post/Flat-Datacenter-Storage-Paper-Review/</link>
+      <pubDate>Wed, 30 Mar 2016 21:33:37 +0800</pubDate>
+      
+      <guid>http://wiesen.github.io/post/Flat-Datacenter-Storage-Paper-Review/</guid>
+      <description>
+
+&lt;p&gt;A review for paper Nightingale E B, Elson J, Fan J, et al. Flat datacenter storage[C]//Presented as part of the 10th USENIX Symposium on Operating Systems Design and Implementation (OSDI 12). 2012: 1-15.&lt;/p&gt;
+
+&lt;h1 id=&#34;introduction&#34;&gt;Introduction&lt;/h1&gt;
+
+&lt;p&gt;What is FDS?&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Flat Datacenter Storage (FDS) is a high-performance, fault-tolerant, large-scale, &lt;strong&gt;locality-oblivious&lt;/strong&gt; blob store.&lt;/li&gt;
+&lt;li&gt;Using a novel combination of &lt;strong&gt;full bisection bandwidth networks&lt;/strong&gt;, &lt;strong&gt;data and metadata striping&lt;/strong&gt;, and** flow control**, FDS multiplexes an application’s large-scale I/O across the available throughput and latency budget of every disk in a cluster.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;How is the Performance?&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;2 GByte/sec per client.&lt;/li&gt;
+&lt;li&gt;Recover from lost disk (92 GB) in 6.2 seconds.&lt;/li&gt;
+&lt;li&gt;It sets the world-record for disk-to-disk sorting in 2012 for MinuteSort: 1,033 disks and 256 computers (136 tract servers, 120 clients), 1,401 Gbyte in 59.4s.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h1 id=&#34;architecture&#34;&gt;Architecture&lt;/h1&gt;
+
+&lt;p&gt;High-level design &amp;ndash; a common pattern&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/fds-flat.png&#34; alt=&#34;comparison&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Right distributed model - GFS &amp;amp; HDFS: Data is either on a local disk or a remote disk.&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Move the computation to data. Location awareness adds &lt;strong&gt;complexity&lt;/strong&gt;.&lt;/li&gt;
+&lt;li&gt;Why move? Because remote data access is slow.&lt;/li&gt;
+&lt;li&gt;Why slow? Because the network is oversubscribed.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Left distributed model &amp;ndash; FDS: Object storage assuming no oversubscription. Data is &lt;em&gt;all&lt;/em&gt; remote.&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Separates the storage from computation.&lt;/li&gt;
+&lt;li&gt;No local vs. remote disk distinction&lt;/li&gt;
+&lt;li&gt;simpler work schedulers&lt;/li&gt;
+&lt;li&gt;simpler programming models&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/fds-architectures.png&#34; alt=&#34;architecture&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Above it&amp;rsquo;s the architecture of FDS:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Lots of clients, and lots of storage servers (&amp;ldquo;tractservers&amp;rdquo;)&lt;/li&gt;
+&lt;li&gt;Partition the data, and master (&amp;ldquo;metadata server&amp;rdquo;) controls partitioning&lt;/li&gt;
+&lt;li&gt;Replica groups for reliability&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h1 id=&#34;deisign-overview&#34;&gt;Deisign Overview&lt;/h1&gt;
+
+&lt;h2 id=&#34;how-to-store-data-blobs-and-tracts&#34;&gt;How to store data? &amp;ndash; Blobs and Tracts&lt;/h2&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;Data is logically stored in blobs.&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;A blob is a byte sequence named with a 128-bit GUID.&lt;/li&gt;
+&lt;li&gt;Blobs can be &lt;em&gt;any length&lt;/em&gt; up to the system’s storage capacity.&lt;/li&gt;
+&lt;li&gt;Blobs are divided into &lt;strong&gt;tracts&lt;/strong&gt;.&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Tracts are the units responsible for read and write&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Tracts are &lt;em&gt;sized&lt;/em&gt; such that random and sequential access achieves nearly the same throughput.&lt;/li&gt;
+&lt;li&gt;The tract size is set when the cluster is created based upon cluster hardware.(64kb~8MB)&lt;/li&gt;
+&lt;li&gt;All tracts’ metadata is &lt;strong&gt;cached in memory&lt;/strong&gt;, eliminating many disk accesses.&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Every disk is managed by a process called a tractserver:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Services read and write requests from clients.&lt;/li&gt;
+&lt;li&gt;Lay out tracts &lt;strong&gt;directly to disk by using the raw disk interface&lt;/strong&gt;.&lt;/li&gt;
+&lt;li&gt;Provides API, and the API features are follow:
+
+&lt;ul&gt;
+&lt;li&gt;Tract reads are not guaranteed to arrive in order of issue. Writes are not guaranteed to be committed in   order of issue.&lt;/li&gt;
+&lt;li&gt;Tractserver writes are &lt;em&gt;atomic&lt;/em&gt;: a write is either committed or failed completely.&lt;/li&gt;
+&lt;li&gt;Calls are &lt;em&gt;asynchronous&lt;/em&gt;: using callback, allows deep pipelining to achieve good performance.&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;Weak&lt;/em&gt; consistency to clients&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;how-to-organize-and-manage-metadata-deterministic-data-placement&#34;&gt;How to organize and manage metadata? &amp;ndash; Deterministic data placement&lt;/h2&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;Many systems solve this problem using a metadata server that stores the location of data blocks.&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Advantage: allowing maximum flexibility of data placement and visibility into the system’s state.&lt;/li&gt;
+&lt;li&gt;Drawbacks: the metadata server is a central point of failure, usually implemented as a replicated state machine.&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;FDS uses a metadata server, but it&amp;rsquo;s role is simple and limited:  &lt;strong&gt;tract locator table&lt;/strong&gt; (&lt;strong&gt;TLT&lt;/strong&gt;):&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;collect a list of the system’s active tractservers and distribute it to clients.&lt;/li&gt;
+&lt;li&gt;With &lt;em&gt;k-way&lt;/em&gt; replication, each entry has the address of &lt;em&gt;k&lt;/em&gt; tractservers.&lt;/li&gt;
+&lt;li&gt;Weighted by disk speed&lt;/li&gt;
+&lt;li&gt;Only update when cluster changes&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Compute a tract index to read or write, which is designed to both be deterministic and produce uniform disk utilization: &lt;em&gt;Tract_Locator&lt;/em&gt; = TLT[(Hash(&lt;em&gt;GUID&lt;/em&gt;) + &lt;em&gt;Tract&lt;/em&gt;) % len(TLT)]&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Hash(&lt;em&gt;GUID&lt;/em&gt;)&lt;/strong&gt;: Randomize blob&amp;rsquo;s tractserver, even if GUIDs aren&amp;rsquo;t random (uses SHA-1)&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;em&gt;Tract&lt;/em&gt;&lt;/strong&gt;: adds tract number outside the hash, so large blobs use all TLT entries uniformly&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Compute a tract index for Blob metadata, which enable to distribute Blob metadata: &lt;em&gt;Tract_Locator&lt;/em&gt; = TLT[(Hash(&lt;em&gt;GUID&lt;/em&gt;) - 1) % len(TLT)]&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;The metadata server isn&amp;rsquo;t a single point failure.&lt;/li&gt;
+&lt;li&gt;Parallelized operation can be servied in parallel by independent tractservers.&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;To summarize, FDS metadata scheme has following properties:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;The metadata server is in the critical path &lt;em&gt;only&lt;/em&gt; when a client process starts.&lt;/li&gt;
+&lt;li&gt;The TLT can be &lt;em&gt;cached long-term&lt;/em&gt;, eliminating all traffic to the metadata server under normal conditions.&lt;/li&gt;
+&lt;li&gt;TLT contains random permutations of the list of tractservers, which make sequential reads and writes parallel.&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;what-kind-of-application-will-will-not-benefic-from-fds-dynamic-work-allocation&#34;&gt;What kind of application will /will not benefic from FDS? &amp;ndash; Dynamic Work Allocation&lt;/h2&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Since &lt;strong&gt;storage and compute are no longer colocated&lt;/strong&gt;, the assignment of work to worker can be done &lt;em&gt;dynamically&lt;/em&gt; at fine granularity &lt;em&gt;during&lt;/em&gt; task execution, which enables FDS to &lt;strong&gt;mitigate stragglers&lt;/strong&gt;.&lt;/li&gt;
+&lt;li&gt;The &lt;strong&gt;best practice&lt;/strong&gt; for FDS applications is to centrally (or, at large scale, hierarchically) give small units of work to each worker as it nears completion of its previous unit.&lt;/li&gt;
+&lt;li&gt;Such a scheme is &lt;strong&gt;not practical&lt;/strong&gt; in systems where the assignment of work to workers is fixed in advance by the requirement that data be resident at a particular worker before the job begins.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h1 id=&#34;replication-and-failure-recovery&#34;&gt;Replication and Failure Recovery&lt;/h1&gt;
+
+&lt;h2 id=&#34;replication&#34;&gt;Replication&lt;/h2&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Serialized Blob operation &lt;em&gt;Create&lt;/em&gt;, &lt;em&gt;Delete&lt;/em&gt;, &lt;em&gt;Extend&lt;/em&gt;: client writes to primary, primary executes a &lt;strong&gt;two-phase commit&lt;/strong&gt; with replicas.&lt;/li&gt;
+&lt;li&gt;Write to &lt;em&gt;all&lt;/em&gt; replicas, read from &lt;em&gt;random&lt;/em&gt; replica&lt;/li&gt;
+&lt;li&gt;Supports per-blob &lt;strong&gt;variable replication&lt;/strong&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&#34;failure-recovery&#34;&gt;Failure recovery&lt;/h2&gt;
+
+&lt;ul&gt;
+&lt;li&gt;each ertry in TLT has a &lt;strong&gt;version number&lt;/strong&gt; to control update, and &lt;em&gt;all&lt;/em&gt; operations as well.&lt;/li&gt;
+&lt;li&gt;Transient failures: &lt;strong&gt;partial failure recovery&lt;/strong&gt; that complete failure recovery or use other replicas to recover the writes that the returning tractserver missed.&lt;/li&gt;
+&lt;li&gt;Cascading tractserver failures: fill more slots in the TLT&lt;/li&gt;
+&lt;li&gt;Concurrent tractserver failures: detected as missing TLT entries, and execute normal failure recovery protocol.&lt;/li&gt;
+&lt;li&gt;Metadata server failures: using Paxos leader election&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&#34;replicated-data-layout&#34;&gt;Replicated data layout&lt;/h2&gt;
+
+&lt;ul&gt;
+&lt;li&gt;The selection of which k disks appear has an important impact on both durability and recovery speed&lt;/li&gt;
+&lt;li&gt;A better TLT has &lt;em&gt;O(n^2)&lt;/em&gt; entries, so each possible pair of disks appears in anentry of the TLT.
+
+&lt;ul&gt;
+&lt;li&gt;First, performance during recovery involves &lt;em&gt;every disk&lt;/em&gt; in the cluster.&lt;/li&gt;
+&lt;li&gt;a triple disk failure within the recovery window has only about a &lt;em&gt;2/n&lt;/em&gt; chance of causing permanent data loss.&lt;/li&gt;
+&lt;li&gt;adding more replicas decreases the probability of data loss.&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&#34;cluster-growth&#34;&gt;Cluster growth&lt;/h2&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Rebalances the assignment of TLT entries so that both existing data and new workloads are uniformly distributed.&lt;/li&gt;
+&lt;li&gt;These assignments happen in two phases (&lt;code&gt;pending&lt;/code&gt; and &lt;code&gt;commits&lt;/code&gt;).&lt;/li&gt;
+&lt;li&gt;If a new tractserver fails while its TLT entries are pending, increments the TLT entry version and expunges it.&lt;/li&gt;
+&lt;li&gt;new tractservers must read from the existing tractserver with a superset of the data required.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h1 id=&#34;networking&#34;&gt;Networking&lt;/h1&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Network bandwidth = disk bandwidth&lt;/li&gt;
+&lt;li&gt;Full bisection bandwidth is stochastic&lt;/li&gt;
+&lt;li&gt;Short flows good for ECMP&lt;/li&gt;
+&lt;li&gt;TCP &lt;em&gt;hates&lt;/em&gt; short flows, but RTS/CTS to mitigate incast&lt;/li&gt;
+&lt;li&gt;FDS works &lt;em&gt;great&lt;/em&gt; for Blob Storate on CLOS networks.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;hr /&gt;
+
+&lt;p&gt;Reference：&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;&lt;a href=&#34;http://www.binospace.com/index.php/flat-datacenter-storage-system-analysis/&#34;&gt;Flat DataCenter Storage之系统分析&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&#34;http://cs.stackexchange.com/questions/23163/how-does-fds-flat-datacenter-storage-make-optimizations-around-locality-unnece&#34;&gt;How does FDS (flat datacenter storage) make optimizations around locality unnecessary?&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&#34;https://www.youtube.com/watch?v=YbOjxCxtMpU&#34;&gt;Youtube video&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Chain Replication Paper Review</title>
+      <link>http://wiesen.github.io/post/Chain-Replication-Paper-Review/</link>
+      <pubDate>Sat, 19 Mar 2016 21:33:09 +0800</pubDate>
+      
+      <guid>http://wiesen.github.io/post/Chain-Replication-Paper-Review/</guid>
+      <description>
+
+&lt;p&gt;本文是读完 Van Renesse R, Schneider F B. Chain Replication for Supporting High Throughput and Availability[C]//OSDI. 2004. 的总结。&lt;/p&gt;
+
+&lt;h2 id=&#34;summary&#34;&gt;Summary&lt;/h2&gt;
+
+&lt;p&gt;Chain replication is a new approach to coordinating clusters of fail-stop storage servers.&lt;/p&gt;
+
+&lt;p&gt;Chain replication 采用 ROWAA (read one, write all available) 方法, 具有良好的 Scalability.&lt;/p&gt;
+
+&lt;p&gt;该方法目的是, &lt;strong&gt;不以牺牲强一致性为代价来实现高吞吐和高可用&lt;/strong&gt;, 从而提供分布式存储服务.&lt;/p&gt;
+
+&lt;h2 id=&#34;a-storage-service-interface&#34;&gt;A Storage Service Interface&lt;/h2&gt;
+
+&lt;p&gt;&lt;strong&gt;Clients&lt;/strong&gt; 发送 query 或 update 操作 request&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;The storage service&lt;/strong&gt; 为每个 request 生成 reply 发送会 client 告知其已经接收或已经处理完成, 从而 client 可以得知某 request 是否接收成功以及是否处理完成.&lt;/p&gt;
+
+&lt;p&gt;Client request type:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;query(objId, opts) -&amp;gt; value&lt;/code&gt;: retrieve current value of &lt;em&gt;opts&lt;/em&gt; of &lt;em&gt;objId&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;update(objId, newVal, opts) -&amp;gt; value&lt;/code&gt;: update &lt;em&gt;opts&lt;/em&gt; of &lt;em&gt;objId&lt;/em&gt; with &lt;em&gt;newVal&lt;/em&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Client&amp;rsquo;s view of an object:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;State is:
+    Hist[objId]: history of all updates to objId
+    Pending[objId]: set of pending requests for objId
+Transitions are:
+    T1: Client request r arrives: 
+        Pending[objId] += {r}
+    // 一个 client request 接收失败 = server 忽略了该 client request
+    T2: Client request r ∈ Pending[objId] ignored: 
+        Pending[objId] -= {r}
+    T3: Client request r ∈ Pending[objId] processed: 
+        Pending[objId] -= {r}
+        if r = query(objId, opts) then 
+            reply according options opts based on Hist[objId]
+        else if r = update(objId, newVal, opts) then
+            Hist[objId] := Hist[objId] · r
+            reply according options opts based on Hist[objId]
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;chain-replication-protocol&#34;&gt;Chain Replication Protocol&lt;/h2&gt;
+
+&lt;p&gt;&lt;strong&gt;1. Assumptions: 所有服务器均假设为 fail-stop&lt;/strong&gt;&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;each server halts in response to a failure&lt;/li&gt;
+&lt;li&gt;a server’s halted state can be detected by the environment&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;&lt;strong&gt;2. Protocol Details&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;在 chain replication 中, 所有 servers 根据 &lt;em&gt;objID&lt;/em&gt; 线性排列从而组成一个链表.
+&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/the%20chain.png&#34; width=&#34;400&#34;/&gt;&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;所有 update 操作由 HEAD 结点接收并开始处理, 然后按照FIFO顺序向链表中的下一个节点传递, 直到该 update 操作被 TAIL 节点处理.&lt;/li&gt;
+&lt;li&gt;所有 query 操作由 TAIL 结点接收并处理.&lt;/li&gt;
+&lt;li&gt;所有 query 操作 / update 操作的确认由 TAIL 结点处理 (即发送 reply 给 client).
+&lt;br /&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;&lt;strong&gt;3. Coping with Server Failures&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;论文中构建一个 &lt;em&gt;master&lt;/em&gt; server, 其主要功能如下 (为区分本文将其余负责数据存储的 server 称为 &lt;em&gt;data&lt;/em&gt; server):&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;检测其余 &lt;em&gt;data&lt;/em&gt; servers 的失败&lt;/li&gt;
+&lt;li&gt;在链表新增或删除节点时, 通知 &lt;em&gt;data&lt;/em&gt; servers 更新 predecessor 及 successor&lt;/li&gt;
+&lt;li&gt;告知 client 链表的 HEAD 节点和 TAIL 节点&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;论文中假设 &lt;em&gt;master&lt;/em&gt; server 永不崩溃。而实际上该论文的 prototype 利用 Paxos 协调 &lt;em&gt;master&lt;/em&gt; server 的各个 replicas 从而 behave in aggregate like a single process that does not fail, 以此避免单点故障.&lt;/p&gt;
+
+&lt;p&gt;下面仅讨论 &lt;em&gt;data&lt;/em&gt; server 故障, 即如何在链表中的节点出现故障时保证存储服务的强一致性.主要分为以下头节点, 尾节点和中间节点三种情况.&lt;/p&gt;
+
+&lt;p&gt;论文中阐述了两个性质:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Update Propagation Invariant (更新传递不变性)&lt;/strong&gt;. 意即对于编号 &lt;em&gt;i&lt;/em&gt; 和 &lt;em&gt;j&lt;/em&gt;, 若有: &lt;img src=&#34;http://latex.codecogs.com/gif.latex?i%20%5Cle%20j&#34; alt=&#34;fomula&#34; /&gt; (例如 &lt;em&gt;i&lt;/em&gt; 是 &lt;em&gt;j&lt;/em&gt; 的 predecessor), 则有:  successor 的 update 操作序列 是 predecessor 的前缀 —— &lt;img src=&#34;http://latex.codecogs.com/gif.latex?Hist%5Ej_%7BobjID%7D%20%5Cpreceq%20Hist%5Ei_%7BobjID%7D&#34; alt=&#34;fomula&#34; /&gt; (该性质根据链表节点间 update 操作由 FIFO 传递得出)&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Inprocess Requests Invariant (上下文请求不变性)&lt;/strong&gt;. 每个 server &lt;em&gt;i&lt;/em&gt; 维护一个列表 &lt;img src=&#34;http://www.forkosh.com/mathtex.cgi?Sent_i}&#34;&gt;, 其中存储着 server &lt;em&gt;i&lt;/em&gt; 已经处理并传递给 successor 节点但可能未被 tail 节点处理的 update requests. 当 tail 节点处理了一个 update request &lt;em&gt;r&lt;/em&gt; 后会发送确认 &lt;em&gt;ack&amp;reg;&lt;/em&gt; 给 predecessor, server &lt;em&gt;i&lt;/em&gt; 接收 &lt;em&gt;ack&amp;reg;&lt;/em&gt; 后将 &lt;em&gt;r&lt;/em&gt; 从 &lt;img src=&#34;http://www.forkosh.com/mathtex.cgi?Sent_i}&#34;&gt; 中删除, 然后依次向前传递. 据此, 若有: &lt;img src=&#34;http://latex.codecogs.com/gif.latex?Hist%7B%5Ei_%7BobjID%7D%7D%20%3D%20Hist%7B%5Ej_%7BobjID%7D%7D%20%5Coplus%20Sent_i&#34; alt=&#34;fomula&#34; /&gt; (根据 tail 节点接收到的 request 必定已被其所有 predecessors 接收到这一事实得出)&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;&lt;strong&gt;Head 节点故障停止&lt;/strong&gt;: 将 Head 节点从链表中移除, 其 successor 节点称为新的 Head 节点. 旧 Head 节点已经传递的 update 操作继续传递, 而丢失的 update 操作可视为 server 忽略了该 update (如前所述等同于server 接收该 client request 失败), 因此对应的 client request 将无法接收到 reply, 此时 client 会 resend request. 不影响存储服务的强一致性.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Tail 节点故障停止&lt;/strong&gt;: 将 Tail 节点从链表中移除, 其前继 Tail- 节点称为新的 Tail 节点. 由于 &lt;img src=&#34;http://latex.codecogs.com/gif.latex?Tail%5E-%20%3C%20Tail%20%5Cto%20Hist%7B%5E%7Btail%7D_%7BobjID%7D%7D%20%5Cpreceq%20Hist%7B%5E%7BTail%5E-%7D_%7BobjID%7D%7D&#34; alt=&#34;fomula&#34; /&gt;, 从用户的角度看即数据变新变多了, 因此并不影响存储服务的读一致性.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;中间节点故障停止&lt;/strong&gt;: 将故障节点 S 从链表中移除, 然后 &lt;em&gt;master&lt;/em&gt; server 首先通知故障节点的后继 S+ 节点新的链表配置, 然后通知前继 S- 节点连接后继 S+ 节点并要求其处理 &lt;img src=&#34;http://www.forkosh.com/mathtex.cgi?Sent^-}&#34;&gt; 中的 update request, 后序 update 操作继续传递下去, 因此也不影响存储服务的强一致性.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;扩展链表&lt;/strong&gt;: 当越来越多故障节点被移除, 链表将会缩短, 同时容错性下降.因此当链表变短时应当向链表中添加新的 servers. 理论上可以在链表的任何位置添加新 server, 但最简单的方法是在结尾添加 T+ 节点. 首先 T+ 通过复制 &lt;img src=&#34;http://www.forkosh.com/mathtex.cgi? Hist{^T_{objID}}&#34;&gt; 到 &lt;img src=&#34;http://www.forkosh.com/mathtex.cgi? Hist{^{T^+}_{objID}}&#34;&gt; 完成初始化, 然后 T+ 节点一边处理由 T 节点 forward 过来的 query request 一边处理 &lt;img src=&#34;http://www.forkosh.com/mathtex.cgi?Sent^T}&#34;&gt;, 最后 T+ 正式作为新的 tail 节点.&lt;/p&gt;
+
+&lt;h2 id=&#34;comparision-to-primary-backup-protocols&#34;&gt;Comparision to Primary/Backup Protocols&lt;/h2&gt;
+
+&lt;p&gt;Chain replication 是 primary/backup 方法的一种改进, 实际上是一种副本管理的状态机方法.&lt;/p&gt;
+
+&lt;p&gt;在 primary/backup 方法中, 有一个 &lt;em&gt;primary&lt;/em&gt; server, 负责序列化 client requests (从而保证强一致性), 然后将序列化的 client requests 或 resulting updates 分散发送到各个 &lt;em&gt;backup&lt;/em&gt; servers, 等待接收非故障 &lt;em&gt;backups&lt;/em&gt; 的确认信息, 最后发送 reply 给 client. 当 &lt;em&gt;primary&lt;/em&gt; server 故障停止, 其中一个 &lt;em&gt;backup&lt;/em&gt; server 将提升为 &lt;em&gt;primary&lt;/em&gt; server.&lt;/p&gt;
+
+&lt;p&gt;相比 primary/backup 方法, Chain replication 的不同如下:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;client requests 由两个 replicas 处理, 即 head 节点负责序列化处理 update request, tail 节点并行处理 query requests, 降低了 query requests 的 latency.&lt;/li&gt;
+&lt;li&gt;Chain replication 只能串行传递 update requests, 因此发送 reply 的 latency 与 the sum of server latencies 成比例.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;当出现 server 故障停止时, Chain replication 和 primary/backup 方法的主要时延都是检测 server failure, 其次是 recovery.&lt;/p&gt;
+
+&lt;h2 id=&#34;simulation-experiments&#34;&gt;Simulation Experiments&lt;/h2&gt;
+
+&lt;p&gt;论文在四种情况下进行实验:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Single Chain, No Failures&lt;/li&gt;
+&lt;li&gt;Multiple Chains, No Failures&lt;/li&gt;
+&lt;li&gt;Effects of Failures on Throughput&lt;/li&gt;
+&lt;li&gt;Large Scale Replication of Critical Data&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&#34;additional-application&#34;&gt;Additional: Application&lt;/h2&gt;
+
+&lt;p&gt;在 &lt;a href=&#34;https://www.usenix.org/legacy/events/usenix09/tech/full_papers/terrace/terrace.pdf&#34;&gt;CRAQ&lt;/a&gt; 论文中介绍了基于 chain replication 的 CRAQ 系统, 该系统扩展了 chain replication protocol, 使链表上的所有节点均可处理 query 操作, 提高系统的吞吐, 同时仍然提供强一致性保证.&lt;/p&gt;
+
+&lt;p&gt;微软云计算平台 &lt;a href=&#34;http://sigops.org/sosp/sosp11/current/2011-Cascais/printable/11-calder.pdf&#34;&gt;Windows Azure&lt;/a&gt;、&lt;a href=&#34;http://sigops.org/sosp/sosp11/current/2011-Cascais/printable/11-calder.pdf&#34;&gt;FDS&lt;/a&gt; 都使用 chain replication protocol 提供强一致性保证.&lt;/p&gt;
+
+&lt;hr /&gt;
+
+&lt;p&gt;&lt;strong&gt;Reference&lt;/strong&gt;&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;&lt;a href=&#34;https://www.youtube.com/watch?v=nEbD-qutsKo&#34;&gt;https://www.youtube.com/watch?v=nEbD-qutsKo&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&#34;http://blog.csdn.net/yfkiss/article/details/13772669&#34;&gt;http://blog.csdn.net/yfkiss/article/details/13772669&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&#34;http://blog.xiaoheshang.info/?p=883&#34;&gt;http://blog.xiaoheshang.info/?p=883&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>MIT 6.824 lab2 Raft Consensus Algorithm Implementation &middot; Wiesen&#39;s Blog</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="http://wiesen.github.io/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="http://wiesen.github.io/img/favicon.ico" type="image/x-icon" />
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+  <a class="pure-menu-heading brand" href="http://wiesen.github.io/">Wiesen</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/about/"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/contact/"><i class='fa fa-phone fa-fw'></i>Contact</a>
+      
+        </li>
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://facebook.com/100010837531785" target="_blank"><i class="fa fa-facebook-square fa-fw"></i>Facebook</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/Wiesen" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+
+<div class="header">
+  <h1>MIT 6.824 lab2 Raft Consensus Algorithm Implementation</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+    <i class="fa fa-calendar fa-fw"></i>
+    <time>10 Jun 2016, 21:32</time>
+  </div>
+
+  
+
+  
+  
+  
+  <div>
+    <i class="fa fa-folder fa-fw"></i>
+    
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/distributed-system">Distributed System</a>
+    
+  </div>
+  
+  
+
+  
+
+</div>
+
+  
+
+<p>Raft 将一致性问题分为了三个相对独立的子问题，分别是：</p>
+
+<ul>
+<li><strong>Leader election</strong>：当前 leader 崩溃时，集群中必须选举出一个新的 leader；</li>
+<li><strong>Log replication</strong>：leader 必须接受来自 clients 的 log entries，并且将其 replicate 到集群机器中，强制其余 logs 与其保持一致；</li>
+<li><strong>Safety</strong>：Raft 中最关键的 safety property 是 State Machine Safety Property，亦即是，当任一机器 apply 了某一特定 log entry 到其 state machine 中，则其余服务器都不可能 apply 了一个 index 相同但 command 不同的 log。</li>
+</ul>
+
+<p>差不多依据上述划分，6.824 中 Raft 的实现指导逻辑还是挺清晰的，其中 safety property 由 Leader election 和 Log replication 共同承担，并且将 Persistence 作为最后一部分。实现过程主要分为：</p>
+
+<ul>
+<li>Leader Election and Heartbeats：首先令 Raft 能够在不存在故障的情景下选举出一个 leader，并且稳定保持状态；</li>
+<li>Log Replication：其次令 Raft 能够保持一个 consistent 并且 replicated 的 log；</li>
+<li>Persistence：最后令 Raft 能够持久化保存 persistent state，这样在重启后可以进行恢复。</li>
+</ul>
+
+<p>其中，本文主要参考 Raft paper，其中的 <strong>figure 2</strong> 作用很大。本文实现<strong>大量依赖 channel 实现消息传递和线程同步</strong>。</p>
+
+<p>仍然存在<strong>少量 bug</strong>，主要是 fail to pass unreliable test case，有待继续优化（主要是分布式调试无从下手）。</p>
+
+<p><a href="https://github.com/Wiesen/MIT-6.824/blob/master/2016/raft/raft.go">Code Link</a></p>
+
+<h2 id="leader-election-and-heartbeat">Leader Election and Heartbeat</h2>
+
+<p>实现 Leader Election，主要是需要完成以下三个功能：</p>
+
+<ol>
+<li><p><strong>Role Transfer：state machine &amp; election timer</strong></p>
+
+<p>首先实现 Raft 的 sate machine，所有 server 都应当在初始化 Raft peer 时开启一个单独的线程来维护状态，令其在 Follower，Candidate，Leader 三个状态之间进行转换。</p>
+
+<p>有一点<strong>注意</strong>的是，<code>nextIndex[]</code> 和 <code>matchindex[]</code> 需要在 election 后进行 reinitialize。</p>
+
+<pre><code>func (rf *Raft) changeRole(role Role) {
+    rf.mu.Lock()
+    defer rf.mu.Unlock()
+    rf.role = role
+    switch rf.role {
+    case Leader:
+        rf.reinitialize()    // reinitialized after election
+        go rf.runAsLeader()
+    case Candidate:
+        go rf.runAsCandidate()
+    case Follower:
+        go rf.runAsFollower()
+    }
+}
+</code></pre>
+
+<p>此外，定时器 election timer 的作用十分关键，所有 server 都应当在初始化 Raft peer 时开启一个单独的线程来维护 election timer。</p>
+
+<p>当 election timer 超时时，机器将会转换至 Candidate 状态。另外在以下三种情况下将会 reset 定时器：收到合法的 heartbeat message；投票给除自身以外的 candidate；自身启动election（本文视为转换为 Candidate 状态）。</p>
+
+<p>同样有一点需要注意，需要确保不同机器上的 timer 异步，也就是不会同时触发，否则所有机器都会自投票导致无法选举 leader。在 golang 中通过以时间作为种子投入到随机发生器中：<code>rand.Seed(time.Now().UnixNano())</code></p>
+
+<pre><code>func (rf *Raft) startElectTimer() {
+    floatInterval := int(RaftElectionTimeoutHigh - RaftElectionTimeoutLow)
+    timeout := time.Duration(rand.Intn(floatInterval)) + RaftElectionTimeoutLow
+    electTimer := time.NewTimer(timeout)
+    for {
+        select {
+        case &lt;- rf.chanHeartbeat: // received valid heartbeat message
+            rf.resetElectTimer(electTimer)
+        case &lt;- rf.chanGrantVote: // voted for other server 
+            rf.resetElectTimer(electTimer)
+        case &lt;-electTimer.C:      // fired election  
+            rf.chanRole &lt;- Candidate
+            rf.resetElectTimer(electTimer)
+        }
+    }
+}
+</code></pre></li>
+
+<li><p><strong>RequstVote RPC 的 sender 和 handler</strong></p>
+
+<p>完成 Raft 的 sate machine后，开始实现 Raft 中的 RequestVote 操作，使得能够选举出一个 leader。</p>
+
+<p>机器处于 Candidate 状态时应当启动 election：<code>currentTerm++</code> -&gt; <code>votedFor = me</code> -&gt; <code>sendRequestVote()</code>。其中 <code>sendRequestVote()</code> 应当异步，也就是并发给其余机器发送 RequstVote。</p>
+
+<p>当出现以下情况，当前 election 过程终结：</p>
+
+<ul>
+<li>获得大多数机器的投票 -&gt; 转换为 Leader 状态；</li>
+<li>接受到的 reply 中 <code>term T &gt; currentTerm</code> -&gt; 更新 <code>currentTerm</code>，转换为 Follower 状态；</li>
+<li>election timer 超时 -&gt; 终结当前 election，并且启动新一轮 election，保持 Candidate 状态；
+<br /></li>
+</ul>
+
+<p>一个机器接收到 RequstVote RPC，需要决定是否投票：</p>
+
+<ul>
+<li>如果 RequstVote RPC 中的 <code>term T &lt; currentTerm</code>，直接返回 false 拒绝投票即可；</li>
+<li>如果 RequstVote RPC 中的 <code>term T &gt; currentTerm</code>，则需要更新 <code>currentTerm</code>，转换为 Follower 状态；</li>
+<li>如果该机器在 <code>currentTerm</code> 已经投票，则直接返回 false 拒绝投票；</li>
+<li>否则在满足 &ldquo;Candidate&rsquo;s log is at least as up-to-date as receiver&rsquo;s log&rdquo; 时返回 true 投票，并且 reset election timeout；
+<br /></li>
+</ul>
+
+<p>所谓 <strong>“up-to-date”</strong> 简单来说就是：比较两个 log 中的最后一条 entry 的 <code>index</code> 和 <code>term</code>：</p>
+
+<ul>
+<li>当两个 log 的最后一条 entry 的 term 不同，则 <strong>later</strong> term is more up-to-date；</li>
+
+<li><p>当两个 log 的最后一条 entry 的 term 相同，则 whichever log is <strong>longer</strong> is more up-to-date</p>
+
+<pre><code>// RequestVote RPC handler.
+func (rf *Raft) RequestVote(args RequestVoteArgs, reply *RequestVoteReply) {
+  if rf.currentTerm &gt; args.Term {
+    reply.Term = rf.currentTerm
+        reply.VoteGranted = false
+    return
+  }
+  if rf.currentTerm &lt; args.Term {
+    rf.currentTerm = args.Term
+    rf.votedFor = -1
+    rf.chanRole &lt;- Follower
+  }
+  reply.Term = args.Term
+  if rf.votedFor != -1 &amp;&amp; rf.votedFor != args.CandidateId {
+    reply.VoteGranted = false
+  } else if rf.logTable[len(rf.logTable)-1].Term &gt; args.LastLogTerm {
+    reply.VoteGranted = false   //! different term
+  } else if len(rf.logTable)-1 &gt; args.LastLogIndex &amp;&amp; rf.logTable[len(rf.logTable)-1].Term == args.LastLogTerm { 
+    reply.VoteGranted = false   //! same term but different index
+  }else {
+    reply.VoteGranted = true
+    rf.votedFor = args.CandidateId
+    rf.chanGrantVote &lt;- true
+  }
+}
+</code></pre></li>
+</ul></li>
+
+<li><p><strong>Heartbeat 的 sender 和 handler</strong></p>
+
+<p>最后实现 Raft 中的 Heartbeat 操作，能够令 Leader 稳定保持状态。</p>
+
+<p>机器处于 Leader 状态时应当启动 heartbeat，而其实际上就是不含 log entry 的 AppendEntries（只需要检测某一机器的 log 是否最新）。</p>
+
+<p>其中 <code>sendHeartbeat()</code> 应当异步，也就是并发给其余机器发送 heartbeat。每一个 heartbeat 线程利用 timer 来周期性地触发操作。</p>
+
+<pre><code>func (rf *Raft) sendHeartbeat(server int) {
+    for rf.getRole() == Leader {
+                rf.doAppendEntries(server)  // later explain in Log Replication
+                heartbeatTimer.Reset(RaftHeartbeatPeriod)
+                &lt;-heartbeatTimer.C
+        }
+}
+</code></pre>
+
+<p>一个机器接收到不含 log entry 的 AppendEntries RPC（也就是 heartbeat）时，需要决定是否更新自身的 term 和 leaderId：</p>
+
+<ul>
+<li>如果 AppendEntries RPC 中的 <code>term T &lt; currentTerm</code>，则 reply 中返回 <code>currentTerm</code> 让发送方更新；</li>
+
+<li><p>如果 RequstVote RPC 中的 <code>term T &gt; currentTerm</code>，则需要更新 <code>currentTerm</code> 和 <code>leaderId</code>，转换为 Follower 状态，并且 reset election timeout；</p>
+
+<pre><code>// temporary AppendEntries RPC handler.
+func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply) {
+if args.Term &lt; rf.currentTerm {
+    reply.Term = rf.currentTerm
+    reply.Success = false
+    return
+}
+//! update current term and only one leader granted in one term
+if rf.currentTerm &lt; args.Term {
+    rf.currentTerm = args.Term
+    rf.votedFor = -1
+    rf.leaderId = args.LeaderId
+    rf.chanRole &lt;- Follower
+}
+rf.chanHeartbeat &lt;- true
+reply.Term = args.Term
+}
+</code></pre></li>
+</ul></li>
+</ol>
+
+<h2 id="log-replication">Log Replication</h2>
+
+<p>完成了 Leader election 后，下一步是令 Raft 保持一个 consistent 并且 replicated 的 log。</p>
+
+<ol>
+<li><p><strong>AppendEntries RPC sender</strong></p>
+
+<p>在 Raft 中，只有 leader 允许添加 log，并且通过发送含有log 的 AppendEntries RPC 给其余机器令其 log 保持一致。</p>
+
+<p>除了 heartbeat 时会发送 AppendEntries RPC 外，当 Leader 收到 client 的 Request 后也有进行 replica 操作，同样是异步并发提升性能。</p>
+
+<pre><code>func (rf *Raft) Replica() {
+// replica log
+for server := range rf.peers {
+    if server != rf.me {
+        go rf.doAppendEntries(server)
+    }
+}
+</code></pre>
+
+<p>接下来主要是 <code>doAppendEntries(server int)</code> 的实现细节。</p>
+
+<p>当 Leader 的 log 比某 server 长时，亦即是 <code>len(rf.logTable) - 1 &gt;= rf.nextIndex[server]</code>，则需要发送 entry，并且直到该 server&rsquo;s log has caught up leader&rsquo;s log。</p>
+
+<p>有一点要<strong>注意</strong>的是：Leader 在对某 server 进行上述的连续发送时间或者等待 reply 的时间可能会大于 heartbeat timeout，因此触发 AppendEntries RPC；或者在上述时间内 client 向 Leader 提交了新的 log，这时候再次触发了 AppendEntries RPC。然而 Leader 本身已经在向该 server 发送 AppendEntries RPC，这时候对该 server 进行 heartbeat 是多余的。</p>
+
+<p>本文检测 Leader 是否在向某 server 发送 AppendEntries RPC，若是则直接退出不再重复操作。这里设计为 Leader 为每一 server 维护一个带有<strong>一个缓存</strong>的 channel，要对某 server 进行 AppendEntries RPC 必须先 read channel。</p>
+
+<p>最后如果 RPC failed 则直接退出，否则收到 AppendEntries RPC 的 reply 时：</p>
+
+<ul>
+<li>首先判断是否 <code>reply.Term &gt; args.Term</code>，若是则 Leader 需要更新自身 currentTerm，并且转换为 Follower 状态。</li>
+
+<li><p>接着如果 args 中带有 log entry，则 <code>reply.Success</code> 会指示是否添加成功。如果成功则更新 <code>rf.matchIndex[server]</code> 和 <code>rf.nextIndex[server]</code>；否则 <code>rf.nextIndex[server]--</code> 直至等于 <code>rf.matchIndex[server]</code>（后续优化）。</p>
+
+<pre><code>func (rf *Raft) doAppendEntries(server int) {
+    select {
+    case &lt;- rf.chanAppend[server]:
+    default:return
+    }
+    isAppend := true
+    for isAppend &amp;&amp; rf.getRole() == Leader {
+        var args AppendEntriesArgs
+        // Set the basic arguments of arg
+        ...
+        if (len(rf.logTable) - 1 &gt;= rf.nextIndex[server]) {
+            args.Entries = append(args.Entries, rf.logTable[rf.nextIndex[server]])
+        } else {
+            isAppend = false
+        }
+        // Copy with reply
+        var reply AppendEntriesReply
+        if rf.sendAppendEntries(server, args, &amp;reply) {
+            if reply.Term &gt; args.Term {
+                rf.currentTerm = args.Term
+                rf.votedFor = -1
+                rf.chanRole &lt;- Follower
+                break
+            }
+            if isAppend {
+                if reply.Success {
+                    rf.matchIndex[server] = rf.nextIndex[server]
+                    rf.nextIndex[server]++
+                } else {
+                    // later explain in AppendEntries RPC optimization
+                    if reply.FailIndex &gt; rf.matchIndex[server] {
+                      rf.nextIndex[server] = reply.FailIndex
+                    } else {
+                        rf.nextIndex[server] = rf.matchIndex[server] + 1
+                    }     
+                }
+            }
+        } else {
+            break
+        }
+    }
+    rf.chanAppend[server] &lt;- true
+}
+</code></pre></li>
+</ul></li>
+
+<li><p><strong>AppendEntries RPC handler</strong></p>
+
+<p>一个机器接收到含有 log entry 的 AppendEntries RPC，前一部分跟处理 heartbeat 一样，剩下的部分则是决定是否更新自身的 log。</p>
+
+<p>剩下根据 Raft paper 中的 figure 2 按部就班实现就好了 【好像并没有什么值得特别提的……</p></li>
+
+<li><p><strong>AppendEntries RPC optimization</strong></p>
+
+<p>这一部分主要是优化 AppendEntries RPC，当发生拒绝 append 时减少 master 需要发送 RPC 的次数。虽然 Raft paper 中怀疑这个优化操作是否有必要，但 lab2 中有些 unreliable test case 偏偏需要你实现这个优化操作……</p>
+
+<p>首先需要在 struct AppendEntriesReply 中添加两个数据：<code>FailIndex int, FailTerm int</code>，分别用于指示 conflicting entry 所在 term 以及在该 term 中存储的 first index；</p>
+
+<p>在 handler 的优化如下：如果 log unmatched，首先记录 <code>FailTerm</code>，然后从当前 conflicting entry 开始向前扫描，直到到达前一个 term，记录下 <code>FailIndex</code>；</p>
+
+<p>在 sender 的优化如下：当 append 失败时，如果 <code>FailIndex &gt; matchIndex[server]</code>，则 <code>nextIndex[server]</code> 直接退至 <code>FailIndex</code>，减少了需要尝试 append 的 RPC 次数；否则 <code>nextIndex[server]</code> 退回到 <code>matchIndex[server] + 1</code>。</p>
+
+<p><strong>STEP 4. Apply committed entries to local service replica</strong></p>
+
+<p>对于 Leader 而言，需要不断检测当前 term 的 log entry 的 replica 操作是否完成，然后进行 commit 操作。</p>
+
+<p>当超过半数的机器已经完成 replica 操作，则 Leader 认为该条 log entry 可以 commit。</p>
+
+<p>一旦当前 term 的某条 log entry L 是通过上述方式 commit 的，则根据 Raft 的 <strong>Log Matching Property</strong>，Leader 可以 commit 先于 L 添加到 log 的所有 entry。</p>
+
+<pre><code>func (rf *Raft) updateLeaderCommit() {
+    oldIndex := rf.getCommitIndex()
+    newIndex := oldIndex
+    for i := len(rf.logTable)-1; i&gt;oldIndex &amp;&amp; rf.logTable[i].Term==rf.getCurrentTerm(); i-- {
+        countServer := 1
+        for server := range rf.peers {
+            if server != rf.me &amp;&amp; rf.matchIndex[server] &gt;= i {
+                countServer++
+            }
+        }
+        if countServer &gt; len(rf.peers) / 2 {
+            newIndex = i
+            break
+        }
+    }
+    if oldIndex == newIndex {
+        return
+    }
+    //! update the log added in previous term
+    for i := oldIndex + 1; i &lt;= newIndex; i++ {
+        rf.chanCommitted &lt;- ApplyMsg{Index:i, Command:rf.logTable[i].Command}
+    }
+    rf.setCommitIndex(newIndex)
+}
+</code></pre>
+
+<p>对于 Follower 而言，只需要根据 AppendEntries RPC 中的 <code>leaderCommit</code> 值及其自身的 <code>commitIndex</code> 值，然后 commit 之中的 entry 即可。</p></li>
+</ol>
+
+<h2 id="persistence">Persistence</h2>
+
+<p>最后一步是持久化保存 persistent state，不过在 lab2 仅是通过 <code>persister</code> object 来保存，并没有真正使用到磁盘。实现了这一部分后可以稳定地 pass 掉关于 Persist 的 test case。</p>
+
+<ol>
+<li><p><strong>Read persist</strong></p>
+
+<p>在 Make Raft peer 时读取 persister。</p></li>
+
+<li><p><strong>Write persist</strong></p>
+
+<p>修改了 Raft 的 persistent state 后应当及时写至 persister，主要是在以下几个地方插入 write：</p>
+
+<ul>
+<li>启动了 election 修改了自身的 persistent state后；</li>
+<li>受到了 RequestVote RPC 和 AppendEntries RPC 的 reply，得知需要更新自身的 persistent state 后；</li>
+<li>RequestVote RPC handler 和 AppendEntries RPC handler 处理完毕后；</li>
+<li>Leader 收到 client 的请求命令，添加到自身的 log 后。</li>
+</ul></li>
+</ol>
+
+<h2 id="defect">Defect</h2>
+
+<p>本文还有些不足，有待后续优化。主要是<strong>不能稳定地</strong> pass <code>TestUnreliableAgree()</code> + <strong>不能</strong> pass <code>TestFigure8Unreliable()</code></p>
+
+<p>To Be Continue&hellip;</p>
+
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="http://wiesen.github.io/post/%E5%BE%AE%E8%BD%AF2016%E6%A0%A1%E6%8B%9B%E5%9C%A8%E7%BA%BF%E7%AC%94%E8%AF%95%E9%A2%98%E8%A7%A3/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="http://wiesen.github.io/post/%E5%BE%AE%E8%BD%AF2016%E6%A0%A1%E6%8B%9B%E5%9C%A8%E7%BA%BF%E7%AC%94%E8%AF%95%E9%A2%98%E8%A7%A3/">微软2016校招在线笔试题解</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'yangwj';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="http://wiesen.github.io/js/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-73790691-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+
