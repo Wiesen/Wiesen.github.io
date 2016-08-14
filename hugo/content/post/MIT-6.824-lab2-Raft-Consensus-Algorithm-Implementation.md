@@ -20,8 +20,6 @@ Raft 将一致性问题分为了三个相对独立的子问题，分别是：
 
 其中，本文主要参考 Raft paper，其中的 **figure 2** 作用很大。本文实现**大量依赖 channel 实现消息传递和线程同步**。
 
-仍然存在**少量 bug**，主要是 fail to pass unreliable test case，有待继续优化（主要是分布式调试无从下手）。
-
 [Code Link](https://github.com/Wiesen/MIT-6.824/blob/master/2016/raft/raft.go)
 
 Leader Election and Heartbeat
@@ -34,20 +32,26 @@ Leader Election and Heartbeat
     
     有一点**注意**的是，`nextIndex[]` 和 `matchindex[]` 需要在 election 后进行 reinitialize。
     
-        func (rf *Raft) changeRole(role Role) {
-        	rf.mu.Lock()
-        	defer rf.mu.Unlock()
-        	rf.role = role
-        	switch rf.role {
-        	case Leader:
-        		rf.reinitialize()    // reinitialized after election
-        		go rf.runAsLeader()
-        	case Candidate:
-        		go rf.runAsCandidate()
-        	case Follower:
-        		go rf.runAsFollower()
-        	}
-        }
+       func (rf *Raft) changeRole() {
+			for true {
+				switch rf.role {
+				case Leader:
+					for i := range rf.peers {
+						rf.nextIndex[i] = rf.logTable[len(rf.logTable)-1].Index + 1
+						rf.matchIndex[i] = 0
+					}
+					go rf.doHeartbeat()
+					<-rf.chanRole
+				case Candidate:
+					chanQuitElect := make(chan bool)
+					go rf.startElection(chanQuitElect)
+					<-rf.chanRole
+					close(chanQuitElect)
+				case Follower:
+					<-rf.chanRole
+				}
+			}
+		}
     
     此外，定时器 election timer 的作用十分关键，所有 server 都应当在初始化 Raft peer 时开启一个单独的线程来维护 election timer。
      
@@ -145,20 +149,20 @@ Leader Election and Heartbeat
      
             // temporary AppendEntries RPC handler.
             func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply) {
-            if args.Term < rf.currentTerm {
-            	reply.Term = rf.currentTerm
-            	reply.Success = false
-            	return
-            }
-            //! update current term and only one leader granted in one term
-            if rf.currentTerm < args.Term {
-            	rf.currentTerm = args.Term
-            	rf.votedFor = -1
-            	rf.leaderId = args.LeaderId
-            	rf.chanRole <- Follower
-            }
-            rf.chanHeartbeat <- true
-            reply.Term = args.Term
+	            if args.Term < rf.currentTerm {
+	            	reply.Term = rf.currentTerm
+	            	reply.Success = false
+	            	return
+	            }
+	            //! update current term and only one leader granted in one term
+	            if rf.currentTerm < args.Term {
+	            	rf.currentTerm = args.Term
+	            	rf.votedFor = -1
+	            	rf.leaderId = args.LeaderId
+	            	rf.chanRole <- Follower
+	            }
+	            rf.chanHeartbeat <- true
+	            reply.Term = args.Term
             }
 
 Log Replication
@@ -167,9 +171,7 @@ Log Replication
 
 1. **AppendEntries RPC sender**
 
-    在 Raft 中，只有 leader 允许添加 log，并且通过发送含有log 的 AppendEntries RPC 给其余机器令其 log 保持一致。
-     
-    除了 heartbeat 时会发送 AppendEntries RPC 外，当 Leader 收到 client 的 Request 后也有进行 replica 操作，同样是异步并发提升性能。
+    在 Raft 中，只有 leader 允许添加 log，并且通过发送含有 log 的 AppendEntries RPC 给其余机器令其 log 保持一致。
     
         func (rf *Raft) Replica() {
         // replica log
@@ -181,76 +183,77 @@ Log Replication
     
     接下来主要是 `doAppendEntries(server int)` 的实现细节。
      
-    当 Leader 的 log 比某 server 长时，亦即是 `len(rf.logTable) - 1 >= rf.nextIndex[server]`，则需要发送 entry，并且直到该 server's log has caught up leader's log。
+    当 Leader 的 log 比某 server 长时，亦即是 `rf.nextIndex[server] < len(rf.logTable)`，则需要发送 entry
      
-    有一点要**注意**的是：Leader 在对某 server 进行上述的连续发送时间或者等待 reply 的时间可能会大于 heartbeat timeout，因此触发 AppendEntries RPC；或者在上述时间内 client 向 Leader 提交了新的 log，这时候再次触发了 AppendEntries RPC。然而 Leader 本身已经在向该 server 发送 AppendEntries RPC，这时候对该 server 进行 heartbeat 是多余的。 
+    有一点要**注意**的是：Leader 在对某 server 进行上述的连续发送时间或者等待 reply 的时间可能会大于 heartbeat timeout，因此触发 AppendEntries RPC。然而 Leader 本身正在等待 reply，这时候重复发送是多余的。 
      
-    本文检测 Leader 是否在向某 server 发送 AppendEntries RPC，若是则直接退出不再重复操作。这里设计为 Leader 为每一 server 维护一个带有**一个缓存**的 channel，要对某 server 进行 AppendEntries RPC 必须先 read channel。
+    本文检测 Leader 是否在向某 server 发送 AppendEntries RPC，若是则直接退出不再重复操作：这里设计为 Leader 为每一 server 维护一个带有**一个缓存**的管道，这样某 server 进行 AppendEntries RPC 前可以确认是否正在处理。
      
     最后如果 RPC failed 则直接退出，否则收到 AppendEntries RPC 的 reply 时：
     
     - 首先判断是否 `reply.Term > args.Term`，若是则 Leader 需要更新自身 currentTerm，并且转换为 Follower 状态。
-    - 接着如果 args 中带有 log entry，则 `reply.Success` 会指示是否添加成功。如果成功则更新 `rf.matchIndex[server]` 和 `rf.nextIndex[server]`；否则 `rf.nextIndex[server]--` 直至等于 `rf.matchIndex[server]`（后续优化）。
+    - 若 `reply.Success` 会表明达成一致，更新 `rf.matchIndex[server]` 和 `rf.nextIndex[server]`；否则仅更新 `rf.nextIndex[server]`（这里涉及到 3 中的优化）。
     
             func (rf *Raft) doAppendEntries(server int) {
-            	select {
-            	case <- rf.chanAppend[server]:
-            	default:return
-            	}
-            	isAppend := true
-            	for isAppend && rf.getRole() == Leader {
-            		var args AppendEntriesArgs
-            		// Set the basic arguments of arg
-                    ...
-            		if (len(rf.logTable) - 1 >= rf.nextIndex[server]) {
-            			args.Entries = append(args.Entries, rf.logTable[rf.nextIndex[server]])
-            		} else {
-            			isAppend = false
-            		}
-            		// Copy with reply
-            		var reply AppendEntriesReply
-            		if rf.sendAppendEntries(server, args, &reply) {
-            			if reply.Term > args.Term {
-            				rf.currentTerm = args.Term
-                    		rf.votedFor = -1
-            				rf.chanRole <- Follower
-            				break
-            			}
-            			if isAppend {
-            				if reply.Success {
-            					rf.matchIndex[server] = rf.nextIndex[server]
-            					rf.nextIndex[server]++
-            				} else {
-                                // later explain in AppendEntries RPC optimization
-            					if reply.FailIndex > rf.matchIndex[server] {
-            					  rf.nextIndex[server] = reply.FailIndex
-            					} else {
-            						rf.nextIndex[server] = rf.matchIndex[server] + 1
-            					}     
-            				}
-            			}
-            		} else {
-            			break
-            		}
-            	}
-            	rf.chanAppend[server] <- true
-            }
+				//! make a lock for every follower to serialize
+				select {
+				case <- rf.chanAppend[server]:
+				default: return
+				}
+				defer func() {rf.chanAppend[server] <- true}()
+			
+				for rf.getRole() == Leader {
+					rf.mu.Lock()
+					var args AppendEntriesArgs
+					...				// set variable value
+					if rf.nextIndex[server] < len(rf.logTable) {
+						args.Entry = rf.logTable[rf.nextIndex[server]:]
+					}
+					rf.mu.Unlock()
 
-2. **AppendEntries RPC handler**
+					var reply AppendEntriesReply
+					if rf.sendAppendEntries(server, args, &reply) {
+						if rf.role != Leader {
+							return
+						}
+						if args.Term != rf.currentTerm || reply.Term > args.Term {
+							if reply.Term > args.Term {
+								...	// update term and role
+							}
+							return
+						}
+						if reply.Success {
+							rf.matchIndex[server] = reply.NextIndex - 1
+							rf.nextIndex[server] = reply.NextIndex
+						} else {
+							rf.nextIndex[server] = reply.NextIndex
+						}
+					}
+				}
+			}
 
-    一个机器接收到含有 log entry 的 AppendEntries RPC，前一部分跟处理 heartbeat 一样，剩下的部分则是决定是否更新自身的 log。
-     
-    剩下根据 Raft paper 中的 figure 2 按部就班实现就好了 【好像并没有什么值得特别提的……
+2. **AppendEntries RPC handler** (2016.8.5 Update)
 
-3. **AppendEntries RPC optimization**
+    一个机器接收到含有 log entry 的 AppendEntries RPC，前一部分跟处理 heartbeat 一样，剩下的部分则是决定是否更新自身的 log。根据 Raft paper 中的 figure 2 按部就班实现就好了。
 
-    这一部分主要是优化 AppendEntries RPC，当发生拒绝 append 时减少 master 需要发送 RPC 的次数。虽然 Raft paper 中怀疑这个优化操作是否有必要，但 lab2 中有些 unreliable test case 偏偏需要你实现这个优化操作……
+	Update：处理 log entries array 还是需要注意一下：首先决定是否更新 log table，当满足条件决定更新后，主要存在三种更新情况：（1）更新旧 index；（2）更新旧 index，且添加新 index；（3）仅添加新 index。（如下图）
+
+	![raft-appendentries](http://7vij5d.com1.z0.glb.clouddn.com/raft-appendentries.bmp)
+
+	本文方法是：首先记录下当前开始处理的 `basicIndex := args.PrevLogIndex + 1`（即 `args.Entry` 中的起始 index），然后遍历 `args.Entry`，一旦 index 已达 logTable 末端或者某个 entry 的 term 不匹配，则清除 logTable 中当前及后续的 entry，并且将 `args.Entry` 的当前及后续 entry 添加到 logTable中。
+
+3. **AppendEntries RPC optimization** (2016.8.5 Update)
+
+    这一部分主要是优化 AppendEntries RPC，当发生拒绝 append 时减少 master 需要发送 RPC 的次数。虽然 Raft paper 中怀疑这个优化操作是否有必要，但 lab2 中有些 unreliable test case 就需要你实现这个优化操作…
      
-    首先需要在 struct AppendEntriesReply 中添加两个数据：`FailIndex int, FailTerm int`，分别用于指示 conflicting entry 所在 term 以及在该 term 中存储的 first index；
+    首先需要在 struct AppendEntriesReply 中添加两个数据：`NextIndex int`,  `FailTerm int`，分别用于指示 conflicting entry 所在 term，以及在该 term 中存储的第一个 entry 的 index；
      
-    在 handler 的优化如下：如果 log unmatched，首先记录 `FailTerm`，然后从当前 conflicting entry 开始向前扫描，直到到达前一个 term，记录下 `FailIndex`；
+    在 handler 的优化如下：如果 log unmatched，存在两种情况：
+
+    - `len(rf.logTable) <= args.PrevLogIndex`：则直接返回 `NextIndex = len(rf.logTable)` 即可；
+    - `rf.logTable[args.PrevLogIndex].Term != args.PrevLogTerm`：首先记录 `FailTerm`，然后从当前 conflicting entry 开始向前扫描，直到 index 为 0 或者 term 不匹配，然后记录下该 term 的第一个 index；
      
-    在 sender 的优化如下：当 append 失败时，如果 `FailIndex > matchIndex[server]`，则 `nextIndex[server]` 直接退至 `FailIndex`，减少了需要尝试 append 的 RPC 次数；否则 `nextIndex[server]` 退回到 `matchIndex[server] + 1`。
+    在 sender 的优化如下：当 append 失败时，如果 `NextIndex > matchIndex[server]`，则 `nextIndex[server]` 直接退至 `NextIndex`，减少了需要尝试 append 的 RPC 次数；否则 `nextIndex[server]` 退回到 `matchIndex[server] + 1`。
     
     **STEP 4. Apply committed entries to local service replica**
     
@@ -261,7 +264,10 @@ Log Replication
     一旦当前 term 的某条 log entry L 是通过上述方式 commit 的，则根据 Raft 的 **Log Matching Property**，Leader 可以 commit 先于 L 添加到 log 的所有 entry。
     
         func (rf *Raft) updateLeaderCommit() {
-        	oldIndex := rf.getCommitIndex()
+			rf.mu.Lock()
+			defer rf.mu.Unlock()
+			defer rf.persist()
+        	oldIndex := rf.commitIndex
         	newIndex := oldIndex
         	for i := len(rf.logTable)-1; i>oldIndex && rf.logTable[i].Term==rf.getCurrentTerm(); i-- {
         		countServer := 1
@@ -278,14 +284,16 @@ Log Replication
         	if oldIndex == newIndex {
         		return
         	}
+			rf.commitIndex = newIndex
+
         	//! update the log added in previous term
         	for i := oldIndex + 1; i <= newIndex; i++ {
         		rf.chanCommitted <- ApplyMsg{Index:i, Command:rf.logTable[i].Command}
+				rf.lastApplied = i
         	}
-        	rf.setCommitIndex(newIndex)
         }
      
-    对于 Follower 而言，只需要根据 AppendEntries RPC 中的 `leaderCommit` 值及其自身的 `commitIndex` 值，然后 commit 之中的 entry 即可。 
+    对于 Follower 而言，则：`commitIndex = min(leaderCommit, index of last new entry)`。 
 
 Persistence
 ---
@@ -309,3 +317,25 @@ Defect
 本文还有些不足，有待后续优化。主要是**不能稳定地** pass `TestUnreliableAgree()` + **不能** pass `TestFigure8Unreliable()`
 
 To Be Continue...
+
+2016-8-11 Update
+---
+最近几天 debug 了之前的代码，发现了若干个问题。目前的代码实现已经**比较稳定**地 pass 所有的 test case，上面的代码段也已经修改了。但仍然存在一个 bug: 在过 TestUnreliableAgree() 时 fail to reach agreement。这个 bug 的触发几率很低，还没想明白哪里出问题。
+
+1. **LEADER ELECTION: Role Transfer (state machine)**
+
+ 之前实现 server state machine 的方法是利用 channel 来进行状态修改操作，并且会新开一个 goroutine 进行该状态死循环，而没有其他状态的处理逻辑。本文由一个 goroutine 阻塞读取该 channel，从而处理 server 的状态转换。然而，channel 同步是存在延时的，只有在当前 goroutine 被挂起或者休眠等时，才会转去处理。
+
+ 这样的方法存在一个 bug：新 Leader 产生后，旧 Leader 收到消息应该更新自身的 term 并且转换为 Follower；然而由于 channel 同步并非立即执行，旧 Leader 在自身状态被重新赋值前仍然会执行 Leader 的代码；这时候就会出现两个 Leader 同时处理 RPC。
+
+ 因此，修改的内容是：去掉 channel 同步方法，当需要进行状态转换时，立即修改 server 的状态，终止该 server 当前状态的执行。
+
+2. **LOG REPLICATION: AppendEntries RPC**
+
+ 之前不能 pass `TestUnreliableAgree()` 和 `TestFigure8Unreliable()` 时丝毫没有提示，只能等程序运行时间过长然后被杀死。后来思考了一下问题原因：**程序运行过慢，跟不上 test case 要求的速度，所以后续的测试代码也根本没有执行**。
+
+ 然后发现程序执行慢的原因是：Leader 发送 AppendEntries RPC 每次仅携带一条 log entry，导致 server 无法快速 catch up。所以修改的主要内容就是：AppendEntries RPC 每次携带从 `nextIndex` 直到最新的 log entries。
+
+Reference
+---
+> [MIT 6.824 Week 3 notes](https://www.douban.com/note/549229678/)
