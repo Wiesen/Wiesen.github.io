@@ -3,7 +3,7 @@ date = "2016-06-10T21:32:46+08:00"
 draft = false
 title = "MIT 6.824 lab2 Raft Consensus Algorithm Implementation"
 
-topics = ["Distributed System"]
+topics = ["Distributed System", "MIT 6.824"]
 +++
 
 Raft 将一致性问题分为了三个相对独立的子问题，分别是：

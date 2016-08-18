@@ -3,7 +3,7 @@ date = "2016-08-06T17:32:46+08:00"
 draft = false
 title = "MIT 6.824 lab3 Fault-Tolerant Key/Value Service Implementation"
 
-topics = ["Distributed System"]
+topics = ["Distributed System", "MIT 6.824"]
 +++
 
 lab3 是基于 lab2 实现的 Raft Consensus Algorithm 之上实现 KV Service。主要分为两部分：
