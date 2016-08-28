@@ -49,7 +49,7 @@ paginate = 10
   [[menu.main]]
     name = "Contact"
     pre = "<i class='fa fa-phone fa-fw'></i>"
-    weight = 3
+    weight = 4
     url = "/contact/"
 
 [social]
