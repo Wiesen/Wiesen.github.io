@@ -7,8 +7,135 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>&amp;copy; 2016. All rights reserved.</copyright>
-    <lastBuildDate>Tue, 16 Aug 2016 17:32:46 +0800</lastBuildDate>
+    <lastBuildDate>Fri, 09 Sep 2016 17:32:46 +0800</lastBuildDate>
     <atom:link href="http://wiesen.github.io/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>MIT 6.824 Lab 4 Sharded KeyValue Service Implementation</title>
+      <link>http://wiesen.github.io/post/MIT-6.824-Lab4-Sharded-KeyValue-Service/</link>
+      <pubDate>Fri, 09 Sep 2016 17:32:46 +0800</pubDate>
+      
+      <guid>http://wiesen.github.io/post/MIT-6.824-Lab4-Sharded-KeyValue-Service/</guid>
+      <description>
+
+&lt;p&gt;lab4 是基于 lab2 和 lab3 实现的 Raft Consensus Algorithm 之上实现 Sharded KeyValue Service。主要分为两部分：&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Part A：The Shard Master&lt;/li&gt;
+&lt;li&gt;Part B: Sharded Key/Value Server&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;除了最后一个 challenge test case &lt;code&gt;TestDelete()&lt;/code&gt; 以外，目前代码其余都可以 pass。但偶尔会 fail 在 unreliable test case，目前的定位是 raft 的实现还有点 bug。&lt;/p&gt;
+
+&lt;p&gt;Code Link:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;https://github.com/Wiesen/MIT-6.824/tree/master/2016/shardmaster&#34;&gt;PART A&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://github.com/Wiesen/MIT-6.824/tree/master/2016/shardkv&#34;&gt;PART B&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&#34;architecture&#34;&gt;Architecture&lt;/h2&gt;
+
+&lt;p&gt;lab4 的架构是典型的 M/S 架构（a configuration service and a set of replica groups)，不过实现十分基础，很多功能没有实现：1) shards 之间的传递很慢并且不允许 concurrent client acess；2) 每个 raft group 中的 member 不会改变。&lt;/p&gt;
+
+&lt;p&gt;configuration service&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;由若干 shardmaster 利用 raft 协议保证一致性的集群；&lt;/li&gt;
+&lt;li&gt;管理 configurations 的顺序：每个 configuration 描述 replica group 以及每个 group 分别负责存储哪些 shards；&lt;/li&gt;
+&lt;li&gt;响应 Join/Leave/Move/Query 请求，并且对 configuration 做出相应的改变；&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;replica group&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;由若干 shardkv 利用 raft 协议保证一致性的集群；&lt;/li&gt;
+&lt;li&gt;负责具体数据的存储（一部分），组合所有 group 的数据即为整个 database 的数据；&lt;/li&gt;
+&lt;li&gt;响应对应 shards 的 Get/PutAppend 请求，并保证 linearized；&lt;/li&gt;
+&lt;li&gt;周期性向 shardmaster 进行 query 获取 configuration，并且进行 migration 和 update；&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&#34;part-a-the-shard-master&#34;&gt;Part A：The Shard Master&lt;/h2&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;RPC Join/leave/Move/Query&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;Client:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;at most once semantics：每个 Client 及 每个 Request 赋予唯一的 id；&lt;/li&gt;
+&lt;li&gt;sequential consistency：对于每个 Client，仅有一条 Request RPC 在显式执行；&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Server:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;异步：开一个 goroutine 来监听和处理 accept entry，与各 RPC 中的 start entry 分离，利用 channel 进行同步和通信；&lt;/li&gt;
+&lt;li&gt;at most once semantics：主要针对写操作，本文在 accept operation 处进行 duplicated check (也可以在 start operation 处再加一层)，对于重复的 request，仅向 client 回复操作结果；&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Rebanlancing&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;lab4 对 shards 分配的要求是: divide the shards as evenly as possible among the groups, and should move as few shards as possible to achieve that goal.&lt;/p&gt;
+
+&lt;p&gt;最直接的做法是: 首先计算每个 replica group 分配多少个 shards ( &lt;code&gt;quota = num_of_shards / num_of_group&lt;/code&gt;, &lt;code&gt;remain = num_of_shards - num_of_group * quota&lt;/code&gt;，然后依据 &lt;code&gt;num_of_server&lt;/code&gt; 对 replica group 进行排序，server 数量多的 group 分配 shards 个数 &lt;code&gt;quota + 1&lt;/code&gt;，其余分配 &lt;code&gt;quota&lt;/code&gt; )，最后把 shards 从多的 group 移动到少的 group。&lt;/p&gt;
+
+&lt;p&gt;然而，在 go 中实现上面的做法并不是那么 clean，很多特性在语言层面上并不支持，比如: 1) get map.keys(); 2) 根据特定的字段进行排序等，自行实现实在麻烦。&lt;/p&gt;
+
+&lt;p&gt;因此，由于 lab 中只有 join/leave 会造成 imbalance，并且 group 是逐个 join/leave。所以 simple first，首先统计 prior config 中每个 group 有多少个 shards，并且计算 present config 中平均每个 group 分配多少个 shards (&lt;code&gt;quota = num_of_shards / num_of_group&lt;/code&gt;)，然后循环将 max_shards_group/leaving_group 中的 shards 分配给 joining_group/min_shards_group.&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;part-b-sharded-key-value-server&#34;&gt;Part B: Sharded Key/Value Server&lt;/h2&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;RPC PutAppend/Get/TransferShard&lt;/strong&gt;&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;Hint: Think about how the shardkv client and server should deal with ErrWrongGroup. Should the client change the sequence number if it receives ErrWrongGroup ? Should the server update the client state if it returns ErrWrongGroup when executing a Get / Put request?&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;绝大部分与 Part A 一样，除了 ErrWrongGroup 的异常处理。&lt;/p&gt;
+
+&lt;p&gt;当 server 发现 ErrWrongGroup 时，不需要 update client state；当 client 收到 ErrWrongGroup 时，不需要改变 operation sequence number，换个 group 继续 request 即可。&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Migrating Shard&lt;/strong&gt;&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;Hint: When groups move shards, they need to move some duplicate detection state as well as the key/value data. Think about how the receiver of a shard should update its own duplicate detection state. Is it correct for the receiver to entirely replace its state with the received one?&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;假设&lt;/strong&gt;: configuration 由 cfg1 —&amp;gt; cfg2，shard S1 由 G1 -&amp;gt; G2&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;How to migrate - push or pull&lt;/strong&gt;: 这时应该由 G1 push S1 还是由 G2 pull S1？一般来说，G2 完成 reconfig 操作后，随时会有针对 migrated shard 的 get/put/append 操作。如果由 G1 push S1，那么就无法保证 migrated shard 什么时候完成，出现错误。所以应该由 G2 在进行 reconfig 时进行 pull;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Response to migration&lt;/strong&gt;: 由于 lab 中 group 是逐个 join/leave，同一个 group 不会同时迁入和迁出 shards，亦即是迁入和迁出 shards 的 groups 不会相交。因此当 G1 处于 cfg2 时，G1 已经不再负责 S1，之后可随时响应 migration 迁出 S1。亦即是：当 G1.cfg.num &amp;gt; G2.cfg.num 才能响应 migration，否则必须等待 G1 更新完毕 (避免互相请求出现死锁)。&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Reconfiguration&lt;/strong&gt;&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;Hint: Process re-configurations one at a time, in order.&lt;/p&gt;
+
+&lt;p&gt;Hint: When group G1 needs a shard from G2 during a configuration change, does it matter at what point during its processing of log entries G2 sends the shard to G1?&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Detect&lt;/strong&gt;: 开一个 goroutine 来周期性地向 shardmaster query 最新的 configuration (由 group leader 完成)，当发现 configuration 更新时 (one by one in order)，即向其余 group 获取需要的 shards (migrating shard)；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;When to reconfigurate&lt;/strong&gt;: Reconfiguration operation 仅仅是 group leader 从 shardmaster 获取到的 operation proposal，新的 configuration 什么时候生效是由各 group 自身决定，本文的实现是当 group 获取到需要的 shards 后再进行 reconfiguration update。因此会出现当 client 根据新的 configuration 向 shardkv 发起 request 时，各个 group 都还没完成 configuration update。不过这并没什么影响，我们可以让 client 一直 loop 向每个 replica group 发起 request (当然是一直被拒)，直到目标 group 完成 reconfiguration update;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Consistency&lt;/strong&gt;: Reconfiguration operation 会影响到 PutAPpend/Get，因此同样需要利用 raft 保证 group 内的一致性，确保集群内完成了之前的操作后同时进行 Reconfiguration；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Replace What&lt;/strong&gt;: 包括 config，StoreShard (data) 以及 Ack (duplicate detection)，其中 Ack 不是 replace entirely，仅当 kv.ack[clientId] &amp;lt; migration.Ack[clientId] 才更新；
+&lt;br /&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;reference&#34;&gt;Reference&lt;/h2&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;&lt;a href=&#34;https://github.com/bluesea147/6.824/blob/master/src/shardmaster/server.go&#34;&gt;bluesea147/6.824/shardmaster&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&#34;https://github.com/bluesea147/6.824/blob/master/src/shardkv/server.go&#34;&gt;bluesea147/6.824/shardkv&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+</description>
+    </item>
     
     <item>
       <title>Robotics: Estimation and learning</title>
@@ -16,11 +143,11 @@
       <pubDate>Tue, 16 Aug 2016 17:32:46 +0800</pubDate>
       
       <guid>http://wiesen.github.io/post/Robotics-Estimation-and-Learning/</guid>
-      <description>&lt;p&gt;One of the course of Robotics in Coursera from the University of Pennsylvania. It is helpful to learn the classical algorithm of robotics.&lt;/p&gt;
+      <description>&lt;p&gt;&lt;a href=&#34;https://www.coursera.org/learn/robotics-learning&#34;&gt;Course Link&lt;/a&gt;: One of the course of Robotics in Coursera from the University of Pennsylvania. It is helpful to learn the classical algorithm of robotics.&lt;/p&gt;
 
-&lt;p&gt;&lt;a href=&#34;https://www.coursera.org/learn/robotics-learning&#34;&gt;Course Link&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Here are some course notes in Chinese collected from Zhihu. These notes introduce algorithm in a little more detial than course.&lt;/p&gt;
 
-&lt;p&gt;Here are some notes in Chinese collected from Zhihu.&lt;/p&gt;
+&lt;p&gt;However, the code in these notes has bug and even can not run normally, which are no worthy of learning. The code in my GitHub pass all homeworks.&lt;/p&gt;
 
 &lt;ol&gt;
 &lt;li&gt;Gaussian Model Learning: &lt;a href=&#34;https://zhuanlan.zhihu.com/p/21648507?refer=robotics-learning&#34;&gt;从高斯分布、机器人误差、EM 算法到小球检测&lt;/a&gt;&lt;/li&gt;

@@ -1,13 +1,14 @@
-baseurl = "http://wiesen.github.io/"
+baseurl = "http://wiesen.github.io"
 languageCode = "en-us"
 title = "Wiesen's Blog"
-theme = "blackburn"
+theme = "Wiesen"
 author = "Wiesen Yang"
 copyright = "&copy; 2016. All rights reserved."
 canonifyurls = true
 paginate = 10
 
 [indexes]
+  tag = "tags"
   topic = "topics"
 
 [params]
@@ -41,15 +42,9 @@ paginate = 10
     identifier = "about"
     url = "/about/"
   [[menu.main]]
-    name = "Topics"
-    pre = "<i class='fa fa-folder fa-fw'></i>"
-    weight = 3
-    identifier = "topic"
-    url = "/topics/"
-  [[menu.main]]
     name = "Contact"
     pre = "<i class='fa fa-phone fa-fw'></i>"
-    weight = 4
+    weight = 3
     url = "/contact/"
 
 [social]

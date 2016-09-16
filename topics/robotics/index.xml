@@ -16,11 +16,11 @@
       <pubDate>Tue, 16 Aug 2016 17:32:46 +0800</pubDate>
       
       <guid>http://wiesen.github.io/post/Robotics-Estimation-and-Learning/</guid>
-      <description>&lt;p&gt;One of the course of Robotics in Coursera from the University of Pennsylvania. It is helpful to learn the classical algorithm of robotics.&lt;/p&gt;
+      <description>&lt;p&gt;&lt;a href=&#34;https://www.coursera.org/learn/robotics-learning&#34;&gt;Course Link&lt;/a&gt;: One of the course of Robotics in Coursera from the University of Pennsylvania. It is helpful to learn the classical algorithm of robotics.&lt;/p&gt;
 
-&lt;p&gt;&lt;a href=&#34;https://www.coursera.org/learn/robotics-learning&#34;&gt;Course Link&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Here are some course notes in Chinese collected from Zhihu. These notes introduce algorithm in a little more detial than course.&lt;/p&gt;
 
-&lt;p&gt;Here are some notes in Chinese collected from Zhihu.&lt;/p&gt;
+&lt;p&gt;However, the code in these notes has bug and even can not run normally, which are no worthy of learning. The code in my GitHub pass all homeworks.&lt;/p&gt;
 
 &lt;ol&gt;
 &lt;li&gt;Gaussian Model Learning: &lt;a href=&#34;https://zhuanlan.zhihu.com/p/21648507?refer=robotics-learning&#34;&gt;从高斯分布、机器人误差、EM 算法到小球检测&lt;/a&gt;&lt;/li&gt;
