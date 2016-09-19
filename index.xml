@@ -7,8 +7,22 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>&amp;copy; 2016. All rights reserved.</copyright>
-    <lastBuildDate>Fri, 09 Sep 2016 17:32:46 +0800</lastBuildDate>
+    <lastBuildDate>Sun, 18 Sep 2016 17:32:46 +0800</lastBuildDate>
     <atom:link href="http://wiesen.github.io/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Solution to Raspberry Pi ROS rivz Core Dumped</title>
+      <link>http://wiesen.github.io/post/Solution-to-Raspberry-Pi-ROS-rivz-Segmentation-Fault/</link>
+      <pubDate>Sun, 18 Sep 2016 17:32:46 +0800</pubDate>
+      
+      <guid>http://wiesen.github.io/post/Solution-to-Raspberry-Pi-ROS-rivz-Segmentation-Fault/</guid>
+      <description>&lt;p&gt;Recently I installed ROS on Raspberry Pi2 (both Jessie and Ubuntu 14.04) in order to implement SLAM algorithm on it. However when runs the rviz (rosrun rviz rviz) I get core dumped message.&lt;/p&gt;
+
+&lt;p&gt;After searching I found the solution &lt;a href=&#34;https://github.com/ros/robot_model/issues/110&#34;&gt;here&lt;/a&gt;. What I do is upgrade libpcre3 to 3_8.35 (upgrade collada-dom to 2.4.4 does not help). &lt;a href=&#34;http://ports.ubuntu.com/pool/main/p/pcre3/libpcre3_8.35-7.1ubuntu1_armhf.deb&#34;&gt;Here&lt;/a&gt; is the download link.&lt;/p&gt;
+
+&lt;p&gt;I confirm that rviz now works properly on my Raspberry Pi2 running the official ubuntu 14.04 image.&lt;/p&gt;
+</description>
+    </item>
     
     <item>
       <title>MIT 6.824 Lab 4 Sharded KeyValue Service Implementation</title>
