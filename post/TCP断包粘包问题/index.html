@@ -7,7 +7,7 @@
   <meta name="description" content="">
   <meta name="generator" content="Hugo 0.16" />
 
-  <title>Posts &middot; Wiesen&#39;s Blog</title>
+  <title>TCP断包粘包问题 &middot; Wiesen&#39;s Blog</title>
 
   
   
@@ -36,8 +36,6 @@
   <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
 
   
-  
-  <link rel="alternate" type="application/rss+xml" title="Wiesen&#39;s Blog" href="http://wiesen.github.io/post/index.xml" />
   
 
   
@@ -104,10 +102,6 @@
   <div class="pure-menu social">
   <ul class="pure-menu-list">
 
-    
-    <li class="pure-menu-item">
-      <a class="pure-menu-link" href="http://wiesen.github.io/post/index.xml"><i class="fa fa-rss fa-fw"></i>RSS</a>
-    </li>
     
 
     
@@ -191,48 +185,130 @@
 
 
 <div class="header">
-  <h1>Posts</h1>
+  <h1>TCP断包粘包问题</h1>
+  <h2></h2>
 </div>
 <div class="content">
-  
-  <h2>2016</h2>
-  <ul>
-  
-    <li><time>26 Oct 2016, 10:32</time> - <a href="http://wiesen.github.io/post/TCP%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/">TCP断包粘包问题</a></li>
+
+  <div class="post-meta">
+
+  <div>
+    <i class="fa fa-calendar fa-fw"></i>
+    <time>26 Oct 2016, 10:32</time>
+  </div>
 
   
-    <li><time>18 Sep 2016, 17:32</time> - <a href="http://wiesen.github.io/post/Solution-to-Raspberry-Pi-ROS-rivz-Segmentation-Fault/">Solution to Raspberry Pi ROS rivz Core Dumped</a></li>
 
   
-    <li><time>09 Sep 2016, 17:32</time> - <a href="http://wiesen.github.io/post/MIT-6.824-Lab4-Sharded-KeyValue-Service/">MIT 6.824 Lab 4 Sharded KeyValue Service Implementation</a></li>
+  
+  
+  <div>
+    <i class="fa fa-folder fa-fw"></i>
+    
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/network">network</a>
+    
+  </div>
+  
+  
 
   
-    <li><time>16 Aug 2016, 17:32</time> - <a href="http://wiesen.github.io/post/Robotics-Estimation-and-Learning/">Robotics: Estimation and learning</a></li>
+
+</div>
 
   
-    <li><time>06 Aug 2016, 17:32</time> - <a href="http://wiesen.github.io/post/MIT-6.824-lab3-Fault-Tolerant-KVService-Implementation/">MIT 6.824 lab3 Fault-Tolerant Key/Value Service Implementation</a></li>
+
+<p>（内容收集自网络）</p>
+
+<h2 id="粘包问题">粘包问题</h2>
+
+<p>粘包问题是由 TCP 是<strong>“字节流”</strong>协议，没有消息边界所引起的。而 UDP/HTTP 具有消息边界，所以不存在断包粘包问题。</p>
+
+<p>另外：</p>
+
+<ol>
+<li>如果发送数据无结构，如文件传输，这样发送方只管发送，接收方只管接收存储就 ok，也不用考虑粘包；</li>
+<li>如果利用 TCP 短连接时，不会出现粘包问题；</li>
+<li>当发送数据存在一定结构，并且需要维护长连接时，则需要考虑粘包问题；</li>
+</ol>
+
+<h2 id="问题原因">问题原因</h2>
+
+<p>出现粘包现象的原因既可能由发送方造成，也可能由接收方造成:</p>
+
+<ol>
+<li>发送端需要等缓冲区满才发送出去，造成粘包;</li>
+<li>接收方没能及时地接收缓冲区的包，造成多个包接收;</li>
+</ol>
+
+<h2 id="解决方法">解决方法</h2>
+
+<p>为了避免粘包现象，可采取以下几种措施。</p>
+
+<ol>
+<li><p>对于发送方引起的粘包现象，用户可通过编程设置来避免，TCP 提供了强制数据立即传送的操作指令 push，TCP 软件收到该操作指令后，就立即将本段数据发送出去，而不必等待发送缓冲区满；</p>
+
+<p>缺点: 第一种编程设置方法虽然可以避免发送方引起的粘包，但它关闭了优化算法，降低了网络发送效率，影响应用程序的性能，一般不建议使用。</p></li>
+
+<li><p>对于接收方引起的粘包，则可通过优化程序设计、精简接收进程工作量、提高接收进程优先级等措施，使其及时接收数据，从而尽量避免出现粘包现象；</p>
+
+<p>缺点: 第二种方法只能减少出现粘包的可能性，但并不能完全避免粘包，当发送频率较高时，或由于网络突发可能使某个时间段数据包到达接收方较快，接收方还是有可能来不及接收，从而导致粘包。</p></li>
+</ol>
+
+<p>既能保证效率又能比较好地解决粘包的方法，是由应用层进行<strong>分包处理</strong>，本质上就是由<strong>应用层</strong>来维护消息和消息的边界。主要是采用以下两种方式：</p>
+
+<ol>
+<li>以<strong>特殊字符</strong>作为消息的分界符;</li>
+<li>在消息头部加入整个消息的<strong>长度信息</strong>。</li>
+</ol>
+
 
   
-    <li><time>10 Jun 2016, 21:32</time> - <a href="http://wiesen.github.io/post/MIT-6.824-lab2-Raft-Consensus-Algorithm-Implementation/">MIT 6.824 lab2 Raft Consensus Algorithm Implementation</a></li>
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="http://wiesen.github.io/post/Solution-to-Raspberry-Pi-ROS-rivz-Segmentation-Fault/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="http://wiesen.github.io/post/Solution-to-Raspberry-Pi-ROS-rivz-Segmentation-Fault/">Solution to Raspberry Pi ROS rivz Core Dumped</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+  </div>
+</div>
+
+
 
   
-    <li><time>15 Apr 2016, 21:31</time> - <a href="http://wiesen.github.io/post/%E5%BE%AE%E8%BD%AF2016%E6%A0%A1%E6%8B%9B%E5%9C%A8%E7%BA%BF%E7%AC%94%E8%AF%95%E9%A2%98%E8%A7%A3/">微软2016校招在线笔试题解</a></li>
+<div id="disqus_thread"></div>
+<script type="text/javascript">
 
-  
-    <li><time>30 Mar 2016, 21:33</time> - <a href="http://wiesen.github.io/post/Flat-Datacenter-Storage-Paper-Review/">Flat Datacenter Storage Paper Review</a></li>
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
 
-  
-    <li><time>19 Mar 2016, 21:33</time> - <a href="http://wiesen.github.io/post/Chain-Replication-Paper-Review/">Chain Replication Paper Review</a></li>
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Wiesen';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 
-  
-    <li><time>15 Mar 2016, 21:31</time> - <a href="http://wiesen.github.io/post/%E5%BF%AB%E9%80%9F%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/">快速排序笔记</a></li>
 
-  
-    <li><time>10 Mar 2016, 21:24</time> - <a href="http://wiesen.github.io/post/%E5%BD%92%E5%B9%B6%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/">归并排序笔记</a></li>
-
-  
-  </ul>
-  
 </div>
 
 </div>
