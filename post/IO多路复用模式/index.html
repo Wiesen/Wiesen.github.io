@@ -7,7 +7,7 @@
   <meta name="description" content="">
   <meta name="generator" content="Hugo 0.16" />
 
-  <title>TCP断包粘包问题 &middot; Wiesen&#39;s Blog</title>
+  <title>I/O多路复用设计模式 &middot; Wiesen&#39;s Blog</title>
 
   
   
@@ -185,7 +185,7 @@
 
 
 <div class="header">
-  <h1>TCP断包粘包问题</h1>
+  <h1>I/O多路复用设计模式</h1>
   <h2></h2>
 </div>
 <div class="content">
@@ -194,7 +194,7 @@
 
   <div>
     <i class="fa fa-calendar fa-fw"></i>
-    <time>26 Oct 2016, 10:32</time>
+    <time>24 Nov 2016, 21:31</time>
   </div>
 
   
@@ -205,7 +205,7 @@
   <div>
     <i class="fa fa-folder fa-fw"></i>
     
-      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/network">network</a>
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/design-pattern">Design Pattern</a>
     
   </div>
   
@@ -217,62 +217,92 @@
 
   
 
-<p>（内容收集自网络）</p>
+<h2 id="introduction">Introduction</h2>
 
-<h2 id="粘包问题">粘包问题</h2>
+<p>System I/O can be blocking, or non-blocking synchronous, or non-blocking asynchronous.
+ - Blocking I/O means that the calling system does not return control to the caller until the operation is finished
+ - a non-blocking synchronous call returns control to the caller immediately</p>
 
-<p>粘包问题是由 TCP 是<strong>“字节流”</strong>协议，没有消息边界所引起的。而 UDP/HTTP 具有消息边界，所以不存在断包粘包问题。</p>
+<p>I/O multiplexing mechanisms rely on an event demultiplexor: dispatches I/O events from a limited number of sources to the appropriate read/write event handlers.</p>
 
-<p>另外：</p>
+<p>There are two non-blocking I/O multiplexing mechanisms: reactor &amp;&amp; proactor.</p>
 
-<ol>
-<li>如果发送数据无结构，如文件传输，这样发送方只管发送，接收方只管接收存储就 ok，也不用考虑粘包；</li>
-<li>如果利用 TCP 短连接时，不会出现粘包问题；</li>
-<li>当发送数据存在一定结构，并且需要维护长连接时，则需要考虑粘包问题；</li>
-</ol>
-
-<h2 id="问题原因">问题原因</h2>
-
-<p>出现粘包现象的原因既可能由发送方造成，也可能由接收方造成:</p>
+<h2 id="mechanism">Mechanism</h2>
 
 <ol>
-<li>发送端需要等缓冲区满才发送出去，造成粘包;</li>
-<li>接收方没能及时地接收缓冲区的包，造成多个包接收;</li>
+<li><p>Reactor</p>
+
+<p>In the Reactor pattern, the event demultiplexor waits for events that indicate when a file descriptor or socket is ready for a read or write operation.</p>
+
+<p>Structure:</p>
+
+<ul>
+<li>Request Event Dispatcher (<strong>synchronous</strong> event demultiplexer): uses an event loop to block on all resources, and dispatches resources from the demultiplexer to the associated event handler</li>
+<li>Request Event Handler (user handler): performs the actual I/O operation, handles data, , declares renewed interest in I/O events, and returns control to the dispatcher</li>
+</ul>
+
+<p>Benific:
+ - separates application specific code from the reactor implementation
+ - allows for simple coarse-grain concurrency while not adding the complexity of multiple threads to the system</p>
+
+<p>Limitations:
+ - more difficult to debug than a procedural pattern due to the inverted flow of control
+ - by only calling event handlers synchronously, it limits maximum concurrency, especially on symmetric multiprocessing hardware
+ - The scalability of the reactor pattern is limited by event handler and demultiplexer</p></li>
+
+<li><p>Proactor</p>
+
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/Proactor.png" alt="proactor" /></p>
+
+<p>In the Proactor pattern, the initiator (event demultiplexor) initiates asynchronous I/O operations. The I/O operation itself is <strong>performed by OS</strong>.</p>
+
+<p>A completion handler is called after the asynchronous part has terminated. The proactor pattern can be considered to be an <strong>asynchronous variant</strong> of the synchronous reactor pattern.</p>
+
+<p>The implementation of this classic asynchronous pattern is based on an asynchronous OS-level API, which is called it &ldquo;system-level&rdquo; or &ldquo;true&rdquo; async.</p>
+
+<p>Structure:</p>
+
+<ul>
+<li>Proactive Initiator : initiates asynchronous I/O operations</li>
+<li>Completion Event Dispatcher (event demultiplexor): waits for events that indicate the completion of the I/O operation, and forwards those events to the appropriate handlers</li>
+<li>Completion Event Handler (user handler): handles the data from user defined buffer, starts a new asynchronous operation, and returns control to the dispatcher</li>
+</ul></li>
 </ol>
 
-<h2 id="解决方法">解决方法</h2>
+<h2 id="emulated-proactor-implementation">Emulated Proactor Implementation</h2>
 
-<p>为了避免粘包现象，可采取以下几种措施。</p>
+<p>A solution to the challenge of designing a portable framework for the Proactor and Reactor I/O patterns: transform a Reactor demultiplexor I/O solution to an emulated async I/O by moving read/write operations from event handlers inside the demultiplexor (this is &ldquo;emulated async&rdquo; approach).</p>
 
-<ol>
-<li><p>对于发送方引起的粘包现象，用户可通过编程设置来避免，TCP 提供了强制数据立即传送的操作指令 push，TCP 软件收到该操作指令后，就立即将本段数据发送出去，而不必等待发送缓冲区满；</p>
+<p>We simply shifted responsibilities between different actors. By adding functionality to the demultiplexor I/O pattern, we were able to convert the Reactor pattern to a Proactor pattern.</p>
 
-<p>缺点: 第一种编程设置方法虽然可以避免发送方引起的粘包，但它关闭了优化算法，降低了网络发送效率，影响应用程序的性能，一般不建议使用。</p></li>
+<p>Structure:
+ - Dispatcher (<strong>asynchronous</strong> event demultiplexer): performs a non-blocking I/O operation and on completion calls the appropriate handler
+ - Event Handler (user handler): handles data from the user-defined buffer, declares new interes, then returns control to the dispatcher</p>
 
-<li><p>对于接收方引起的粘包，则可通过优化程序设计、精简接收进程工作量、提高接收进程优先级等措施，使其及时接收数据，从而尽量避免出现粘包现象；</p>
+<hr />
 
-<p>缺点: 第二种方法只能减少出现粘包的可能性，但并不能完全避免粘包，当发送频率较高时，或由于网络突发可能使某个时间段数据包到达接收方较快，接收方还是有可能来不及接收，从而导致粘包。</p></li>
-</ol>
+<p>Reference：</p>
 
-<p>既能保证效率又能比较好地解决粘包的方法，是由应用层进行<strong>分包处理</strong>，本质上就是由<strong>应用层</strong>来维护消息和消息的边界。主要是采用以下两种方式：</p>
+<blockquote>
+<p><a href="http://www.artima.com/articles/io_design_patternsP.html">Comparing Two High-Performance I/O Design Patterns</a></p>
 
-<ol>
-<li>以<strong>特殊字符</strong>作为消息的分界符;</li>
-<li>在消息头部加入整个消息的<strong>长度信息</strong>。</li>
-</ol>
+<p><a href="https://en.wikipedia.org/wiki/Reactor_pattern">Reactor pattern</a></p>
+
+<p><a href="https://en.wikipedia.org/wiki/Proactor_pattern">Proactor pattern</a></p>
+</blockquote>
 
 
   
 <div class="prev-next-post pure-g">
   <div class="pure-u-1-24" style="text-align: left;">
     
-    <a href="http://wiesen.github.io/post/Solution-to-Raspberry-Pi-ROS-rivz-Segmentation-Fault/"><i class="fa fa-chevron-left"></i></a>
+    <a href="http://wiesen.github.io/post/TCP%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/"><i class="fa fa-chevron-left"></i></a>
     
   </div>
   <div class="pure-u-10-24">
     
     <nav class="prev">
-      <a href="http://wiesen.github.io/post/Solution-to-Raspberry-Pi-ROS-rivz-Segmentation-Fault/">Solution to Raspberry Pi ROS rivz Core Dumped</a>
+      <a href="http://wiesen.github.io/post/TCP%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/">TCP断包粘包问题</a>
     </nav>
     
   </div>
@@ -281,14 +311,8 @@
   </div>
   <div class="pure-u-10-24">
     
-    <nav class="next">
-      <a href="http://wiesen.github.io/post/IO%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E6%A8%A1%E5%BC%8F/">I/O多路复用设计模式</a>
-    </nav>
-    
   </div>
   <div class="pure-u-1-24" style="text-align: right;">
-    
-    <a href="http://wiesen.github.io/post/IO%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E6%A8%A1%E5%BC%8F/"><i class="fa fa-chevron-right"></i></a>
     
   </div>
 </div>
