@@ -1,7 +1,7 @@
 +++
 date = "2016-09-09T17:32:46+08:00"
 draft = false
-title = "MIT 6.824 Lab 4 Sharded KeyValue Service Implementation"
+title = "MIT 6.824: Lab 4 Sharded KeyValue Service Implementation"
 
 topics = ["Distributed System", "MIT 6.824"]
 +++

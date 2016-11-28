@@ -1,7 +1,7 @@
 +++
 date = "2016-08-06T17:32:46+08:00"
 draft = false
-title = "MIT 6.824 lab3 Fault-Tolerant Key/Value Service Implementation"
+title = "MIT 6.824: lab3 Fault-Tolerant Key/Value Service Implementation"
 
 topics = ["Distributed System", "MIT 6.824"]
 +++

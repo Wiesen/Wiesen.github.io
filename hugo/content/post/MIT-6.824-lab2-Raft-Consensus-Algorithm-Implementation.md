@@ -1,7 +1,7 @@
 +++
 date = "2016-06-10T21:32:46+08:00"
 draft = false
-title = "MIT 6.824 lab2 Raft Consensus Algorithm Implementation"
+title = "MIT 6.824: lab2 Raft Consensus Algorithm Implementation"
 
 topics = ["Distributed System", "MIT 6.824"]
 +++

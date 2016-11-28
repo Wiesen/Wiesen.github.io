@@ -7,8 +7,88 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>&amp;copy; 2016. All rights reserved.</copyright>
-    <lastBuildDate>Thu, 24 Nov 2016 21:31:20 +0800</lastBuildDate>
+    <lastBuildDate>Mon, 28 Nov 2016 21:31:20 +0800</lastBuildDate>
     <atom:link href="http://wiesen.github.io/post/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Leveldb: Introduction</title>
+      <link>http://wiesen.github.io/post/leveldb-Introduction/</link>
+      <pubDate>Mon, 28 Nov 2016 21:31:20 +0800</pubDate>
+      
+      <guid>http://wiesen.github.io/post/leveldb-Introduction/</guid>
+      <description>
+
+&lt;h2 id=&#34;introduction&#34;&gt;Introduction&lt;/h2&gt;
+
+&lt;p&gt;Leveldb 库提供持久层 kv 存储，其中 keys 和values 可以是任意字节数组。目前有C++，golang 的实现。&lt;/p&gt;
+
+&lt;p&gt;作者 Jeff Dean, Sanjay Ghemawat 同时也是设计实现 BigTable 的作者。在 BigTable 中有两个关键部分：master server 和 tablet server。&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;master server 负责存储 meta-data，并且调度管理 tablet server；&lt;/li&gt;
+&lt;li&gt;tablet server 负责存储具体数据，并且响应读写操作。&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Leveldb 可视为 BigTable 中 tablet server 的简化实现。&lt;/p&gt;
+
+&lt;h2 id=&#34;features-limitations-performance&#34;&gt;Features, Limitations, Performance&lt;/h2&gt;
+
+&lt;p&gt;详见 &lt;a href=&#34;https://github.com/google/leveldb&#34;&gt;leveldb homepage&lt;/a&gt;&lt;/p&gt;
+
+&lt;h2 id=&#34;how-to-use&#34;&gt;How to use&lt;/h2&gt;
+
+&lt;p&gt;详见 &lt;a href=&#34;https://github.com/google/leveldb/blob/master/doc/index.html&#34;&gt;leveldb 使用文档&lt;/a&gt;&lt;/p&gt;
+
+&lt;h2 id=&#34;overall-architecture&#34;&gt;Overall Architecture&lt;/h2&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/leveldb-architecture.png&#34; alt=&#34;architecture&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Leveldb 存储主要分为 SSTable 和 MemTable，前者为不可变且存储于持久设备上，后者位于内存上并且可变。其中有两个 MemTable，一个为当前写入 MemTable，另一个为等待持久化的 Immutable MemTable。此外还有一些辅助文件，后面详述。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Write Operation&lt;/strong&gt;：当用户需要插入一条 kv 到 Leveldb 中时，首先会被存储到 log 中；然后插入到 MemTable 中；当 MemTable 达到一定大小后会转化为 read-only Immutable MemTable，并且创建一个新的 MemTable；同时开启一个新的后台线程将 Immutable MemTable 的内容 dump 到磁盘中，创建一个新的 SSTable；&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Deletion Operation&lt;/strong&gt;：在 Leveldb 中视为特殊的 Write operation，写入一个 deletion marker。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Read Operation&lt;/strong&gt;：当 leveldb 收到一个 Get 请求时，首先会在 MemTable 进行查找；然后在 Immutable MemTable 查找；最后在 SSTable 中查找（从 level 0 到 higher level），直到匹配到一个 kv item。&lt;/p&gt;
+
+&lt;h2 id=&#34;files&#34;&gt;Files&lt;/h2&gt;
+
+&lt;p&gt;详见 &lt;a href=&#34;https://github.com/google/leveldb/blob/master/doc/impl.html&#34;&gt;leveldb 实现文档&lt;/a&gt;&lt;/p&gt;
+
+&lt;h2 id=&#34;source-code-structure&#34;&gt;Source Code Structure&lt;/h2&gt;
+
+&lt;pre&gt;&lt;code&gt;leveldb-1.4.0  
+|
++--- port           &amp;lt;=== 提供各个平台的基本接口
+|
++--- util           &amp;lt;=== 提供一些通用工具类
+|
++--- helpers
+|      |
+|      +--- memenv  &amp;lt;=== Env的一个具体实现(Env是leveldb封装的运行环境)
+|
++--- table          &amp;lt;=== 磁盘数据结构
+|
++--- db             &amp;lt;=== db的所有实现
+|
++--- doc
+|     |
+|     +--- table_format.txt   &amp;lt;=== 磁盘文件数据结构说明
+|     |
+|     +--- log_format.txt     &amp;lt;=== 日志文件（用于宕机恢复未刷盘的数据）数据结构说明
+|     |
+|     +--- impl.html          &amp;lt;=== 一些实现
+|     |
+|     +--- index.html         &amp;lt;=== 使用说明
+|     |
+|     +--- bench.html         &amp;lt;=== 测试数据
+|
++--- include
+     |
+     +--- leveldb           &amp;lt;=== 所有头文件
+&lt;/code&gt;&lt;/pre&gt;
+</description>
+    </item>
     
     <item>
       <title>I/O多路复用设计模式</title>
@@ -20,9 +100,12 @@
 
 &lt;h2 id=&#34;introduction&#34;&gt;Introduction&lt;/h2&gt;
 
-&lt;p&gt;System I/O can be blocking, or non-blocking synchronous, or non-blocking asynchronous.
- - Blocking I/O means that the calling system does not return control to the caller until the operation is finished
- - a non-blocking synchronous call returns control to the caller immediately&lt;/p&gt;
+&lt;p&gt;System I/O can be blocking, or non-blocking synchronous, or non-blocking asynchronous:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Blocking I/O means that the calling system does not return control to the caller until the operation is finished&lt;/li&gt;
+&lt;li&gt;a non-blocking synchronous call returns control to the caller immediately&lt;/li&gt;
+&lt;/ul&gt;
 
 &lt;p&gt;I/O multiplexing mechanisms rely on an event demultiplexor: dispatches I/O events from a limited number of sources to the appropriate read/write event handlers.&lt;/p&gt;
 
@@ -42,14 +125,21 @@
 &lt;li&gt;Request Event Handler (user handler): performs the actual I/O operation, handles data, , declares renewed interest in I/O events, and returns control to the dispatcher&lt;/li&gt;
 &lt;/ul&gt;
 
-&lt;p&gt;Benific:
- - separates application specific code from the reactor implementation
- - allows for simple coarse-grain concurrency while not adding the complexity of multiple threads to the system&lt;/p&gt;
+&lt;p&gt;Benific:&lt;/p&gt;
 
-&lt;p&gt;Limitations:
- - more difficult to debug than a procedural pattern due to the inverted flow of control
- - by only calling event handlers synchronously, it limits maximum concurrency, especially on symmetric multiprocessing hardware
- - The scalability of the reactor pattern is limited by event handler and demultiplexer&lt;/p&gt;&lt;/li&gt;
+&lt;ul&gt;
+&lt;li&gt;separates application specific code from the reactor implementation&lt;/li&gt;
+&lt;li&gt;allows for simple coarse-grain concurrency while not adding the complexity of multiple threads to the system&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Limitations:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;more difficult to debug than a procedural pattern due to the inverted flow of control&lt;/li&gt;
+&lt;li&gt;by only calling event handlers synchronously, it limits maximum concurrency, especially on symmetric multiprocessing hardware&lt;/li&gt;
+&lt;li&gt;The scalability of the reactor pattern is limited by event handler and demultiplexer
+&lt;br /&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
 
 &lt;li&gt;&lt;p&gt;Proactor&lt;/p&gt;
 
@@ -76,9 +166,12 @@
 
 &lt;p&gt;We simply shifted responsibilities between different actors. By adding functionality to the demultiplexor I/O pattern, we were able to convert the Reactor pattern to a Proactor pattern.&lt;/p&gt;
 
-&lt;p&gt;Structure:
- - Dispatcher (&lt;strong&gt;asynchronous&lt;/strong&gt; event demultiplexer): performs a non-blocking I/O operation and on completion calls the appropriate handler
- - Event Handler (user handler): handles data from the user-defined buffer, declares new interes, then returns control to the dispatcher&lt;/p&gt;
+&lt;p&gt;Structure:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Dispatcher (&lt;strong&gt;asynchronous&lt;/strong&gt; event demultiplexer): performs a non-blocking I/O operation and on completion calls the appropriate handler&lt;/li&gt;
+&lt;li&gt;Event Handler (user handler): handles data from the user-defined buffer, declares new interes, then returns control to the dispatcher&lt;/li&gt;
+&lt;/ul&gt;
 
 &lt;hr /&gt;
 
@@ -163,7 +256,7 @@
     </item>
     
     <item>
-      <title>MIT 6.824 Lab 4 Sharded KeyValue Service Implementation</title>
+      <title>MIT 6.824: Lab 4 Sharded KeyValue Service Implementation</title>
       <link>http://wiesen.github.io/post/MIT-6.824-Lab4-Sharded-KeyValue-Service/</link>
       <pubDate>Fri, 09 Sep 2016 17:32:46 +0800</pubDate>
       
@@ -311,7 +404,7 @@
     </item>
     
     <item>
-      <title>MIT 6.824 lab3 Fault-Tolerant Key/Value Service Implementation</title>
+      <title>MIT 6.824: lab3 Fault-Tolerant Key/Value Service Implementation</title>
       <link>http://wiesen.github.io/post/MIT-6.824-lab3-Fault-Tolerant-KVService-Implementation/</link>
       <pubDate>Sat, 06 Aug 2016 17:32:46 +0800</pubDate>
       
@@ -477,7 +570,7 @@
     </item>
     
     <item>
-      <title>MIT 6.824 lab2 Raft Consensus Algorithm Implementation</title>
+      <title>MIT 6.824: lab2 Raft Consensus Algorithm Implementation</title>
       <link>http://wiesen.github.io/post/MIT-6.824-lab2-Raft-Consensus-Algorithm-Implementation/</link>
       <pubDate>Fri, 10 Jun 2016 21:32:46 +0800</pubDate>
       

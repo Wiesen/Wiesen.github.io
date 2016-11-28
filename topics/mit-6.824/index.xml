@@ -11,7 +11,7 @@
     <atom:link href="http://wiesen.github.io/topics/mit-6.824/index.xml" rel="self" type="application/rss+xml" />
     
     <item>
-      <title>MIT 6.824 Lab 4 Sharded KeyValue Service Implementation</title>
+      <title>MIT 6.824: Lab 4 Sharded KeyValue Service Implementation</title>
       <link>http://wiesen.github.io/post/MIT-6.824-Lab4-Sharded-KeyValue-Service/</link>
       <pubDate>Fri, 09 Sep 2016 17:32:46 +0800</pubDate>
       
@@ -138,7 +138,7 @@
     </item>
     
     <item>
-      <title>MIT 6.824 lab3 Fault-Tolerant Key/Value Service Implementation</title>
+      <title>MIT 6.824: lab3 Fault-Tolerant Key/Value Service Implementation</title>
       <link>http://wiesen.github.io/post/MIT-6.824-lab3-Fault-Tolerant-KVService-Implementation/</link>
       <pubDate>Sat, 06 Aug 2016 17:32:46 +0800</pubDate>
       
@@ -304,7 +304,7 @@
     </item>
     
     <item>
-      <title>MIT 6.824 lab2 Raft Consensus Algorithm Implementation</title>
+      <title>MIT 6.824: lab2 Raft Consensus Algorithm Implementation</title>
       <link>http://wiesen.github.io/post/MIT-6.824-lab2-Raft-Consensus-Algorithm-Implementation/</link>
       <pubDate>Fri, 10 Jun 2016 21:32:46 +0800</pubDate>
       
