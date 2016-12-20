@@ -7,7 +7,7 @@
   <meta name="description" content="">
   <meta name="generator" content="Hugo 0.18" />
 
-  <title>TCP断包粘包问题 &middot; Wiesen&#39;s Blog</title>
+  <title>Leveldb: Basic Settings &middot; Wiesen&#39;s Blog</title>
 
   
   
@@ -185,7 +185,7 @@
 
 
 <div class="header">
-  <h1>TCP断包粘包问题</h1>
+  <h1>Leveldb: Basic Settings</h1>
   <h2></h2>
 </div>
 <div class="content">
@@ -194,7 +194,7 @@
 
   <div>
     <i class="fa fa-calendar fa-fw"></i>
-    <time>26 Oct 2016, 10:32</time>
+    <time>19 Dec 2016, 21:31</time>
   </div>
 
   
@@ -205,7 +205,9 @@
   <div>
     <i class="fa fa-folder fa-fw"></i>
     
-      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/network">network</a>
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/database">Database</a>&nbsp;&#47;
+    
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/leveldb">Leveldb</a>
     
   </div>
   
@@ -217,62 +219,175 @@
 
   
 
-<p>（内容收集自网络）</p>
-
-<h2 id="粘包问题">粘包问题</h2>
-
-<p>粘包问题是由 TCP 是<strong>“字节流”</strong>协议，没有消息边界所引起的。而 UDP/HTTP 具有消息边界，所以不存在断包粘包问题。</p>
-
-<p>另外：</p>
+<p>（待完善……）</p>
 
 <ol>
-<li>如果发送数据无结构，如文件传输，这样发送方只管发送，接收方只管接收存储就 ok，也不用考虑粘包；</li>
-<li>如果利用 TCP 短连接时，不会出现粘包问题；</li>
-<li>当发送数据存在一定结构，并且需要维护长连接时，则需要考虑粘包问题；</li>
+<li><p>Slice(<code>include/leveldb/slice.h</code>)</p>
+
+<p>为操作数据的方便，将数据和长度包装成 Slice 使用，直接操控指针以避免不必要的数据拷贝</p>
+
+<pre><code>class Slice {
+    … 
+    private: 
+        const char* data_; 
+        size_t size_; 
+};
+</code></pre></li>
+
+<li><p>Optin(<code>include/leveldb/option.h</code>)</p>
+
+<p>leveldb 中启动时的一些配置，通过 Option 传入，get/put/delete 时，也有相应的 ReadOption/WriteOption。</p></li>
+
+<li><p>Env(<code>include/leveldb/env.h</code> <code>util/evn_posix.h</code>)</p>
+
+<p>考虑到移植以及灵活性，leveldb 将系统相关的处理（文件/进程/时间之类）抽象成 Env，用户可以自己实现相应的接口，作为 Option 传入。默认使用自带的实现。</p></li>
+
+<li><p>varint(<code>util/coding.h</code>)</p>
+
+<p>leveldb 采用了 protocalbuffer 里使用的变长整形编码方法，节省空间。</p></li>
+
+<li><p>ValueType(<code>db/dbformat.h</code>)</p>
+
+<p>leveldb更新（put/delete）某个key时不会操控到db中的数据，每次操作都是直接新插入一份kv数据，具体的数据合并和清除由后台的compact完成。</p>
+
+<p>所以，每次 put 都会添加一份 KV 数据，即使该 key 已经存在；而 delete 等同于 put 空的 value。为了区分 live 数据和已删除的 mock 数据，leveldb 使用 ValueType 来标识：</p>
+
+<pre><code>enum ValueType { 
+    kTypeDeletion = 0x0, 
+    kTypeValue = 0x1 
+};
+</code></pre></li>
+
+<li><p>SequenceNumber(<code>db/dbformat.h</code>)</p>
+
+<p>leveldb中的每次更新（put/delete) 操作都拥有一个版本，由 SequnceNumber 来标识，整个db有一个全局值保存着当前使用到的SequnceNumber。SequnceNumber 在 leveldb 有重要的地位，key 的排序，compact 以及 snapshot 都依赖于它。</p>
+
+<p><code>typedef uint64_t SequenceNumber</code>: 存储时，SequnceNumber 只占用56 bits, ValueType 占用8 bits，二者共同占用 64bits（uint64_t).</p>
+
+<table>
+<thead>
+<tr>
+<th>0-56</th>
+<th align="center">56-64</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>SequnceNumber</td>
+<td align="center">ValueType</td>
+</tr>
+</tbody>
+</table></li>
+
+<li><p>user_key &amp; memtable_key &amp; internal_key</p>
+
+<ul>
+<li>user_key: 用户使用的 key</li>
+<li>memtable_key: memtable 中使用的 key</li>
+<li>internal_key: sstable 中使用的 key</li>
+</ul></li>
+
+<li><p>InternalKey(<code>db/dbformat.h</code>) &amp; ParsedInternalKey (<code>db/dbformat.h</code>)</p>
+
+<p>InternalKey: userkey ＋ 元信息（8 bytes, SequnceNumber|ValueType), ParsedInternalKey 为 InternalKey 分拆得到的结构体</p>
+
+<pre><code>class InternalKey {
+    …
+    private:
+        std::string rep_;
+}
+
+struct ParsedInternalKey { 
+    Slice user_key; 
+    SequenceNumber sequence; 
+    ValueType type; 
+};
+</code></pre></li>
+
+<li><p>LookupKey(<code>db/dbformat.h</code>)</p>
+
+<p>db 内部为查找 memtable/sstable 方便而设置的类：</p>
+
+<pre><code>class LookupKey { 
+    … 
+    private: 
+        const char* start_;
+        const char* kstart_;
+        const char* end_;
+};
+</code></pre>
+
+<table>
+<thead>
+<tr>
+<th>start_</th>
+<th align="center">kstart_ - end_</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>internal_key_size</td>
+<td align="center">internal_key: userkey_data + SequenceNumber</td>
+</tr>
+
+<tr>
+<td>(varint32)</td>
+<td align="center">(InternalKey_size: char[] + uint64)</td>
+</tr>
+</tbody>
+</table>
+
+<p>对 memtable lookup 时使用 <code>memtable_key</code> [<code>start_</code>,<code>end_</code>], 对 sstable lookup 时使用 <code>internal_key</code> [<code>kstart_</code>, <code>end_</code>]。</p>
+
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_key.png" width="450"/></p></li>
+
+<li><p>memtable entry</p>
+
+<p>MemTable 中 entry 存储格式（实际上是字符串）：</p>
+
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_memtable_entry.png" width="600"/></p></li>
+
+<li><p>Comparator(<code>include/leveldb/comparator.h</code> <code>util/comparator.cc</code>)</p></li>
+
+<li><p>InternalKeyComparator(<code>db/dbformat.h</code>)</p></li>
+
+<li><p>WriteBatch(<code>db/write_batch.cc</code>)</p></li>
+
+<li><p>FileMetaData(<code>db/version_edit.h</code>)</p></li>
+
+<li><p>block(<code>table/block.cc</code>)</p></li>
+
+<li><p>BlockHandle(<code>table/dbformat.h</code>)</p></li>
+
+<li><p>FileNumber(<code>db/dbformat.h</code>)</p></li>
+
+<li><p>filename(<code>db/dbformat.cc</code>)</p></li>
+
+<li><p>Compact(<code>db/db_impl.cc</code> <code>db/version_set.cc</code>)</p></li>
+
+<li><p>Iterator(<code>include/leveldb/iterator.h</code>)</p></li>
 </ol>
 
-<h2 id="问题原因">问题原因</h2>
+<h2 id="reference">Reference</h2>
 
-<p>出现粘包现象的原因既可能由发送方造成，也可能由接收方造成:</p>
+<p>leveldb实现解析 by 淘宝-核心系统研发-存储 那岩</p>
 
-<ol>
-<li>发送端需要等缓冲区满才发送出去，造成粘包;</li>
-<li>接收方没能及时地接收缓冲区的包，造成多个包接收;</li>
-</ol>
-
-<h2 id="解决方法">解决方法</h2>
-
-<p>为了避免粘包现象，可采取以下几种措施。</p>
-
-<ol>
-<li><p>对于发送方引起的粘包现象，用户可通过编程设置来避免，TCP 提供了强制数据立即传送的操作指令 push，TCP 软件收到该操作指令后，就立即将本段数据发送出去，而不必等待发送缓冲区满；</p>
-
-<p>缺点: 第一种编程设置方法虽然可以避免发送方引起的粘包，但它关闭了优化算法，降低了网络发送效率，影响应用程序的性能，一般不建议使用。</p></li>
-
-<li><p>对于接收方引起的粘包，则可通过优化程序设计、精简接收进程工作量、提高接收进程优先级等措施，使其及时接收数据，从而尽量避免出现粘包现象；</p>
-
-<p>缺点: 第二种方法只能减少出现粘包的可能性，但并不能完全避免粘包，当发送频率较高时，或由于网络突发可能使某个时间段数据包到达接收方较快，接收方还是有可能来不及接收，从而导致粘包。</p></li>
-</ol>
-
-<p>既能保证效率又能比较好地解决粘包的方法，是由应用层进行<strong>分包处理</strong>，本质上就是由<strong>应用层</strong>来维护消息和消息的边界。主要是采用以下两种方式：</p>
-
-<ol>
-<li>以<strong>特殊字符</strong>作为消息的分界符;</li>
-<li>在消息头部加入整个消息的<strong>长度信息</strong>。</li>
-</ol>
+<p><a href="http://www.pandademo.com/2016/03/memtable-and-skiplist-leveldb-source-dissect-3/">MemTable 与 SkipList-leveldb 源码剖析 (3)</a></p>
 
 
   
 <div class="prev-next-post pure-g">
   <div class="pure-u-1-24" style="text-align: left;">
     
-    <a href="http://wiesen.github.io/post/Solution-to-Raspberry-Pi-ROS-rivz-Segmentation-Fault/"><i class="fa fa-chevron-left"></i></a>
+    <a href="http://wiesen.github.io/post/leveldb-Introduction/"><i class="fa fa-chevron-left"></i></a>
     
   </div>
   <div class="pure-u-10-24">
     
     <nav class="prev">
-      <a href="http://wiesen.github.io/post/Solution-to-Raspberry-Pi-ROS-rivz-Segmentation-Fault/">Solution to Raspberry Pi ROS rivz Core Dumped</a>
+      <a href="http://wiesen.github.io/post/leveldb-Introduction/">Leveldb: Introduction</a>
     </nav>
     
   </div>
@@ -282,13 +397,13 @@
   <div class="pure-u-10-24">
     
     <nav class="next">
-      <a href="http://wiesen.github.io/post/IO%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E6%A8%A1%E5%BC%8F/">I/O多路复用设计模式</a>
+      <a href="http://wiesen.github.io/post/leveldb-Storage/">Leveldb: Storage MemTable</a>
     </nav>
     
   </div>
   <div class="pure-u-1-24" style="text-align: right;">
     
-    <a href="http://wiesen.github.io/post/IO%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E6%A8%A1%E5%BC%8F/"><i class="fa fa-chevron-right"></i></a>
+    <a href="http://wiesen.github.io/post/leveldb-Storage/"><i class="fa fa-chevron-right"></i></a>
     
   </div>
 </div>

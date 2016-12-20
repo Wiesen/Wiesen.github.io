@@ -2,13 +2,275 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Posts on Wiesen&#39;s Blog</title>
-    <link>http://wiesen.github.io/post/</link>
+    <link>http://wiesen.github.io/post/index.xml</link>
     <description>Recent content in Posts on Wiesen&#39;s Blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>&amp;copy; 2016. All rights reserved.</copyright>
-    <lastBuildDate>Mon, 28 Nov 2016 21:31:20 +0800</lastBuildDate>
+    <lastBuildDate>Tue, 20 Dec 2016 21:31:20 +0800</lastBuildDate>
     <atom:link href="http://wiesen.github.io/post/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Leveldb: Storage MemTable</title>
+      <link>http://wiesen.github.io/post/leveldb-Storage/</link>
+      <pubDate>Tue, 20 Dec 2016 21:31:20 +0800</pubDate>
+      
+      <guid>http://wiesen.github.io/post/leveldb-Storage/</guid>
+      <description>
+
+&lt;div style=&#34;text-align: center&#34;&gt;
+&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/leveldb-architecture.png&#34; width=&#34;500&#34;/&gt;
+&lt;/div&gt;
+
+&lt;h2 id=&#34;memtable-db-skiplist-h-db-memtable-h-memtable-cc&#34;&gt;Memtable (&lt;code&gt;db/skiplist.h db/memtable.h&amp;amp;memtable.cc&lt;/code&gt;)&lt;/h2&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;Introduction&lt;/p&gt;
+
+&lt;p&gt;MemTable 是 leveldb 的 kv 数据在内存中的存储结构。当 Memtable 写入的数据占用内存到达指定大小 (Options.write_buffer_size)，则自动转换为 Immutable Memtable，同时生成新的 Memtable 供写操作写入新数据。后台的 compact 进程会负责将 immutable memtable dump to disk 生成 sstable。&lt;/p&gt;
+
+&lt;p&gt;Memtable 类只是一个接口类，其底层实现依赖于两大核心组件 Arena 和 SkipList，Arena 内存分配器统一管理内存，SkipList 用于实际 KV 存储。&lt;/p&gt;
+
+&lt;p&gt;根据上一篇 blog 中 LSM tree 的性质，table 应当保持有序性。而对一个排序结构执行插入操作开销很大（随机写），通常性能瓶颈集中在这里。一些数据结构如链表, AVL 树, B 树, skiplist 等都加速了随机写。leveldb 的 memtable 实现没有使用复杂的 B 树，采用更轻量级的 &lt;a href=&#34;https://en.wikipedia.org/wiki/Skip_list&#34;&gt;skiplist&lt;/a&gt;。&lt;/p&gt;
+
+&lt;p&gt;skiplist 是一种可以代替平衡树的数据结构。其从概率上保证数据平衡，结构和实现比平衡树简单。概率上时间复杂度近似 O(logN)，与平衡树相同，但空间上比较节省，一个节点平均只需要 1.333 个指针。&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Interface&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;成员变量&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;typedef SkipList&amp;lt;const char*, KeyComparator&amp;gt; Table;
+KeyComparator comparator_;
+int refs_;    // 引用计数
+Arena arena_; // 内存池
+Table table_; // Table 就是 SkipList&amp;lt;const char*, KeyComparator&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;共有函数&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;explicit MemTable(const InternalKeyComparator&amp;amp; comparator);
+void Ref();
+void Unref();
+size_t ApproximateMemoryUsage();
+Iterator* NewIterator();
+void Add(SequenceNumber seq, ValueType type, const Slice&amp;amp; key, const Slice&amp;amp; value);
+bool Get(const LookupKey&amp;amp; key, std::string* value, Status* s);
+&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;私有函数&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;~MemTable();  // Private since only Unref() should be used to delete it
+// No copying allowed
+MemTable(const MemTable&amp;amp;);
+void operator=(const MemTable&amp;amp;);
+&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
+&lt;/ol&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Analysis&lt;/p&gt;
+
+&lt;p&gt;MemTable 的对象构造必须显式调用，重点在于初始 Arena 和 SkipList 两大核心组件，且提供引用计数初始为 0，使用时必须先 Ref()，实际对象销毁在 Unref() 引用计数为 0 时。&lt;/p&gt;
+
+&lt;p&gt;此外，LevelDB 中禁止类被复制的方法都是声明拷贝构造函数和赋值操作符为 private，并且只提供声明，而不提供定义。（析构函数同理）（C++11 中可以使用 = delete)&lt;/p&gt;
+
+&lt;p&gt;memtable 对 key 的查找和遍历是 MemTableIterator，而 MemTableIterator 实际上是 SkipList iterator wrapper。NewIterator 即是返回一个 MemTableIterator，用于有序遍历 memtable 的存储数据。&lt;/p&gt;
+
+&lt;p&gt;写入 &lt;code&gt;void Add(SequenceNumber seq, ValueType type, const Slice&amp;amp; key, const Slice&amp;amp; value)&lt;/code&gt;:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;将传入的参数封装为 &lt;code&gt;Internalkey&lt;/code&gt;，然后与 &lt;code&gt;value&lt;/code&gt; 一起编码成上述 entry&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;SkipList::Insert()&lt;/code&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;读取 &lt;code&gt;bool Get(const LookupKey&amp;amp; key, std::string* value, Status* s)&lt;/code&gt;:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;从传入的 &lt;code&gt;LookupKey&lt;/code&gt; 中获取 &lt;code&gt;memtable_key&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;MemTableIterator::Seek()&lt;/code&gt; 返回 &lt;code&gt;MemTableIterator&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;seek 失败，返回 data not exist。seek 成功，则判断数据的 ValueType：a) &lt;code&gt;kTypeValue&lt;/code&gt; 则返回对应的 &lt;code&gt;value&lt;/code&gt; 数据; b) &lt;code&gt;kTypeDeletion&lt;/code&gt; 则返回 data not exist&lt;br /&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;没有 Delete，前面说过，memtable 的 delete 是 lazy 的，实际上是 add 一条 &lt;code&gt;ValueType&lt;/code&gt; 为 &lt;code&gt;kTypeDeletion&lt;/code&gt; 的记录。&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;reference&#34;&gt;Reference&lt;/h2&gt;
+
+&lt;p&gt;&lt;a href=&#34;http://blog.csdn.net/sparkliang/article/details/8567602&#34;&gt;Leveldb 源码分析 &amp;ndash;1&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&#34;http://mingxinglai.com/cn/2013/01/leveldb-memtable/&#34;&gt;LevelDB : MemTable&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&#34;http://luodw.cc/2015/10/16/leveldb-05/&#34;&gt;leveldb skiplist 实现分析&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&#34;http://www.pandademo.com/2016/03/memtable-and-skiplist-leveldb-source-dissect-3/&#34;&gt;MemTable 与 SkipList-leveldb 源码剖析 (3)&lt;/a&gt;&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Leveldb: Basic Settings</title>
+      <link>http://wiesen.github.io/post/Leveldb-Basic-Concept/</link>
+      <pubDate>Mon, 19 Dec 2016 21:31:20 +0800</pubDate>
+      
+      <guid>http://wiesen.github.io/post/Leveldb-Basic-Concept/</guid>
+      <description>
+
+&lt;p&gt;（待完善……）&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;Slice(&lt;code&gt;include/leveldb/slice.h&lt;/code&gt;)&lt;/p&gt;
+
+&lt;p&gt;为操作数据的方便，将数据和长度包装成 Slice 使用，直接操控指针以避免不必要的数据拷贝&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;class Slice {
+    … 
+    private: 
+        const char* data_; 
+        size_t size_; 
+};
+&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Optin(&lt;code&gt;include/leveldb/option.h&lt;/code&gt;)&lt;/p&gt;
+
+&lt;p&gt;leveldb 中启动时的一些配置，通过 Option 传入，get/put/delete 时，也有相应的 ReadOption/WriteOption。&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Env(&lt;code&gt;include/leveldb/env.h&lt;/code&gt; &lt;code&gt;util/evn_posix.h&lt;/code&gt;)&lt;/p&gt;
+
+&lt;p&gt;考虑到移植以及灵活性，leveldb 将系统相关的处理（文件/进程/时间之类）抽象成 Env，用户可以自己实现相应的接口，作为 Option 传入。默认使用自带的实现。&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;varint(&lt;code&gt;util/coding.h&lt;/code&gt;)&lt;/p&gt;
+
+&lt;p&gt;leveldb 采用了 protocalbuffer 里使用的变长整形编码方法，节省空间。&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;ValueType(&lt;code&gt;db/dbformat.h&lt;/code&gt;)&lt;/p&gt;
+
+&lt;p&gt;leveldb更新（put/delete）某个key时不会操控到db中的数据，每次操作都是直接新插入一份kv数据，具体的数据合并和清除由后台的compact完成。&lt;/p&gt;
+
+&lt;p&gt;所以，每次 put 都会添加一份 KV 数据，即使该 key 已经存在；而 delete 等同于 put 空的 value。为了区分 live 数据和已删除的 mock 数据，leveldb 使用 ValueType 来标识：&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;enum ValueType { 
+    kTypeDeletion = 0x0, 
+    kTypeValue = 0x1 
+};
+&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;SequenceNumber(&lt;code&gt;db/dbformat.h&lt;/code&gt;)&lt;/p&gt;
+
+&lt;p&gt;leveldb中的每次更新（put/delete) 操作都拥有一个版本，由 SequnceNumber 来标识，整个db有一个全局值保存着当前使用到的SequnceNumber。SequnceNumber 在 leveldb 有重要的地位，key 的排序，compact 以及 snapshot 都依赖于它。&lt;/p&gt;
+
+&lt;p&gt;&lt;code&gt;typedef uint64_t SequenceNumber&lt;/code&gt;: 存储时，SequnceNumber 只占用56 bits, ValueType 占用8 bits，二者共同占用 64bits（uint64_t).&lt;/p&gt;
+
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;0-56&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;56-64&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;SequnceNumber&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;ValueType&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;user_key &amp;amp; memtable_key &amp;amp; internal_key&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;user_key: 用户使用的 key&lt;/li&gt;
+&lt;li&gt;memtable_key: memtable 中使用的 key&lt;/li&gt;
+&lt;li&gt;internal_key: sstable 中使用的 key&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;InternalKey(&lt;code&gt;db/dbformat.h&lt;/code&gt;) &amp;amp; ParsedInternalKey (&lt;code&gt;db/dbformat.h&lt;/code&gt;)&lt;/p&gt;
+
+&lt;p&gt;InternalKey: userkey ＋ 元信息（8 bytes, SequnceNumber|ValueType), ParsedInternalKey 为 InternalKey 分拆得到的结构体&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;class InternalKey {
+    …
+    private:
+        std::string rep_;
+}
+
+struct ParsedInternalKey { 
+    Slice user_key; 
+    SequenceNumber sequence; 
+    ValueType type; 
+};
+&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;LookupKey(&lt;code&gt;db/dbformat.h&lt;/code&gt;)&lt;/p&gt;
+
+&lt;p&gt;db 内部为查找 memtable/sstable 方便而设置的类：&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;class LookupKey { 
+    … 
+    private: 
+        const char* start_;
+        const char* kstart_;
+        const char* end_;
+};
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;start_&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;kstart_ - end_&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;internal_key_size&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;internal_key: userkey_data + SequenceNumber&lt;/td&gt;
+&lt;/tr&gt;
+
+&lt;tr&gt;
+&lt;td&gt;(varint32)&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;(InternalKey_size: char[] + uint64)&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+&lt;p&gt;对 memtable lookup 时使用 &lt;code&gt;memtable_key&lt;/code&gt; [&lt;code&gt;start_&lt;/code&gt;,&lt;code&gt;end_&lt;/code&gt;], 对 sstable lookup 时使用 &lt;code&gt;internal_key&lt;/code&gt; [&lt;code&gt;kstart_&lt;/code&gt;, &lt;code&gt;end_&lt;/code&gt;]。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/leveldb_key.png&#34; width=&#34;450&#34;/&gt;&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;memtable entry&lt;/p&gt;
+
+&lt;p&gt;MemTable 中 entry 存储格式（实际上是字符串）：&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/leveldb_memtable_entry.png&#34; width=&#34;600&#34;/&gt;&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Comparator(&lt;code&gt;include/leveldb/comparator.h&lt;/code&gt; &lt;code&gt;util/comparator.cc&lt;/code&gt;)&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;InternalKeyComparator(&lt;code&gt;db/dbformat.h&lt;/code&gt;)&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;WriteBatch(&lt;code&gt;db/write_batch.cc&lt;/code&gt;)&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;FileMetaData(&lt;code&gt;db/version_edit.h&lt;/code&gt;)&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;block(&lt;code&gt;table/block.cc&lt;/code&gt;)&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;BlockHandle(&lt;code&gt;table/dbformat.h&lt;/code&gt;)&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;FileNumber(&lt;code&gt;db/dbformat.h&lt;/code&gt;)&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;filename(&lt;code&gt;db/dbformat.cc&lt;/code&gt;)&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Compact(&lt;code&gt;db/db_impl.cc&lt;/code&gt; &lt;code&gt;db/version_set.cc&lt;/code&gt;)&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Iterator(&lt;code&gt;include/leveldb/iterator.h&lt;/code&gt;)&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;reference&#34;&gt;Reference&lt;/h2&gt;
+
+&lt;p&gt;leveldb实现解析 by 淘宝-核心系统研发-存储 那岩&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&#34;http://www.pandademo.com/2016/03/memtable-and-skiplist-leveldb-source-dissect-3/&#34;&gt;MemTable 与 SkipList-leveldb 源码剖析 (3)&lt;/a&gt;&lt;/p&gt;
+</description>
+    </item>
     
     <item>
       <title>Leveldb: Introduction</title>
@@ -17,6 +279,8 @@
       
       <guid>http://wiesen.github.io/post/leveldb-Introduction/</guid>
       <description>
+
+&lt;p&gt;看了不少 blog 分析 leveldb，但很少看到有人从设计原因和策略上进行总结。所以这个系列对 leveldb 的实现做一点设计分析，争取将内部实现逻辑串联起来，至于源码注释之类的网上一扒拉就有很多啦。&lt;/p&gt;
 
 &lt;h2 id=&#34;introduction&#34;&gt;Introduction&lt;/h2&gt;
 
@@ -47,22 +311,22 @@
 
 &lt;p&gt;上述说明：基于目前这样的硬件特性，我们设计存储系统时要&lt;strong&gt;尽量避免随机读写，设计为顺序读写&lt;/strong&gt;。&lt;/p&gt;
 
-&lt;p&gt;然而，读操作和写操作是相互矛盾的：&lt;/p&gt;
+&lt;p&gt;然而，顺序读和顺序写是相互矛盾的：&lt;/p&gt;
 
 &lt;ul&gt;
-&lt;li&gt;为了优化读操作，最好是将相关的数据写入相邻的块，以维护顺序读，而这造成了随机写；&lt;/li&gt;
-&lt;li&gt;为了优化写操作，最好是所有的写都是 Append，也就是顺序写，而这造成了随机读。&lt;/li&gt;
+&lt;li&gt;为了优化读效率，最好是将以有序方式组织数据从而写入相邻的块，以维护顺序读，而这增加了随机写；&lt;/li&gt;
+&lt;li&gt;为了优化写效率，最好是所有的写都是增量写，也就是顺序写，而这增加了随机读。&lt;/li&gt;
 &lt;/ul&gt;
 
 &lt;p&gt;题外话：常见的优化读操作性能的设计有：二分、hash、B+ 树等。这些方法使用各种查找结构来组织数据，有效提升读操作性能(最少提供了O(logN))，但是增加了随机写操作，大大降低了写操作性能。&lt;/p&gt;
 
-&lt;p&gt;因此，如果一个业务&lt;strong&gt;对写操作的吞吐量十分敏感，或者写操作数量远远大于读操作&lt;/strong&gt;，那么应该采取的措施是：&lt;strong&gt;优化写操作，也就是尽量将写操作设计为 Append&lt;/strong&gt;，从而尽可能地减少寻道，以达到磁盘理论写入速度最大值。&lt;/p&gt;
+&lt;p&gt;因此，如果一个业务&lt;strong&gt;对写操作的吞吐量十分敏感，或者写操作数量远远大于读操作&lt;/strong&gt;，那么应该采取的措施是：&lt;strong&gt;优化写操作，也就是尽量将写操作设计为增量写&lt;/strong&gt;，从而尽可能地减少寻道，以达到磁盘理论写入速度最大值。&lt;/p&gt;
 
 &lt;p&gt;这个策略常用于日志或者堆文件这种业务场景中，因为它们是完全顺序的（包括读写），所以可以提供很好的写操作性能。&lt;/p&gt;
 
 &lt;h2 id=&#34;leveldb-core-idea&#34;&gt;Leveldb Core Idea&lt;/h2&gt;
 
-&lt;p&gt;以 &lt;strong&gt;LSM(Log Structured Merge) Tree&lt;/strong&gt;组织数据达到顺序写，辅以 &lt;strong&gt;Bloom Filter&lt;/strong&gt; 和 &lt;strong&gt;Shard LRU cache&lt;/strong&gt; 优化随机读操作。&lt;/p&gt;
+&lt;p&gt;以 &lt;strong&gt;LSM(Log Structured Merge) Tree&lt;/strong&gt;组织数据从而将逻辑场景中的写请求转换为顺序写，辅以 &lt;strong&gt;Bloom Filter&lt;/strong&gt; 和 &lt;strong&gt;Shard LRU cache&lt;/strong&gt; 等策略优化随机读操作从而保证读效率。&lt;/p&gt;
 
 &lt;ol&gt;
 &lt;li&gt;&lt;p&gt;&lt;a href=&#34;https://en.wikipedia.org/wiki/Log-structured_merge-tree&#34;&gt;&lt;strong&gt;LSM tree&lt;/strong&gt;&lt;/a&gt;&lt;/p&gt;
@@ -73,7 +337,9 @@
 &lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/memtable.png&#34; width=&#34;500&#34;/&gt; &lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/compaction.png&#34; width=&#34;500&#34;/&gt;
 &lt;/div&gt;
 
-&lt;p&gt;LSM tree 针对&lt;strong&gt;写入速度瓶颈问题&lt;/strong&gt;而提出，其基本思想是：&lt;strong&gt;将随机写转换为顺序写，交换读和写的随机 IO&lt;/strong&gt;，数据更新仅以 Append 操作进行，并保存为有序文件 SSTable (Sorted String Table)到磁盘中（read only），每个文件保存一段时间内的数据更新。&lt;/p&gt;
+&lt;p&gt;LSM tree 针对&lt;strong&gt;写入速度瓶颈问题&lt;/strong&gt;而提出的方法，其基本思想是：&lt;strong&gt;将随机写转换为顺序写，交换读和写的随机 IO&lt;/strong&gt;。主要组成结构为：MemTable（内存中）+ SSTable (Sorted String Table)&lt;/p&gt;
+
+&lt;p&gt;首先数据更新增量写入 MemTable，其后保存为有序文件 SSTable 到磁盘中（read only），每个文件保存一段时间内的数据更新。为了均衡读写效率，SSTable 文件是一种分层次（level）管理。&lt;/p&gt;
 
 &lt;p&gt;LSM Tree 的主要措施有:&lt;/p&gt;
 
@@ -93,7 +359,7 @@
 
 &lt;p&gt;bloomfilter 以概率性算法高效检索一个 key 是否在一个 SSTable (核心为 hash，若判断为不存在则必定不存在，若判断为存在则可能不存在)。&lt;/p&gt;&lt;/li&gt;
 
-&lt;li&gt;&lt;p&gt;&lt;a href=&#34;https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_Recently_Used_.28LRU.29&#34;&gt;Shard LRU Cache&lt;/a&gt;&lt;/p&gt;
+&lt;li&gt;&lt;p&gt;&lt;a href=&#34;https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_Recently_Used_.28LRU.29&#34;&gt;&lt;strong&gt;Shard LRU Cache&lt;/strong&gt;&lt;/a&gt;&lt;/p&gt;
 
 &lt;p&gt;leveldb 中的 cache 分为 Table Cache 和 Block Cache 两种，其中 Table Cache 中缓存的是 sstable 的索引数据，Block Cache 缓存的是 Block 数据（可选打开）&lt;/p&gt;
 
@@ -108,7 +374,7 @@
 &lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/leveldb-architecture.png&#34; width=&#34;500&#34;/&gt;
 &lt;/div&gt;
 
-&lt;p&gt;Leveldb 存储主要分为 SSTable 和 MemTable，前者为不可变且存储于持久设备上，后者位于内存上并且可变。其中有两个 MemTable，一个为当前写入 MemTable，另一个为等待持久化的 Immutable MemTable。此外还有一些辅助文件，后面详述。&lt;/p&gt;
+&lt;p&gt;Leveldb 存储主要分为 SSTable 和 MemTable（即 LSM Tree），前者为不可变且存储于持久设备上，后者位于内存上并且可变。其中有两个 MemTable，一个为当前写入 MemTable，另一个为等待持久化的 Immutable MemTable。此外还有一些辅助文件，后面详述。&lt;/p&gt;
 
 &lt;p&gt;&lt;strong&gt;Write Operation&lt;/strong&gt;：当用户需要插入一条 kv 到 Leveldb 中时，首先会被存储到 log 中 &lt;strong&gt;(Write Ahead Log, WAL, 保证数据持久性)&lt;/strong&gt;；然后插入到 MemTable 中；当 MemTable 达到一定大小后会转化为 read-only Immutable MemTable，并且创建一个新的 MemTable；同时开启一个新的后台线程将 Immutable MemTable 的内容 dump 到磁盘中，创建一个新的 SSTable；&lt;/p&gt;
 
@@ -130,11 +396,11 @@
 |
 +--- helpers
 |      |
-|      +--- memenv  &amp;lt;=== Env的一个具体实现(Env是leveldb封装的运行环境)
+|      +--- memenv  &amp;lt;=== Env 的一个具体实现(Env 是 leveldb 封装的运行环境)
 |
-+--- table          &amp;lt;=== 磁盘数据结构
++--- table          &amp;lt;=== sstable 相关的数据格式定义和操作实现
 |
-+--- db             &amp;lt;=== db的所有实现
++--- db             &amp;lt;=== 主要逻辑的实现
 |
 +--- doc
 |     |
@@ -152,6 +418,18 @@
      |
      +--- leveldb           &amp;lt;=== 所有头文件
 &lt;/code&gt;&lt;/pre&gt;
+
+&lt;hr /&gt;
+
+&lt;p&gt;Reference：&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;&lt;a href=&#34;http://zouzls.github.io/2016/11/23/LevelDB%E4%B9%8BLSM-Tree/&#34;&gt;LevelDB 之 LSM-Tree&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&#34;http://brg-liuwei.github.io/tech/2014/10/15/leveldb-0.html&#34;&gt;和我一起学习 leveldb&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&#34;http://www.open-open.com/lib/view/open1424916275249.html&#34;&gt;Log Structured Merge Trees(LSM) 原理&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
 </description>
     </item>
     

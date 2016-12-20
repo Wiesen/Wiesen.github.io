@@ -7,7 +7,7 @@
   <meta name="description" content="">
   <meta name="generator" content="Hugo 0.18" />
 
-  <title>TCP断包粘包问题 &middot; Wiesen&#39;s Blog</title>
+  <title>Leveldb: Storage MemTable &middot; Wiesen&#39;s Blog</title>
 
   
   
@@ -185,7 +185,7 @@
 
 
 <div class="header">
-  <h1>TCP断包粘包问题</h1>
+  <h1>Leveldb: Storage MemTable</h1>
   <h2></h2>
 </div>
 <div class="content">
@@ -194,7 +194,7 @@
 
   <div>
     <i class="fa fa-calendar fa-fw"></i>
-    <time>26 Oct 2016, 10:32</time>
+    <time>20 Dec 2016, 21:31</time>
   </div>
 
   
@@ -205,7 +205,9 @@
   <div>
     <i class="fa fa-folder fa-fw"></i>
     
-      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/network">network</a>
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/database">Database</a>&nbsp;&#47;
+    
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/leveldb">Leveldb</a>
     
   </div>
   
@@ -217,62 +219,103 @@
 
   
 
-<p>（内容收集自网络）</p>
+<div style="text-align: center">
+<img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb-architecture.png" width="500"/>
+</div>
 
-<h2 id="粘包问题">粘包问题</h2>
-
-<p>粘包问题是由 TCP 是<strong>“字节流”</strong>协议，没有消息边界所引起的。而 UDP/HTTP 具有消息边界，所以不存在断包粘包问题。</p>
-
-<p>另外：</p>
+<h2 id="memtable-db-skiplist-h-db-memtable-h-memtable-cc">Memtable (<code>db/skiplist.h db/memtable.h&amp;memtable.cc</code>)</h2>
 
 <ol>
-<li>如果发送数据无结构，如文件传输，这样发送方只管发送，接收方只管接收存储就 ok，也不用考虑粘包；</li>
-<li>如果利用 TCP 短连接时，不会出现粘包问题；</li>
-<li>当发送数据存在一定结构，并且需要维护长连接时，则需要考虑粘包问题；</li>
-</ol>
+<li><p>Introduction</p>
 
-<h2 id="问题原因">问题原因</h2>
+<p>MemTable 是 leveldb 的 kv 数据在内存中的存储结构。当 Memtable 写入的数据占用内存到达指定大小 (Options.write_buffer_size)，则自动转换为 Immutable Memtable，同时生成新的 Memtable 供写操作写入新数据。后台的 compact 进程会负责将 immutable memtable dump to disk 生成 sstable。</p>
 
-<p>出现粘包现象的原因既可能由发送方造成，也可能由接收方造成:</p>
+<p>Memtable 类只是一个接口类，其底层实现依赖于两大核心组件 Arena 和 SkipList，Arena 内存分配器统一管理内存，SkipList 用于实际 KV 存储。</p>
 
-<ol>
-<li>发送端需要等缓冲区满才发送出去，造成粘包;</li>
-<li>接收方没能及时地接收缓冲区的包，造成多个包接收;</li>
-</ol>
+<p>根据上一篇 blog 中 LSM tree 的性质，table 应当保持有序性。而对一个排序结构执行插入操作开销很大（随机写），通常性能瓶颈集中在这里。一些数据结构如链表, AVL 树, B 树, skiplist 等都加速了随机写。leveldb 的 memtable 实现没有使用复杂的 B 树，采用更轻量级的 <a href="https://en.wikipedia.org/wiki/Skip_list">skiplist</a>。</p>
 
-<h2 id="解决方法">解决方法</h2>
+<p>skiplist 是一种可以代替平衡树的数据结构。其从概率上保证数据平衡，结构和实现比平衡树简单。概率上时间复杂度近似 O(logN)，与平衡树相同，但空间上比较节省，一个节点平均只需要 1.333 个指针。</p></li>
 
-<p>为了避免粘包现象，可采取以下几种措施。</p>
+<li><p>Interface</p>
 
 <ol>
-<li><p>对于发送方引起的粘包现象，用户可通过编程设置来避免，TCP 提供了强制数据立即传送的操作指令 push，TCP 软件收到该操作指令后，就立即将本段数据发送出去，而不必等待发送缓冲区满；</p>
+<li><p>成员变量</p>
 
-<p>缺点: 第一种编程设置方法虽然可以避免发送方引起的粘包，但它关闭了优化算法，降低了网络发送效率，影响应用程序的性能，一般不建议使用。</p></li>
+<pre><code>typedef SkipList&lt;const char*, KeyComparator&gt; Table;
+KeyComparator comparator_;
+int refs_;    // 引用计数
+Arena arena_; // 内存池
+Table table_; // Table 就是 SkipList&lt;const char*, KeyComparator&gt;
+</code></pre></li>
 
-<li><p>对于接收方引起的粘包，则可通过优化程序设计、精简接收进程工作量、提高接收进程优先级等措施，使其及时接收数据，从而尽量避免出现粘包现象；</p>
+<li><p>共有函数</p>
 
-<p>缺点: 第二种方法只能减少出现粘包的可能性，但并不能完全避免粘包，当发送频率较高时，或由于网络突发可能使某个时间段数据包到达接收方较快，接收方还是有可能来不及接收，从而导致粘包。</p></li>
-</ol>
+<pre><code>explicit MemTable(const InternalKeyComparator&amp; comparator);
+void Ref();
+void Unref();
+size_t ApproximateMemoryUsage();
+Iterator* NewIterator();
+void Add(SequenceNumber seq, ValueType type, const Slice&amp; key, const Slice&amp; value);
+bool Get(const LookupKey&amp; key, std::string* value, Status* s);
+</code></pre></li>
 
-<p>既能保证效率又能比较好地解决粘包的方法，是由应用层进行<strong>分包处理</strong>，本质上就是由<strong>应用层</strong>来维护消息和消息的边界。主要是采用以下两种方式：</p>
+<li><p>私有函数</p>
+
+<pre><code>~MemTable();  // Private since only Unref() should be used to delete it
+// No copying allowed
+MemTable(const MemTable&amp;);
+void operator=(const MemTable&amp;);
+</code></pre></li>
+</ol></li>
+
+<li><p>Analysis</p>
+
+<p>MemTable 的对象构造必须显式调用，重点在于初始 Arena 和 SkipList 两大核心组件，且提供引用计数初始为 0，使用时必须先 Ref()，实际对象销毁在 Unref() 引用计数为 0 时。</p>
+
+<p>此外，LevelDB 中禁止类被复制的方法都是声明拷贝构造函数和赋值操作符为 private，并且只提供声明，而不提供定义。（析构函数同理）（C++11 中可以使用 = delete)</p>
+
+<p>memtable 对 key 的查找和遍历是 MemTableIterator，而 MemTableIterator 实际上是 SkipList iterator wrapper。NewIterator 即是返回一个 MemTableIterator，用于有序遍历 memtable 的存储数据。</p>
+
+<p>写入 <code>void Add(SequenceNumber seq, ValueType type, const Slice&amp; key, const Slice&amp; value)</code>:</p>
 
 <ol>
-<li>以<strong>特殊字符</strong>作为消息的分界符;</li>
-<li>在消息头部加入整个消息的<strong>长度信息</strong>。</li>
+<li>将传入的参数封装为 <code>Internalkey</code>，然后与 <code>value</code> 一起编码成上述 entry</li>
+<li><code>SkipList::Insert()</code></li>
 </ol>
+
+<p>读取 <code>bool Get(const LookupKey&amp; key, std::string* value, Status* s)</code>:</p>
+
+<ol>
+<li>从传入的 <code>LookupKey</code> 中获取 <code>memtable_key</code></li>
+<li><code>MemTableIterator::Seek()</code> 返回 <code>MemTableIterator</code></li>
+<li>seek 失败，返回 data not exist。seek 成功，则判断数据的 ValueType：a) <code>kTypeValue</code> 则返回对应的 <code>value</code> 数据; b) <code>kTypeDeletion</code> 则返回 data not exist<br /></li>
+</ol>
+
+<p>没有 Delete，前面说过，memtable 的 delete 是 lazy 的，实际上是 add 一条 <code>ValueType</code> 为 <code>kTypeDeletion</code> 的记录。</p></li>
+</ol>
+
+<h2 id="reference">Reference</h2>
+
+<p><a href="http://blog.csdn.net/sparkliang/article/details/8567602">Leveldb 源码分析 &ndash;1</a></p>
+
+<p><a href="http://mingxinglai.com/cn/2013/01/leveldb-memtable/">LevelDB : MemTable</a></p>
+
+<p><a href="http://luodw.cc/2015/10/16/leveldb-05/">leveldb skiplist 实现分析</a></p>
+
+<p><a href="http://www.pandademo.com/2016/03/memtable-and-skiplist-leveldb-source-dissect-3/">MemTable 与 SkipList-leveldb 源码剖析 (3)</a></p>
 
 
   
 <div class="prev-next-post pure-g">
   <div class="pure-u-1-24" style="text-align: left;">
     
-    <a href="http://wiesen.github.io/post/Solution-to-Raspberry-Pi-ROS-rivz-Segmentation-Fault/"><i class="fa fa-chevron-left"></i></a>
+    <a href="http://wiesen.github.io/post/Leveldb-Basic-Concept/"><i class="fa fa-chevron-left"></i></a>
     
   </div>
   <div class="pure-u-10-24">
     
     <nav class="prev">
-      <a href="http://wiesen.github.io/post/Solution-to-Raspberry-Pi-ROS-rivz-Segmentation-Fault/">Solution to Raspberry Pi ROS rivz Core Dumped</a>
+      <a href="http://wiesen.github.io/post/Leveldb-Basic-Concept/">Leveldb: Basic Settings</a>
     </nav>
     
   </div>
@@ -281,14 +324,8 @@
   </div>
   <div class="pure-u-10-24">
     
-    <nav class="next">
-      <a href="http://wiesen.github.io/post/IO%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E6%A8%A1%E5%BC%8F/">I/O多路复用设计模式</a>
-    </nav>
-    
   </div>
   <div class="pure-u-1-24" style="text-align: right;">
-    
-    <a href="http://wiesen.github.io/post/IO%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E6%A8%A1%E5%BC%8F/"><i class="fa fa-chevron-right"></i></a>
     
   </div>
 </div>

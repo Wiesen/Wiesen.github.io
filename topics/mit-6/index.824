@@ -7,7 +7,7 @@
   <meta name="description" content="">
   <meta name="generator" content="Hugo 0.18" />
 
-  <title>Robotics &middot; Wiesen&#39;s Blog</title>
+  <title>Mit 6.824 &middot; Wiesen&#39;s Blog</title>
 
   
   
@@ -37,7 +37,7 @@
 
   
   
-  <link rel="alternate" type="application/rss+xml" title="Wiesen&#39;s Blog" href="http://wiesen.github.io/topics/robotics/index.xml" />
+  <link rel="alternate" type="application/rss+xml" title="Wiesen&#39;s Blog" href="http://wiesen.github.io/topics/mit-6.824/index.xml" />
   
 
   
@@ -106,7 +106,7 @@
 
     
     <li class="pure-menu-item">
-      <a class="pure-menu-link" href="http://wiesen.github.io/topics/robotics/index.xml"><i class="fa fa-rss fa-fw"></i>RSS</a>
+      <a class="pure-menu-link" href="http://wiesen.github.io/topics/mit-6.824/index.xml"><i class="fa fa-rss fa-fw"></i>RSS</a>
     </li>
     
 
@@ -191,20 +191,20 @@
 
 
 <div class="header">
-  <h1>Robotics</h1>
+  <h1>Mit 6.824</h1>
 </div>
 
 <div class="content">
   
     <article>
   <header>
-    <h2><a href="http://wiesen.github.io/post/Solution-to-Raspberry-Pi-ROS-rivz-Segmentation-Fault/">Solution to Raspberry Pi ROS rivz Core Dumped</a></h2>
+    <h2><a href="http://wiesen.github.io/post/MIT-6.824-Lab4-Sharded-KeyValue-Service/">MIT 6.824: Lab 4 Sharded KeyValue Service Implementation</a></h2>
 
     <div class="post-meta">
 
   <div>
     <i class="fa fa-calendar fa-fw"></i>
-    <time>18 Sep 2016, 17:32</time>
+    <time>09 Sep 2016, 17:32</time>
   </div>
 
   
@@ -215,7 +215,9 @@
   <div>
     <i class="fa fa-folder fa-fw"></i>
     
-      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/robotics">Robotics</a>
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/distributed-system">Distributed System</a>&nbsp;&#47;
+    
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/mit-6.824">MIT 6.824</a>
     
   </div>
   
@@ -229,7 +231,7 @@
 
   
   <footer>
-    <a href="http://wiesen.github.io/post/Solution-to-Raspberry-Pi-ROS-rivz-Segmentation-Fault/">Read more<i class="fa fa-angle-double-right fa-fw"></i></a>
+    <a href="http://wiesen.github.io/post/MIT-6.824-Lab4-Sharded-KeyValue-Service/">Read more<i class="fa fa-angle-double-right fa-fw"></i></a>
   </footer>
   
 </article>
@@ -237,13 +239,13 @@
   
     <article>
   <header>
-    <h2><a href="http://wiesen.github.io/post/Robotics-Estimation-and-Learning/">Robotics: Estimation and learning</a></h2>
+    <h2><a href="http://wiesen.github.io/post/MIT-6.824-lab3-Fault-Tolerant-KVService-Implementation/">MIT 6.824: lab3 Fault-Tolerant Key/Value Service Implementation</a></h2>
 
     <div class="post-meta">
 
   <div>
     <i class="fa fa-calendar fa-fw"></i>
-    <time>16 Aug 2016, 17:32</time>
+    <time>06 Aug 2016, 17:32</time>
   </div>
 
   
@@ -254,7 +256,9 @@
   <div>
     <i class="fa fa-folder fa-fw"></i>
     
-      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/robotics">Robotics</a>
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/distributed-system">Distributed System</a>&nbsp;&#47;
+    
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/mit-6.824">MIT 6.824</a>
     
   </div>
   
@@ -268,7 +272,48 @@
 
   
   <footer>
-    <a href="http://wiesen.github.io/post/Robotics-Estimation-and-Learning/">Read more<i class="fa fa-angle-double-right fa-fw"></i></a>
+    <a href="http://wiesen.github.io/post/MIT-6.824-lab3-Fault-Tolerant-KVService-Implementation/">Read more<i class="fa fa-angle-double-right fa-fw"></i></a>
+  </footer>
+  
+</article>
+
+  
+    <article>
+  <header>
+    <h2><a href="http://wiesen.github.io/post/MIT-6.824-lab2-Raft-Consensus-Algorithm-Implementation/">MIT 6.824: lab2 Raft Consensus Algorithm Implementation</a></h2>
+
+    <div class="post-meta">
+
+  <div>
+    <i class="fa fa-calendar fa-fw"></i>
+    <time>10 Jun 2016, 21:32</time>
+  </div>
+
+  
+
+  
+  
+  
+  <div>
+    <i class="fa fa-folder fa-fw"></i>
+    
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/distributed-system">Distributed System</a>&nbsp;&#47;
+    
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/mit-6.824">MIT 6.824</a>
+    
+  </div>
+  
+  
+
+  
+
+</div>
+
+  </header>
+
+  
+  <footer>
+    <a href="http://wiesen.github.io/post/MIT-6.824-lab2-Raft-Consensus-Algorithm-Implementation/">Read more<i class="fa fa-angle-double-right fa-fw"></i></a>
   </footer>
   
 </article>
