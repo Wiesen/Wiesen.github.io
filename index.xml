@@ -2,7 +2,7 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Wiesen&#39;s Blog</title>
-    <link>http://wiesen.github.io/index.xml</link>
+    <link>http://wiesen.github.io/</link>
     <description>Recent content on Wiesen&#39;s Blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
@@ -434,11 +434,11 @@ struct ParsedInternalKey {
     </item>
     
     <item>
-      <title>I/O多路复用设计模式</title>
-      <link>http://wiesen.github.io/post/IO%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E6%A8%A1%E5%BC%8F/</link>
+      <title>I/O Event Handling Design Patterns</title>
+      <link>http://wiesen.github.io/post/IO-Event-Handling-Design-Patterns/</link>
       <pubDate>Thu, 24 Nov 2016 21:31:20 +0800</pubDate>
       
-      <guid>http://wiesen.github.io/post/IO%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E6%A8%A1%E5%BC%8F/</guid>
+      <guid>http://wiesen.github.io/post/IO-Event-Handling-Design-Patterns/</guid>
       <description>
 
 &lt;h2 id=&#34;introduction&#34;&gt;Introduction&lt;/h2&gt;
@@ -531,55 +531,118 @@ struct ParsedInternalKey {
     </item>
     
     <item>
-      <title>TCP断包粘包问题</title>
+      <title>TCP粘包问题：分包</title>
       <link>http://wiesen.github.io/post/TCP%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/</link>
       <pubDate>Wed, 26 Oct 2016 10:32:46 +0800</pubDate>
       
       <guid>http://wiesen.github.io/post/TCP%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/</guid>
       <description>
 
-&lt;p&gt;（内容收集自网络）&lt;/p&gt;
+&lt;h2 id=&#34;update-2017-01-17&#34;&gt;Update 2017-01-17&lt;/h2&gt;
+
+&lt;p&gt;From Muduo：&lt;/p&gt;
+
+&lt;p&gt;TCP 是&lt;strong&gt;“字节流”&lt;/strong&gt;协议，其本身没有“消息包”的概念，因此“粘包问题”是个伪命题。但对利用 TCP 进行通信的应用层程序来说，分包是其基本需求。&lt;/p&gt;
+
+&lt;p&gt;分包指的是在发送一个消息（message）或者一帧（frame）数据时，通过一定的处理，令接收方能从字节流中识别并截取（还原）出一个个消息包。&lt;/p&gt;
+
+&lt;p&gt;对于短连接的 TCP 服务，分包不是问题。只要发送方主动关闭连接，就表示一条消息发送完毕，接收方 read() 返回0，从而得知消息结尾。&lt;/p&gt;
+
+&lt;p&gt;对于长连接的 TCP 服务，分包有4种方法：&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;消息长度固定（亦即是提前确定包长度，适合定长消息包）；&lt;/li&gt;
+&lt;li&gt;使用特殊的字符或字符串作为消息的边界，例如 HTTP 协议的 headers 以“\r\n”为字段的分隔符；&lt;/li&gt;
+&lt;li&gt;在每条消息的头部加一个长度字段，最常见的做法；&lt;/li&gt;
+&lt;li&gt;利用消息本身的格式来分包，例如 XML 格式的消息中&lt;root&gt;&amp;hellip;&lt;/rrot&gt;的配对，或者json格式中的{&amp;hellip;}的配对。解析这种消息格式通常会用到状态机。&lt;/li&gt;
+&lt;/ol&gt;
 
 &lt;h2 id=&#34;粘包问题&#34;&gt;粘包问题&lt;/h2&gt;
 
-&lt;p&gt;粘包问题是由 TCP 是&lt;strong&gt;“字节流”&lt;/strong&gt;协议，没有消息边界所引起的。而 UDP/HTTP 具有消息边界，所以不存在断包粘包问题。&lt;/p&gt;
+&lt;p&gt;一个完整的消息可能会被TCP拆分成多个包进行发送，也有可能把多个小的包封装成一个大的数据包发送。粘包是指发送方发送的若干包数据到接收方接收时粘成一包，从接收缓冲区看，后一包数据的头紧接着前一包数据的尾。&lt;/p&gt;
 
-&lt;p&gt;另外：&lt;/p&gt;
+&lt;p&gt;粘包问题是由 TCP 是面向字节流协议因此没有消息边界所引起的。而 UDP 是面向数据报的协议，所以不存在拆包粘包问题。&lt;/p&gt;
+
+&lt;p&gt;存在以下特殊情况：&lt;/p&gt;
 
 &lt;ol&gt;
-&lt;li&gt;如果发送数据无结构，如文件传输，这样发送方只管发送，接收方只管接收存储就 ok，也不用考虑粘包；&lt;/li&gt;
+&lt;li&gt;如果发送数据无结构，如文件传输，这样发送方只管发送，接收方只管接收存储就 ok，不用考虑粘包；&lt;/li&gt;
 &lt;li&gt;如果利用 TCP 短连接时，不会出现粘包问题；&lt;/li&gt;
-&lt;li&gt;当发送数据存在一定结构，并且需要维护长连接时，则需要考虑粘包问题；&lt;/li&gt;
+&lt;li&gt;当发送数据&lt;strong&gt;存在一定结构，并且需要维护长连接时&lt;/strong&gt;，则需要考虑粘包问题；&lt;/li&gt;
 &lt;/ol&gt;
 
 &lt;h2 id=&#34;问题原因&#34;&gt;问题原因&lt;/h2&gt;
 
-&lt;p&gt;出现粘包现象的原因既可能由发送方造成，也可能由接收方造成:&lt;/p&gt;
+&lt;p&gt;出现拆包粘包现象的原因既可能由发送方造成，也可能由接收方造成:&lt;/p&gt;
 
 &lt;ol&gt;
-&lt;li&gt;发送端需要等缓冲区满才发送出去，造成粘包;&lt;/li&gt;
-&lt;li&gt;接收方没能及时地接收缓冲区的包，造成多个包接收;&lt;/li&gt;
+&lt;li&gt;要发送的数据大于TCP发送缓冲区剩余空间大小，发生拆包；&lt;/li&gt;
+&lt;li&gt;待发送数据大于MSS（最大报文长度），TCP在传输前进行拆包；&lt;/li&gt;
+&lt;li&gt;要发送的数据小于TCP发送缓冲区的大小，TCP将多次写入缓冲区的数据一次发送出去，造成粘包;&lt;/li&gt;
+&lt;li&gt;接收方没能及时地接收缓冲区的数据，造成粘包;&lt;/li&gt;
 &lt;/ol&gt;
 
 &lt;h2 id=&#34;解决方法&#34;&gt;解决方法&lt;/h2&gt;
 
-&lt;p&gt;为了避免粘包现象，可采取以下几种措施。&lt;/p&gt;
+&lt;p&gt;解决粘包的方法，是由应用层进行&lt;strong&gt;分包处理&lt;/strong&gt;，本质上就是由&lt;strong&gt;应用层&lt;/strong&gt;来维护消息和消息的边界（即定义自己的会话层和表示层协议）。&lt;/p&gt;
+
+&lt;p&gt;本文处理办法：&lt;/p&gt;
 
 &lt;ol&gt;
-&lt;li&gt;&lt;p&gt;对于发送方引起的粘包现象，用户可通过编程设置来避免，TCP 提供了强制数据立即传送的操作指令 push，TCP 软件收到该操作指令后，就立即将本段数据发送出去，而不必等待发送缓冲区满；&lt;/p&gt;
+&lt;li&gt;发送方在每次发送消息时将数据报长度写入一个int32作为包头一并发送出去, 称之为Encode；&lt;/li&gt;
 
-&lt;p&gt;缺点: 第一种编程设置方法虽然可以避免发送方引起的粘包，但它关闭了优化算法，降低了网络发送效率，影响应用程序的性能，一般不建议使用。&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;接受方则先读取一个int32的长度的消息长度信息, 再根据长度读取相应长的byte数据, 称之为Decode；&lt;/p&gt;
 
-&lt;li&gt;&lt;p&gt;对于接收方引起的粘包，则可通过优化程序设计、精简接收进程工作量、提高接收进程优先级等措施，使其及时接收数据，从而尽量避免出现粘包现象；&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;//codec.go
 
-&lt;p&gt;缺点: 第二种方法只能减少出现粘包的可能性，但并不能完全避免粘包，当发送频率较高时，或由于网络突发可能使某个时间段数据包到达接收方较快，接收方还是有可能来不及接收，从而导致粘包。&lt;/p&gt;&lt;/li&gt;
-&lt;/ol&gt;
+package codec
 
-&lt;p&gt;既能保证效率又能比较好地解决粘包的方法，是由应用层进行&lt;strong&gt;分包处理&lt;/strong&gt;，本质上就是由&lt;strong&gt;应用层&lt;/strong&gt;来维护消息和消息的边界。主要是采用以下两种方式：&lt;/p&gt;
+import (
+    &amp;quot;bufio&amp;quot;
+    &amp;quot;bytes&amp;quot;
+    &amp;quot;encoding/binary&amp;quot;
+)
 
-&lt;ol&gt;
-&lt;li&gt;以&lt;strong&gt;特殊字符&lt;/strong&gt;作为消息的分界符;&lt;/li&gt;
-&lt;li&gt;在消息头部加入整个消息的&lt;strong&gt;长度信息&lt;/strong&gt;。&lt;/li&gt;
+func Encode(message string) ([]byte, error) {
+    // 读取消息的长度
+    var length int32 = int32(len(message))
+    var pkg *bytes.Buffer = new(bytes.Buffer)
+    // 写入消息头
+    err := binary.Write(pkg, binary.LittleEndian, length)
+    if err != nil {
+        return nil, err
+    }
+    // 写入消息实体
+    err = binary.Write(pkg, binary.LittleEndian, []byte(message))
+    if err != nil {
+        return nil, err
+    }
+
+    return pkg.Bytes(), nil
+}
+
+func Decode(reader *bufio.Reader) (string, error) {
+    // 读取消息的长度
+    lengthByte, _ := reader.Peek(4)
+    lengthBuff := bytes.NewBuffer(lengthByte)
+    var length int32
+    err := binary.Read(lengthBuff, binary.LittleEndian, &amp;amp;length)
+    if err != nil {
+        return &amp;quot;&amp;quot;, err
+    }
+    if int32(reader.Buffered()) &amp;lt; length+4 {
+        return &amp;quot;&amp;quot;, err
+    }
+
+    // 读取消息真正的内容
+    pack := make([]byte, int(4+length))
+    _, err = reader.Read(pack)
+    if err != nil {
+        return &amp;quot;&amp;quot;, err
+    }
+    return string(pack[4:]), nil
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
 &lt;/ol&gt;
 </description>
     </item>
@@ -670,7 +733,7 @@ struct ParsedInternalKey {
 
 &lt;p&gt;然而，在 go 中实现上面的做法并不是那么 clean，很多特性在语言层面上并不支持，比如: 1) get map.keys(); 2) 根据特定的字段进行排序等，自行实现实在麻烦。&lt;/p&gt;
 
-&lt;p&gt;因此，由于 lab 中只有 join/leave 会造成 imbalance，并且 group 是逐个 join/leave。所以 simple first，首先统计 prior config 中每个 group 有多少个 shards，并且计算 present config 中平均每个 group 分配多少个 shards (&lt;code&gt;quota = num_of_shards / num_of_group&lt;/code&gt;)，然后循环将 max_shards_group/leaving_group 中的 shards 分配给 joining_group/min_shards_group.&lt;/p&gt;&lt;/li&gt;
+&lt;p&gt;因此，由于 lab 中只有 join/leave 会造成 imbalance，并且 group 是逐个 join/leave。所以 make it simple。我们首先统计 prior config 中每个 group 有多少个 shards，并且计算 present config 中平均每个 group 分配多少个 shards (&lt;code&gt;quota = num_of_shards / num_of_group&lt;/code&gt;)，然后循环将 max_shards_group/leaving_group 中的 shards 分配给 joining_group/min_shards_group.&lt;/p&gt;&lt;/li&gt;
 &lt;/ol&gt;
 
 &lt;h2 id=&#34;part-b-sharded-key-value-server&#34;&gt;Part B: Sharded Key/Value Server&lt;/h2&gt;
@@ -708,7 +771,7 @@ struct ParsedInternalKey {
 
 &lt;ul&gt;
 &lt;li&gt;&lt;strong&gt;Detect&lt;/strong&gt;: 开一个 goroutine 来周期性地向 shardmaster query 最新的 configuration (由 group leader 完成)，当发现 configuration 更新时 (one by one in order)，即向其余 group 获取需要的 shards (migrating shard)；&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;When to reconfigurate&lt;/strong&gt;: Reconfiguration operation 仅仅是 group leader 从 shardmaster 获取到的 operation proposal，新的 configuration 什么时候生效是由各 group 自身决定，本文的实现是当 group 获取到需要的 shards 后再进行 reconfiguration update。因此会出现当 client 根据新的 configuration 向 shardkv 发起 request 时，各个 group 都还没完成 configuration update。不过这并没什么影响，我们可以让 client 一直 loop 向每个 replica group 发起 request (当然是一直被拒)，直到目标 group 完成 reconfiguration update;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;When to reconfigurate&lt;/strong&gt;: Reconfiguration operation 仅仅是 group leader 从 shardmaster 获取到了 operation proposal，然而新的 configuration 什么时候生效是由各个 group 自行决定。本文的实现是当 group 获取到需要的 shards 后再进行 reconfiguration update。因此会出现当 client 根据新的 configuration 向 shardkv 发起 request 时，各个 group 都还没完成 configuration update。不过这并没什么影响，我们可以让 client 一直 loop 向每个 replica group 发起 request (当然是一直被拒)，直到目标 group 完成 reconfiguration update;&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;Consistency&lt;/strong&gt;: Reconfiguration operation 会影响到 PutAPpend/Get，因此同样需要利用 raft 保证 group 内的一致性，确保集群内完成了之前的操作后同时进行 Reconfiguration；&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;Replace What&lt;/strong&gt;: 包括 config，StoreShard (data) 以及 Ack (duplicate detection)，其中 Ack 不是 replace entirely，仅当 kv.ack[clientId] &amp;lt; migration.Ack[clientId] 才更新；
 &lt;br /&gt;&lt;/li&gt;
@@ -969,26 +1032,27 @@ struct ParsedInternalKey {
 
 &lt;p&gt;有一点&lt;strong&gt;注意&lt;/strong&gt;的是，&lt;code&gt;nextIndex[]&lt;/code&gt; 和 &lt;code&gt;matchindex[]&lt;/code&gt; 需要在 election 后进行 reinitialize。&lt;/p&gt;
 
-&lt;p&gt;func (rf *Raft) changeRole() {
-        for true {
-            switch rf.role {
-            case Leader:
-                for i := range rf.peers {
-                    rf.nextIndex[i] = rf.logTable[len(rf.logTable)-1].Index + 1
-                    rf.matchIndex[i] = 0
-                }
-                go rf.doHeartbeat()
-                &amp;lt;-rf.chanRole
-            case Candidate:
-                chanQuitElect := make(chan bool)
-                go rf.startElection(chanQuitElect)
-                &amp;lt;-rf.chanRole
-                close(chanQuitElect)
-            case Follower:
-                &amp;lt;-rf.chanRole
+&lt;pre&gt;&lt;code&gt;func (rf *Raft) changeRole() {
+    for true {
+        switch rf.role {
+        case Leader:
+            for i := range rf.peers {
+                rf.nextIndex[i] = rf.logTable[len(rf.logTable)-1].Index + 1
+                rf.matchIndex[i] = 0
             }
+            go rf.doHeartbeat()
+            &amp;lt;-rf.chanRole
+        case Candidate:
+            chanQuitElect := make(chan bool)
+            go rf.startElection(chanQuitElect)
+            &amp;lt;-rf.chanRole
+            close(chanQuitElect)
+        case Follower:
+            &amp;lt;-rf.chanRole
         }
-    }&lt;/p&gt;
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
 
 &lt;p&gt;此外，定时器 election timer 的作用十分关键，所有 server 都应当在初始化 Raft peer 时开启一个单独的线程来维护 election timer。&lt;/p&gt;
 
@@ -1292,22 +1356,20 @@ for server := range rf.peers {
 &lt;p&gt;最近几天 debug 了之前的代码，发现了若干个问题。目前的代码实现已经&lt;strong&gt;比较稳定&lt;/strong&gt;地 pass 所有的 test case，上面的代码段也已经修改了。但仍然存在一个 bug: 在过 TestUnreliableAgree() 时 fail to reach agreement。这个 bug 的触发几率很低，还没想明白哪里出问题。&lt;/p&gt;
 
 &lt;ol&gt;
-&lt;li&gt;&lt;strong&gt;LEADER ELECTION: Role Transfer (state machine)&lt;/strong&gt;&lt;/li&gt;
-&lt;/ol&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;LEADER ELECTION: Role Transfer (state machine)&lt;/strong&gt;&lt;/p&gt;
 
 &lt;p&gt;之前实现 server state machine 的方法是利用 channel 来进行状态修改操作，并且会新开一个 goroutine 进行该状态死循环，而没有其他状态的处理逻辑。本文由一个 goroutine 阻塞读取该 channel，从而处理 server 的状态转换。然而，channel 同步是存在延时的，只有在当前 goroutine 被挂起或者休眠等时，才会转去处理。&lt;/p&gt;
 
 &lt;p&gt;这样的方法存在一个 bug：新 Leader 产生后，旧 Leader 收到消息应该更新自身的 term 并且转换为 Follower；然而由于 channel 同步并非立即执行，旧 Leader 在自身状态被重新赋值前仍然会执行 Leader 的代码；这时候就会出现两个 Leader 同时处理 RPC。&lt;/p&gt;
 
-&lt;p&gt;因此，修改的内容是：去掉 channel 同步方法，当需要进行状态转换时，立即修改 server 的状态，终止该 server 当前状态的执行。&lt;/p&gt;
+&lt;p&gt;因此，修改的内容是：去掉 channel 同步方法，当需要进行状态转换时，立即修改 server 的状态，终止该 server 当前状态的执行。&lt;/p&gt;&lt;/li&gt;
 
-&lt;ol&gt;
-&lt;li&gt;&lt;strong&gt;LOG REPLICATION: AppendEntries RPC&lt;/strong&gt;&lt;/li&gt;
-&lt;/ol&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;LOG REPLICATION: AppendEntries RPC&lt;/strong&gt;&lt;/p&gt;
 
 &lt;p&gt;之前不能 pass &lt;code&gt;TestUnreliableAgree()&lt;/code&gt; 和 &lt;code&gt;TestFigure8Unreliable()&lt;/code&gt; 时丝毫没有提示，只能等程序运行时间过长然后被杀死。后来思考了一下问题原因：&lt;strong&gt;程序运行过慢，跟不上 test case 要求的速度，所以后续的测试代码也根本没有执行&lt;/strong&gt;。&lt;/p&gt;
 
-&lt;p&gt;然后发现程序执行慢的原因是：Leader 发送 AppendEntries RPC 每次仅携带一条 log entry，导致 server 无法快速 catch up。所以修改的主要内容就是：AppendEntries RPC 每次携带从 &lt;code&gt;nextIndex&lt;/code&gt; 直到最新的 log entries。&lt;/p&gt;
+&lt;p&gt;然后发现程序执行慢的原因是：Leader 发送 AppendEntries RPC 每次仅携带一条 log entry，导致 server 无法快速 catch up。所以修改的主要内容就是：AppendEntries RPC 每次携带从 &lt;code&gt;nextIndex&lt;/code&gt; 直到最新的 log entries。&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
 
 &lt;h2 id=&#34;reference&#34;&gt;Reference&lt;/h2&gt;
 

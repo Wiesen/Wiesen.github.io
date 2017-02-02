@@ -7,7 +7,7 @@
   <meta name="description" content="">
   <meta name="generator" content="Hugo 0.16" />
 
-  <title>Solution to Raspberry Pi ROS rivz Core Dumped &middot; Wiesen&#39;s Blog</title>
+  <title>High Performance Server &middot; Wiesen&#39;s Blog</title>
 
   
   
@@ -36,6 +36,8 @@
   <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
 
   
+  
+  <link rel="alternate" type="application/rss+xml" title="Wiesen&#39;s Blog" href="http://wiesen.github.io/topics/high-performance-server/index.xml" />
   
 
   
@@ -102,6 +104,10 @@
   <div class="pure-menu social">
   <ul class="pure-menu-list">
 
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="http://wiesen.github.io/topics/high-performance-server/index.xml"><i class="fa fa-rss fa-fw"></i>RSS</a>
+    </li>
     
 
     
@@ -185,16 +191,20 @@
 
 
 <div class="header">
-  <h1>Solution to Raspberry Pi ROS rivz Core Dumped</h1>
-  <h2></h2>
+  <h1>High Performance Server</h1>
 </div>
-<div class="content">
 
-  <div class="post-meta">
+<div class="content">
+  
+    <article>
+  <header>
+    <h2><a href="http://wiesen.github.io/post/IO-Event-Handling-Design-Patterns/">I/O Event Handling Design Patterns</a></h2>
+
+    <div class="post-meta">
 
   <div>
     <i class="fa fa-calendar fa-fw"></i>
-    <time>18 Sep 2016, 17:32</time>
+    <time>24 Nov 2016, 21:31</time>
   </div>
 
   
@@ -205,7 +215,7 @@
   <div>
     <i class="fa fa-folder fa-fw"></i>
     
-      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/robotics">Robotics</a>
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/high-performance-server">High Performance Server</a>
     
   </div>
   
@@ -215,66 +225,16 @@
 
 </div>
 
-  <p>Recently I installed ROS on Raspberry Pi2 (both Jessie and Ubuntu 14.04) in order to implement SLAM algorithm on it. However when runs the rviz (rosrun rviz rviz) I get core dumped message.</p>
-
-<p>After searching I found the solution <a href="https://github.com/ros/robot_model/issues/110">here</a>. What I do is upgrade libpcre3 to 3_8.35 (upgrade collada-dom to 2.4.4 does not help). <a href="http://ports.ubuntu.com/pool/main/p/pcre3/libpcre3_8.35-7.1ubuntu1_armhf.deb">Here</a> is the download link.</p>
-
-<p>I confirm that rviz now works properly on my Raspberry Pi2 running the official ubuntu 14.04 image.</p>
-
+  </header>
 
   
-<div class="prev-next-post pure-g">
-  <div class="pure-u-1-24" style="text-align: left;">
-    
-    <a href="http://wiesen.github.io/post/MIT-6.824-Lab4-Sharded-KeyValue-Service/"><i class="fa fa-chevron-left"></i></a>
-    
-  </div>
-  <div class="pure-u-10-24">
-    
-    <nav class="prev">
-      <a href="http://wiesen.github.io/post/MIT-6.824-Lab4-Sharded-KeyValue-Service/">MIT 6.824: Lab 4 Sharded KeyValue Service Implementation</a>
-    </nav>
-    
-  </div>
-  <div class="pure-u-2-24">
-    &nbsp;
-  </div>
-  <div class="pure-u-10-24">
-    
-    <nav class="next">
-      <a href="http://wiesen.github.io/post/TCP%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/">TCP粘包问题：分包</a>
-    </nav>
-    
-  </div>
-  <div class="pure-u-1-24" style="text-align: right;">
-    
-    <a href="http://wiesen.github.io/post/TCP%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/"><i class="fa fa-chevron-right"></i></a>
-    
-  </div>
-</div>
-
-
+  <footer>
+    <a href="http://wiesen.github.io/post/IO-Event-Handling-Design-Patterns/">Read more<i class="fa fa-angle-double-right fa-fw"></i></a>
+  </footer>
+  
+</article>
 
   
-<div id="disqus_thread"></div>
-<script type="text/javascript">
-
-(function() {
-    
-    
-    if (window.location.hostname == "localhost")
-        return;
-
-    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-    var disqus_shortname = 'Wiesen';
-    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-})();
-</script>
-<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-
-
 </div>
 
 </div>
@@ -297,4 +257,3 @@
 
 </body>
 </html>
-

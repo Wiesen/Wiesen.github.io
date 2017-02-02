@@ -2,63 +2,127 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Network on Wiesen&#39;s Blog</title>
-    <link>http://wiesen.github.io/topics/network/index.xml</link>
+    <link>http://wiesen.github.io/topics/network/</link>
     <description>Recent content in Network on Wiesen&#39;s Blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>&amp;copy; 2016. All rights reserved.</copyright>
+    <lastBuildDate>Wed, 26 Oct 2016 10:32:46 +0800</lastBuildDate>
     <atom:link href="http://wiesen.github.io/topics/network/index.xml" rel="self" type="application/rss+xml" />
     
     <item>
-      <title>TCP断包粘包问题</title>
+      <title>TCP粘包问题：分包</title>
       <link>http://wiesen.github.io/post/TCP%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/</link>
       <pubDate>Wed, 26 Oct 2016 10:32:46 +0800</pubDate>
       
       <guid>http://wiesen.github.io/post/TCP%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/</guid>
       <description>
 
-&lt;p&gt;（内容收集自网络）&lt;/p&gt;
+&lt;h2 id=&#34;update-2017-01-17&#34;&gt;Update 2017-01-17&lt;/h2&gt;
+
+&lt;p&gt;From Muduo：&lt;/p&gt;
+
+&lt;p&gt;TCP 是&lt;strong&gt;“字节流”&lt;/strong&gt;协议，其本身没有“消息包”的概念，因此“粘包问题”是个伪命题。但对利用 TCP 进行通信的应用层程序来说，分包是其基本需求。&lt;/p&gt;
+
+&lt;p&gt;分包指的是在发送一个消息（message）或者一帧（frame）数据时，通过一定的处理，令接收方能从字节流中识别并截取（还原）出一个个消息包。&lt;/p&gt;
+
+&lt;p&gt;对于短连接的 TCP 服务，分包不是问题。只要发送方主动关闭连接，就表示一条消息发送完毕，接收方 read() 返回0，从而得知消息结尾。&lt;/p&gt;
+
+&lt;p&gt;对于长连接的 TCP 服务，分包有4种方法：&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;消息长度固定（亦即是提前确定包长度，适合定长消息包）；&lt;/li&gt;
+&lt;li&gt;使用特殊的字符或字符串作为消息的边界，例如 HTTP 协议的 headers 以“\r\n”为字段的分隔符；&lt;/li&gt;
+&lt;li&gt;在每条消息的头部加一个长度字段，最常见的做法；&lt;/li&gt;
+&lt;li&gt;利用消息本身的格式来分包，例如 XML 格式的消息中&lt;root&gt;&amp;hellip;&lt;/rrot&gt;的配对，或者json格式中的{&amp;hellip;}的配对。解析这种消息格式通常会用到状态机。&lt;/li&gt;
+&lt;/ol&gt;
 
 &lt;h2 id=&#34;粘包问题&#34;&gt;粘包问题&lt;/h2&gt;
 
-&lt;p&gt;粘包问题是由 TCP 是&lt;strong&gt;“字节流”&lt;/strong&gt;协议，没有消息边界所引起的。而 UDP/HTTP 具有消息边界，所以不存在断包粘包问题。&lt;/p&gt;
+&lt;p&gt;一个完整的消息可能会被TCP拆分成多个包进行发送，也有可能把多个小的包封装成一个大的数据包发送。粘包是指发送方发送的若干包数据到接收方接收时粘成一包，从接收缓冲区看，后一包数据的头紧接着前一包数据的尾。&lt;/p&gt;
 
-&lt;p&gt;另外：&lt;/p&gt;
+&lt;p&gt;粘包问题是由 TCP 是面向字节流协议因此没有消息边界所引起的。而 UDP 是面向数据报的协议，所以不存在拆包粘包问题。&lt;/p&gt;
+
+&lt;p&gt;存在以下特殊情况：&lt;/p&gt;
 
 &lt;ol&gt;
-&lt;li&gt;如果发送数据无结构，如文件传输，这样发送方只管发送，接收方只管接收存储就 ok，也不用考虑粘包；&lt;/li&gt;
+&lt;li&gt;如果发送数据无结构，如文件传输，这样发送方只管发送，接收方只管接收存储就 ok，不用考虑粘包；&lt;/li&gt;
 &lt;li&gt;如果利用 TCP 短连接时，不会出现粘包问题；&lt;/li&gt;
-&lt;li&gt;当发送数据存在一定结构，并且需要维护长连接时，则需要考虑粘包问题；&lt;/li&gt;
+&lt;li&gt;当发送数据&lt;strong&gt;存在一定结构，并且需要维护长连接时&lt;/strong&gt;，则需要考虑粘包问题；&lt;/li&gt;
 &lt;/ol&gt;
 
 &lt;h2 id=&#34;问题原因&#34;&gt;问题原因&lt;/h2&gt;
 
-&lt;p&gt;出现粘包现象的原因既可能由发送方造成，也可能由接收方造成:&lt;/p&gt;
+&lt;p&gt;出现拆包粘包现象的原因既可能由发送方造成，也可能由接收方造成:&lt;/p&gt;
 
 &lt;ol&gt;
-&lt;li&gt;发送端需要等缓冲区满才发送出去，造成粘包;&lt;/li&gt;
-&lt;li&gt;接收方没能及时地接收缓冲区的包，造成多个包接收;&lt;/li&gt;
+&lt;li&gt;要发送的数据大于TCP发送缓冲区剩余空间大小，发生拆包；&lt;/li&gt;
+&lt;li&gt;待发送数据大于MSS（最大报文长度），TCP在传输前进行拆包；&lt;/li&gt;
+&lt;li&gt;要发送的数据小于TCP发送缓冲区的大小，TCP将多次写入缓冲区的数据一次发送出去，造成粘包;&lt;/li&gt;
+&lt;li&gt;接收方没能及时地接收缓冲区的数据，造成粘包;&lt;/li&gt;
 &lt;/ol&gt;
 
 &lt;h2 id=&#34;解决方法&#34;&gt;解决方法&lt;/h2&gt;
 
-&lt;p&gt;为了避免粘包现象，可采取以下几种措施。&lt;/p&gt;
+&lt;p&gt;解决粘包的方法，是由应用层进行&lt;strong&gt;分包处理&lt;/strong&gt;，本质上就是由&lt;strong&gt;应用层&lt;/strong&gt;来维护消息和消息的边界（即定义自己的会话层和表示层协议）。&lt;/p&gt;
+
+&lt;p&gt;本文处理办法：&lt;/p&gt;
 
 &lt;ol&gt;
-&lt;li&gt;&lt;p&gt;对于发送方引起的粘包现象，用户可通过编程设置来避免，TCP 提供了强制数据立即传送的操作指令 push，TCP 软件收到该操作指令后，就立即将本段数据发送出去，而不必等待发送缓冲区满；&lt;/p&gt;
+&lt;li&gt;发送方在每次发送消息时将数据报长度写入一个int32作为包头一并发送出去, 称之为Encode；&lt;/li&gt;
 
-&lt;p&gt;缺点: 第一种编程设置方法虽然可以避免发送方引起的粘包，但它关闭了优化算法，降低了网络发送效率，影响应用程序的性能，一般不建议使用。&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;接受方则先读取一个int32的长度的消息长度信息, 再根据长度读取相应长的byte数据, 称之为Decode；&lt;/p&gt;
 
-&lt;li&gt;&lt;p&gt;对于接收方引起的粘包，则可通过优化程序设计、精简接收进程工作量、提高接收进程优先级等措施，使其及时接收数据，从而尽量避免出现粘包现象；&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;//codec.go
 
-&lt;p&gt;缺点: 第二种方法只能减少出现粘包的可能性，但并不能完全避免粘包，当发送频率较高时，或由于网络突发可能使某个时间段数据包到达接收方较快，接收方还是有可能来不及接收，从而导致粘包。&lt;/p&gt;&lt;/li&gt;
-&lt;/ol&gt;
+package codec
 
-&lt;p&gt;既能保证效率又能比较好地解决粘包的方法，是由应用层进行&lt;strong&gt;分包处理&lt;/strong&gt;，本质上就是由&lt;strong&gt;应用层&lt;/strong&gt;来维护消息和消息的边界。主要是采用以下两种方式：&lt;/p&gt;
+import (
+    &amp;quot;bufio&amp;quot;
+    &amp;quot;bytes&amp;quot;
+    &amp;quot;encoding/binary&amp;quot;
+)
 
-&lt;ol&gt;
-&lt;li&gt;以&lt;strong&gt;特殊字符&lt;/strong&gt;作为消息的分界符;&lt;/li&gt;
-&lt;li&gt;在消息头部加入整个消息的&lt;strong&gt;长度信息&lt;/strong&gt;。&lt;/li&gt;
+func Encode(message string) ([]byte, error) {
+    // 读取消息的长度
+    var length int32 = int32(len(message))
+    var pkg *bytes.Buffer = new(bytes.Buffer)
+    // 写入消息头
+    err := binary.Write(pkg, binary.LittleEndian, length)
+    if err != nil {
+        return nil, err
+    }
+    // 写入消息实体
+    err = binary.Write(pkg, binary.LittleEndian, []byte(message))
+    if err != nil {
+        return nil, err
+    }
+
+    return pkg.Bytes(), nil
+}
+
+func Decode(reader *bufio.Reader) (string, error) {
+    // 读取消息的长度
+    lengthByte, _ := reader.Peek(4)
+    lengthBuff := bytes.NewBuffer(lengthByte)
+    var length int32
+    err := binary.Read(lengthBuff, binary.LittleEndian, &amp;amp;length)
+    if err != nil {
+        return &amp;quot;&amp;quot;, err
+    }
+    if int32(reader.Buffered()) &amp;lt; length+4 {
+        return &amp;quot;&amp;quot;, err
+    }
+
+    // 读取消息真正的内容
+    pack := make([]byte, int(4+length))
+    _, err = reader.Read(pack)
+    if err != nil {
+        return &amp;quot;&amp;quot;, err
+    }
+    return string(pack[4:]), nil
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
 &lt;/ol&gt;
 </description>
     </item>

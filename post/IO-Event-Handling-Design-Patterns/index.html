@@ -7,7 +7,7 @@
   <meta name="description" content="">
   <meta name="generator" content="Hugo 0.16" />
 
-  <title>Leveldb: Basic Settings &middot; Wiesen&#39;s Blog</title>
+  <title>I/O Event Handling Design Patterns &middot; Wiesen&#39;s Blog</title>
 
   
   
@@ -185,7 +185,7 @@
 
 
 <div class="header">
-  <h1>Leveldb: Basic Settings</h1>
+  <h1>I/O Event Handling Design Patterns</h1>
   <h2></h2>
 </div>
 <div class="content">
@@ -194,7 +194,7 @@
 
   <div>
     <i class="fa fa-calendar fa-fw"></i>
-    <time>19 Dec 2016, 21:31</time>
+    <time>24 Nov 2016, 21:31</time>
   </div>
 
   
@@ -205,9 +205,7 @@
   <div>
     <i class="fa fa-folder fa-fw"></i>
     
-      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/database">Database</a>&nbsp;&#47;
-    
-      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/leveldb">Leveldb</a>
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/high-performance-server">High Performance Server</a>
     
   </div>
   
@@ -219,175 +217,105 @@
 
   
 
-<p>（待完善……）</p>
+<h2 id="introduction">Introduction</h2>
 
-<ol>
-<li><p>Slice(<code>include/leveldb/slice.h</code>)</p>
-
-<p>为操作数据的方便，将数据和长度包装成 Slice 使用，直接操控指针以避免不必要的数据拷贝</p>
-
-<pre><code>class Slice {
-    … 
-    private: 
-        const char* data_; 
-        size_t size_; 
-};
-</code></pre></li>
-
-<li><p>Optin(<code>include/leveldb/option.h</code>)</p>
-
-<p>leveldb 中启动时的一些配置，通过 Option 传入，get/put/delete 时，也有相应的 ReadOption/WriteOption。</p></li>
-
-<li><p>Env(<code>include/leveldb/env.h</code> <code>util/evn_posix.h</code>)</p>
-
-<p>考虑到移植以及灵活性，leveldb 将系统相关的处理（文件/进程/时间之类）抽象成 Env，用户可以自己实现相应的接口，作为 Option 传入。默认使用自带的实现。</p></li>
-
-<li><p>varint(<code>util/coding.h</code>)</p>
-
-<p>leveldb 采用了 protocalbuffer 里使用的变长整形编码方法，节省空间。</p></li>
-
-<li><p>ValueType(<code>db/dbformat.h</code>)</p>
-
-<p>leveldb更新（put/delete）某个key时不会操控到db中的数据，每次操作都是直接新插入一份kv数据，具体的数据合并和清除由后台的compact完成。</p>
-
-<p>所以，每次 put 都会添加一份 KV 数据，即使该 key 已经存在；而 delete 等同于 put 空的 value。为了区分 live 数据和已删除的 mock 数据，leveldb 使用 ValueType 来标识：</p>
-
-<pre><code>enum ValueType { 
-    kTypeDeletion = 0x0, 
-    kTypeValue = 0x1 
-};
-</code></pre></li>
-
-<li><p>SequenceNumber(<code>db/dbformat.h</code>)</p>
-
-<p>leveldb中的每次更新（put/delete) 操作都拥有一个版本，由 SequnceNumber 来标识，整个db有一个全局值保存着当前使用到的SequnceNumber。SequnceNumber 在 leveldb 有重要的地位，key 的排序，compact 以及 snapshot 都依赖于它。</p>
-
-<p><code>typedef uint64_t SequenceNumber</code>: 存储时，SequnceNumber 只占用56 bits, ValueType 占用8 bits，二者共同占用 64bits（uint64_t).</p>
-
-<table>
-<thead>
-<tr>
-<th>0-56</th>
-<th align="center">56-64</th>
-</tr>
-</thead>
-
-<tbody>
-<tr>
-<td>SequnceNumber</td>
-<td align="center">ValueType</td>
-</tr>
-</tbody>
-</table></li>
-
-<li><p>user_key &amp; memtable_key &amp; internal_key</p>
+<p>System I/O can be blocking, or non-blocking synchronous, or non-blocking asynchronous:</p>
 
 <ul>
-<li>user_key: 用户使用的 key</li>
-<li>memtable_key: memtable 中使用的 key</li>
-<li>internal_key: sstable 中使用的 key</li>
+<li>Blocking I/O means that the calling system does not return control to the caller until the operation is finished</li>
+<li>a non-blocking synchronous call returns control to the caller immediately</li>
+</ul>
+
+<p>I/O multiplexing mechanisms rely on an event demultiplexor: dispatches I/O events from a limited number of sources to the appropriate read/write event handlers.</p>
+
+<p>There are two non-blocking I/O multiplexing mechanisms: reactor &amp;&amp; proactor.</p>
+
+<h2 id="mechanism">Mechanism</h2>
+
+<ol>
+<li><p>Reactor</p>
+
+<p>In the Reactor pattern, the event demultiplexor waits for events that indicate when a file descriptor or socket is ready for a read or write operation.</p>
+
+<p>Structure:</p>
+
+<ul>
+<li>Request Event Dispatcher (<strong>synchronous</strong> event demultiplexer): uses an event loop to block on all resources, and dispatches resources from the demultiplexer to the associated event handler</li>
+<li>Request Event Handler (user handler): performs the actual I/O operation, handles data, , declares renewed interest in I/O events, and returns control to the dispatcher</li>
+</ul>
+
+<p>Benific:</p>
+
+<ul>
+<li>separates application specific code from the reactor implementation</li>
+<li>allows for simple coarse-grain concurrency while not adding the complexity of multiple threads to the system</li>
+</ul>
+
+<p>Limitations:</p>
+
+<ul>
+<li>more difficult to debug than a procedural pattern due to the inverted flow of control</li>
+<li>by only calling event handlers synchronously, it limits maximum concurrency, especially on symmetric multiprocessing hardware</li>
+<li>The scalability of the reactor pattern is limited by event handler and demultiplexer
+<br /></li>
 </ul></li>
 
-<li><p>InternalKey(<code>db/dbformat.h</code>) &amp; ParsedInternalKey (<code>db/dbformat.h</code>)</p>
+<li><p>Proactor</p>
 
-<p>InternalKey: userkey ＋ 元信息（8 bytes, SequnceNumber|ValueType), ParsedInternalKey 为 InternalKey 分拆得到的结构体</p>
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/Proactor.png" alt="proactor" /></p>
 
-<pre><code>class InternalKey {
-    …
-    private:
-        std::string rep_;
-}
+<p>In the Proactor pattern, the initiator (event demultiplexor) initiates asynchronous I/O operations. The I/O operation itself is <strong>performed by OS</strong>.</p>
 
-struct ParsedInternalKey { 
-    Slice user_key; 
-    SequenceNumber sequence; 
-    ValueType type; 
-};
-</code></pre></li>
+<p>A completion handler is called after the asynchronous part has terminated. The proactor pattern can be considered to be an <strong>asynchronous variant</strong> of the synchronous reactor pattern.</p>
 
-<li><p>LookupKey(<code>db/dbformat.h</code>)</p>
+<p>The implementation of this classic asynchronous pattern is based on an asynchronous OS-level API, which is called it &ldquo;system-level&rdquo; or &ldquo;true&rdquo; async.</p>
 
-<p>db 内部为查找 memtable/sstable 方便而设置的类：</p>
+<p>Structure:</p>
 
-<pre><code>class LookupKey { 
-    … 
-    private: 
-        const char* start_;
-        const char* kstart_;
-        const char* end_;
-};
-</code></pre>
-
-<table>
-<thead>
-<tr>
-<th>start_</th>
-<th align="center">kstart_ - end_</th>
-</tr>
-</thead>
-
-<tbody>
-<tr>
-<td>internal_key_size</td>
-<td align="center">internal_key: userkey_data + SequenceNumber</td>
-</tr>
-
-<tr>
-<td>(varint32)</td>
-<td align="center">(InternalKey_size: char[] + uint64)</td>
-</tr>
-</tbody>
-</table>
-
-<p>对 memtable lookup 时使用 <code>memtable_key</code> [<code>start_</code>,<code>end_</code>], 对 sstable lookup 时使用 <code>internal_key</code> [<code>kstart_</code>, <code>end_</code>]。</p>
-
-<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_key.png" width="450"/></p></li>
-
-<li><p>memtable entry</p>
-
-<p>MemTable 中 entry 存储格式（实际上是字符串）：</p>
-
-<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_memtable_entry.png" width="600"/></p></li>
-
-<li><p>Comparator(<code>include/leveldb/comparator.h</code> <code>util/comparator.cc</code>)</p></li>
-
-<li><p>InternalKeyComparator(<code>db/dbformat.h</code>)</p></li>
-
-<li><p>WriteBatch(<code>db/write_batch.cc</code>)</p></li>
-
-<li><p>FileMetaData(<code>db/version_edit.h</code>)</p></li>
-
-<li><p>block(<code>table/block.cc</code>)</p></li>
-
-<li><p>BlockHandle(<code>table/dbformat.h</code>)</p></li>
-
-<li><p>FileNumber(<code>db/dbformat.h</code>)</p></li>
-
-<li><p>filename(<code>db/dbformat.cc</code>)</p></li>
-
-<li><p>Compact(<code>db/db_impl.cc</code> <code>db/version_set.cc</code>)</p></li>
-
-<li><p>Iterator(<code>include/leveldb/iterator.h</code>)</p></li>
+<ul>
+<li>Proactive Initiator : initiates asynchronous I/O operations</li>
+<li>Completion Event Dispatcher (event demultiplexor): waits for events that indicate the completion of the I/O operation, and forwards those events to the appropriate handlers</li>
+<li>Completion Event Handler (user handler): handles the data from user defined buffer, starts a new asynchronous operation, and returns control to the dispatcher</li>
+</ul></li>
 </ol>
 
-<h2 id="reference">Reference</h2>
+<h2 id="emulated-proactor-implementation">Emulated Proactor Implementation</h2>
 
-<p>leveldb实现解析 by 淘宝-核心系统研发-存储 那岩</p>
+<p>A solution to the challenge of designing a portable framework for the Proactor and Reactor I/O patterns: transform a Reactor demultiplexor I/O solution to an emulated async I/O by moving read/write operations from event handlers inside the demultiplexor (this is &ldquo;emulated async&rdquo; approach).</p>
 
-<p><a href="http://www.pandademo.com/2016/03/memtable-and-skiplist-leveldb-source-dissect-3/">MemTable 与 SkipList-leveldb 源码剖析 (3)</a></p>
+<p>We simply shifted responsibilities between different actors. By adding functionality to the demultiplexor I/O pattern, we were able to convert the Reactor pattern to a Proactor pattern.</p>
+
+<p>Structure:</p>
+
+<ul>
+<li>Dispatcher (<strong>asynchronous</strong> event demultiplexer): performs a non-blocking I/O operation and on completion calls the appropriate handler</li>
+<li>Event Handler (user handler): handles data from the user-defined buffer, declares new interes, then returns control to the dispatcher</li>
+</ul>
+
+<hr />
+
+<p>Reference：</p>
+
+<blockquote>
+<p><a href="http://www.artima.com/articles/io_design_patternsP.html">Comparing Two High-Performance I/O Design Patterns</a></p>
+
+<p><a href="https://en.wikipedia.org/wiki/Reactor_pattern">Reactor pattern</a></p>
+
+<p><a href="https://en.wikipedia.org/wiki/Proactor_pattern">Proactor pattern</a></p>
+</blockquote>
 
 
   
 <div class="prev-next-post pure-g">
   <div class="pure-u-1-24" style="text-align: left;">
     
-    <a href="http://wiesen.github.io/post/leveldb-Introduction/"><i class="fa fa-chevron-left"></i></a>
+    <a href="http://wiesen.github.io/post/TCP%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/"><i class="fa fa-chevron-left"></i></a>
     
   </div>
   <div class="pure-u-10-24">
     
     <nav class="prev">
-      <a href="http://wiesen.github.io/post/leveldb-Introduction/">Leveldb: Introduction</a>
+      <a href="http://wiesen.github.io/post/TCP%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/">TCP粘包问题：分包</a>
     </nav>
     
   </div>
@@ -397,13 +325,13 @@ struct ParsedInternalKey {
   <div class="pure-u-10-24">
     
     <nav class="next">
-      <a href="http://wiesen.github.io/post/leveldb-Storage/">Leveldb: Storage MemTable</a>
+      <a href="http://wiesen.github.io/post/leveldb-Introduction/">Leveldb: Introduction</a>
     </nav>
     
   </div>
   <div class="pure-u-1-24" style="text-align: right;">
     
-    <a href="http://wiesen.github.io/post/leveldb-Storage/"><i class="fa fa-chevron-right"></i></a>
+    <a href="http://wiesen.github.io/post/leveldb-Introduction/"><i class="fa fa-chevron-right"></i></a>
     
   </div>
 </div>

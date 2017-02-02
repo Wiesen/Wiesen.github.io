@@ -2,11 +2,12 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Mit 6.824 on Wiesen&#39;s Blog</title>
-    <link>http://wiesen.github.io/topics/mit-6.824/index.xml</link>
+    <link>http://wiesen.github.io/topics/mit-6/index.824/</link>
     <description>Recent content in Mit 6.824 on Wiesen&#39;s Blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>&amp;copy; 2016. All rights reserved.</copyright>
+    <lastBuildDate>Fri, 09 Sep 2016 17:32:46 +0800</lastBuildDate>
     <atom:link href="http://wiesen.github.io/topics/mit-6.824/index.xml" rel="self" type="application/rss+xml" />
     
     <item>
@@ -81,7 +82,7 @@
 
 &lt;p&gt;然而，在 go 中实现上面的做法并不是那么 clean，很多特性在语言层面上并不支持，比如: 1) get map.keys(); 2) 根据特定的字段进行排序等，自行实现实在麻烦。&lt;/p&gt;
 
-&lt;p&gt;因此，由于 lab 中只有 join/leave 会造成 imbalance，并且 group 是逐个 join/leave。所以 simple first，首先统计 prior config 中每个 group 有多少个 shards，并且计算 present config 中平均每个 group 分配多少个 shards (&lt;code&gt;quota = num_of_shards / num_of_group&lt;/code&gt;)，然后循环将 max_shards_group/leaving_group 中的 shards 分配给 joining_group/min_shards_group.&lt;/p&gt;&lt;/li&gt;
+&lt;p&gt;因此，由于 lab 中只有 join/leave 会造成 imbalance，并且 group 是逐个 join/leave。所以 make it simple。我们首先统计 prior config 中每个 group 有多少个 shards，并且计算 present config 中平均每个 group 分配多少个 shards (&lt;code&gt;quota = num_of_shards / num_of_group&lt;/code&gt;)，然后循环将 max_shards_group/leaving_group 中的 shards 分配给 joining_group/min_shards_group.&lt;/p&gt;&lt;/li&gt;
 &lt;/ol&gt;
 
 &lt;h2 id=&#34;part-b-sharded-key-value-server&#34;&gt;Part B: Sharded Key/Value Server&lt;/h2&gt;
@@ -119,7 +120,7 @@
 
 &lt;ul&gt;
 &lt;li&gt;&lt;strong&gt;Detect&lt;/strong&gt;: 开一个 goroutine 来周期性地向 shardmaster query 最新的 configuration (由 group leader 完成)，当发现 configuration 更新时 (one by one in order)，即向其余 group 获取需要的 shards (migrating shard)；&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;When to reconfigurate&lt;/strong&gt;: Reconfiguration operation 仅仅是 group leader 从 shardmaster 获取到的 operation proposal，新的 configuration 什么时候生效是由各 group 自身决定，本文的实现是当 group 获取到需要的 shards 后再进行 reconfiguration update。因此会出现当 client 根据新的 configuration 向 shardkv 发起 request 时，各个 group 都还没完成 configuration update。不过这并没什么影响，我们可以让 client 一直 loop 向每个 replica group 发起 request (当然是一直被拒)，直到目标 group 完成 reconfiguration update;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;When to reconfigurate&lt;/strong&gt;: Reconfiguration operation 仅仅是 group leader 从 shardmaster 获取到了 operation proposal，然而新的 configuration 什么时候生效是由各个 group 自行决定。本文的实现是当 group 获取到需要的 shards 后再进行 reconfiguration update。因此会出现当 client 根据新的 configuration 向 shardkv 发起 request 时，各个 group 都还没完成 configuration update。不过这并没什么影响，我们可以让 client 一直 loop 向每个 replica group 发起 request (当然是一直被拒)，直到目标 group 完成 reconfiguration update;&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;Consistency&lt;/strong&gt;: Reconfiguration operation 会影响到 PutAPpend/Get，因此同样需要利用 raft 保证 group 内的一致性，确保集群内完成了之前的操作后同时进行 Reconfiguration；&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;Replace What&lt;/strong&gt;: 包括 config，StoreShard (data) 以及 Ack (duplicate detection)，其中 Ack 不是 replace entirely，仅当 kv.ack[clientId] &amp;lt; migration.Ack[clientId] 才更新；
 &lt;br /&gt;&lt;/li&gt;
@@ -341,26 +342,27 @@
 
 &lt;p&gt;有一点&lt;strong&gt;注意&lt;/strong&gt;的是，&lt;code&gt;nextIndex[]&lt;/code&gt; 和 &lt;code&gt;matchindex[]&lt;/code&gt; 需要在 election 后进行 reinitialize。&lt;/p&gt;
 
-&lt;p&gt;func (rf *Raft) changeRole() {
-        for true {
-            switch rf.role {
-            case Leader:
-                for i := range rf.peers {
-                    rf.nextIndex[i] = rf.logTable[len(rf.logTable)-1].Index + 1
-                    rf.matchIndex[i] = 0
-                }
-                go rf.doHeartbeat()
-                &amp;lt;-rf.chanRole
-            case Candidate:
-                chanQuitElect := make(chan bool)
-                go rf.startElection(chanQuitElect)
-                &amp;lt;-rf.chanRole
-                close(chanQuitElect)
-            case Follower:
-                &amp;lt;-rf.chanRole
+&lt;pre&gt;&lt;code&gt;func (rf *Raft) changeRole() {
+    for true {
+        switch rf.role {
+        case Leader:
+            for i := range rf.peers {
+                rf.nextIndex[i] = rf.logTable[len(rf.logTable)-1].Index + 1
+                rf.matchIndex[i] = 0
             }
+            go rf.doHeartbeat()
+            &amp;lt;-rf.chanRole
+        case Candidate:
+            chanQuitElect := make(chan bool)
+            go rf.startElection(chanQuitElect)
+            &amp;lt;-rf.chanRole
+            close(chanQuitElect)
+        case Follower:
+            &amp;lt;-rf.chanRole
         }
-    }&lt;/p&gt;
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
 
 &lt;p&gt;此外，定时器 election timer 的作用十分关键，所有 server 都应当在初始化 Raft peer 时开启一个单独的线程来维护 election timer。&lt;/p&gt;
 
@@ -664,22 +666,20 @@ for server := range rf.peers {
 &lt;p&gt;最近几天 debug 了之前的代码，发现了若干个问题。目前的代码实现已经&lt;strong&gt;比较稳定&lt;/strong&gt;地 pass 所有的 test case，上面的代码段也已经修改了。但仍然存在一个 bug: 在过 TestUnreliableAgree() 时 fail to reach agreement。这个 bug 的触发几率很低，还没想明白哪里出问题。&lt;/p&gt;
 
 &lt;ol&gt;
-&lt;li&gt;&lt;strong&gt;LEADER ELECTION: Role Transfer (state machine)&lt;/strong&gt;&lt;/li&gt;
-&lt;/ol&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;LEADER ELECTION: Role Transfer (state machine)&lt;/strong&gt;&lt;/p&gt;
 
 &lt;p&gt;之前实现 server state machine 的方法是利用 channel 来进行状态修改操作，并且会新开一个 goroutine 进行该状态死循环，而没有其他状态的处理逻辑。本文由一个 goroutine 阻塞读取该 channel，从而处理 server 的状态转换。然而，channel 同步是存在延时的，只有在当前 goroutine 被挂起或者休眠等时，才会转去处理。&lt;/p&gt;
 
 &lt;p&gt;这样的方法存在一个 bug：新 Leader 产生后，旧 Leader 收到消息应该更新自身的 term 并且转换为 Follower；然而由于 channel 同步并非立即执行，旧 Leader 在自身状态被重新赋值前仍然会执行 Leader 的代码；这时候就会出现两个 Leader 同时处理 RPC。&lt;/p&gt;
 
-&lt;p&gt;因此，修改的内容是：去掉 channel 同步方法，当需要进行状态转换时，立即修改 server 的状态，终止该 server 当前状态的执行。&lt;/p&gt;
+&lt;p&gt;因此，修改的内容是：去掉 channel 同步方法，当需要进行状态转换时，立即修改 server 的状态，终止该 server 当前状态的执行。&lt;/p&gt;&lt;/li&gt;
 
-&lt;ol&gt;
-&lt;li&gt;&lt;strong&gt;LOG REPLICATION: AppendEntries RPC&lt;/strong&gt;&lt;/li&gt;
-&lt;/ol&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;LOG REPLICATION: AppendEntries RPC&lt;/strong&gt;&lt;/p&gt;
 
 &lt;p&gt;之前不能 pass &lt;code&gt;TestUnreliableAgree()&lt;/code&gt; 和 &lt;code&gt;TestFigure8Unreliable()&lt;/code&gt; 时丝毫没有提示，只能等程序运行时间过长然后被杀死。后来思考了一下问题原因：&lt;strong&gt;程序运行过慢，跟不上 test case 要求的速度，所以后续的测试代码也根本没有执行&lt;/strong&gt;。&lt;/p&gt;
 
-&lt;p&gt;然后发现程序执行慢的原因是：Leader 发送 AppendEntries RPC 每次仅携带一条 log entry，导致 server 无法快速 catch up。所以修改的主要内容就是：AppendEntries RPC 每次携带从 &lt;code&gt;nextIndex&lt;/code&gt; 直到最新的 log entries。&lt;/p&gt;
+&lt;p&gt;然后发现程序执行慢的原因是：Leader 发送 AppendEntries RPC 每次仅携带一条 log entry，导致 server 无法快速 catch up。所以修改的主要内容就是：AppendEntries RPC 每次携带从 &lt;code&gt;nextIndex&lt;/code&gt; 直到最新的 log entries。&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
 
 &lt;h2 id=&#34;reference&#34;&gt;Reference&lt;/h2&gt;
 

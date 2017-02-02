@@ -5,7 +5,7 @@
   <meta http-equiv="content-type" content="text/html; charset=utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="">
-  <meta name="generator" content="Hugo 0.18" />
+  <meta name="generator" content="Hugo 0.16" />
 
   <title>MIT 6.824: lab2 Raft Consensus Algorithm Implementation &middot; Wiesen&#39;s Blog</title>
 
@@ -39,7 +39,7 @@
   
 
   
-  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/github.min.css">
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/monokai-sublime.min.css">
   <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
   <script>hljs.initHighlightingOnLoad();</script>
   
@@ -250,26 +250,27 @@
 
 <p>有一点<strong>注意</strong>的是，<code>nextIndex[]</code> 和 <code>matchindex[]</code> 需要在 election 后进行 reinitialize。</p>
 
-<p>func (rf *Raft) changeRole() {
-        for true {
-            switch rf.role {
-            case Leader:
-                for i := range rf.peers {
-                    rf.nextIndex[i] = rf.logTable[len(rf.logTable)-1].Index + 1
-                    rf.matchIndex[i] = 0
-                }
-                go rf.doHeartbeat()
-                &lt;-rf.chanRole
-            case Candidate:
-                chanQuitElect := make(chan bool)
-                go rf.startElection(chanQuitElect)
-                &lt;-rf.chanRole
-                close(chanQuitElect)
-            case Follower:
-                &lt;-rf.chanRole
+<pre><code>func (rf *Raft) changeRole() {
+    for true {
+        switch rf.role {
+        case Leader:
+            for i := range rf.peers {
+                rf.nextIndex[i] = rf.logTable[len(rf.logTable)-1].Index + 1
+                rf.matchIndex[i] = 0
             }
+            go rf.doHeartbeat()
+            &lt;-rf.chanRole
+        case Candidate:
+            chanQuitElect := make(chan bool)
+            go rf.startElection(chanQuitElect)
+            &lt;-rf.chanRole
+            close(chanQuitElect)
+        case Follower:
+            &lt;-rf.chanRole
         }
-    }</p>
+    }
+}
+</code></pre>
 
 <p>此外，定时器 election timer 的作用十分关键，所有 server 都应当在初始化 Raft peer 时开启一个单独的线程来维护 election timer。</p>
 
@@ -573,22 +574,20 @@ for server := range rf.peers {
 <p>最近几天 debug 了之前的代码，发现了若干个问题。目前的代码实现已经<strong>比较稳定</strong>地 pass 所有的 test case，上面的代码段也已经修改了。但仍然存在一个 bug: 在过 TestUnreliableAgree() 时 fail to reach agreement。这个 bug 的触发几率很低，还没想明白哪里出问题。</p>
 
 <ol>
-<li><strong>LEADER ELECTION: Role Transfer (state machine)</strong></li>
-</ol>
+<li><p><strong>LEADER ELECTION: Role Transfer (state machine)</strong></p>
 
 <p>之前实现 server state machine 的方法是利用 channel 来进行状态修改操作，并且会新开一个 goroutine 进行该状态死循环，而没有其他状态的处理逻辑。本文由一个 goroutine 阻塞读取该 channel，从而处理 server 的状态转换。然而，channel 同步是存在延时的，只有在当前 goroutine 被挂起或者休眠等时，才会转去处理。</p>
 
 <p>这样的方法存在一个 bug：新 Leader 产生后，旧 Leader 收到消息应该更新自身的 term 并且转换为 Follower；然而由于 channel 同步并非立即执行，旧 Leader 在自身状态被重新赋值前仍然会执行 Leader 的代码；这时候就会出现两个 Leader 同时处理 RPC。</p>
 
-<p>因此，修改的内容是：去掉 channel 同步方法，当需要进行状态转换时，立即修改 server 的状态，终止该 server 当前状态的执行。</p>
+<p>因此，修改的内容是：去掉 channel 同步方法，当需要进行状态转换时，立即修改 server 的状态，终止该 server 当前状态的执行。</p></li>
 
-<ol>
-<li><strong>LOG REPLICATION: AppendEntries RPC</strong></li>
-</ol>
+<li><p><strong>LOG REPLICATION: AppendEntries RPC</strong></p>
 
 <p>之前不能 pass <code>TestUnreliableAgree()</code> 和 <code>TestFigure8Unreliable()</code> 时丝毫没有提示，只能等程序运行时间过长然后被杀死。后来思考了一下问题原因：<strong>程序运行过慢，跟不上 test case 要求的速度，所以后续的测试代码也根本没有执行</strong>。</p>
 
-<p>然后发现程序执行慢的原因是：Leader 发送 AppendEntries RPC 每次仅携带一条 log entry，导致 server 无法快速 catch up。所以修改的主要内容就是：AppendEntries RPC 每次携带从 <code>nextIndex</code> 直到最新的 log entries。</p>
+<p>然后发现程序执行慢的原因是：Leader 发送 AppendEntries RPC 每次仅携带一条 log entry，导致 server 无法快速 catch up。所以修改的主要内容就是：AppendEntries RPC 每次携带从 <code>nextIndex</code> 直到最新的 log entries。</p></li>
+</ol>
 
 <h2 id="reference">Reference</h2>
 

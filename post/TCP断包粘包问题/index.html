@@ -5,9 +5,9 @@
   <meta http-equiv="content-type" content="text/html; charset=utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="">
-  <meta name="generator" content="Hugo 0.18" />
+  <meta name="generator" content="Hugo 0.16" />
 
-  <title>TCP断包粘包问题 &middot; Wiesen&#39;s Blog</title>
+  <title>TCP粘包问题：分包 &middot; Wiesen&#39;s Blog</title>
 
   
   
@@ -39,7 +39,7 @@
   
 
   
-  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/github.min.css">
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/monokai-sublime.min.css">
   <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
   <script>hljs.initHighlightingOnLoad();</script>
   
@@ -185,7 +185,7 @@
 
 
 <div class="header">
-  <h1>TCP断包粘包问题</h1>
+  <h1>TCP粘包问题：分包</h1>
   <h2></h2>
 </div>
 <div class="content">
@@ -217,48 +217,111 @@
 
   
 
-<p>（内容收集自网络）</p>
+<h2 id="update-2017-01-17">Update 2017-01-17</h2>
+
+<p>From Muduo：</p>
+
+<p>TCP 是<strong>“字节流”</strong>协议，其本身没有“消息包”的概念，因此“粘包问题”是个伪命题。但对利用 TCP 进行通信的应用层程序来说，分包是其基本需求。</p>
+
+<p>分包指的是在发送一个消息（message）或者一帧（frame）数据时，通过一定的处理，令接收方能从字节流中识别并截取（还原）出一个个消息包。</p>
+
+<p>对于短连接的 TCP 服务，分包不是问题。只要发送方主动关闭连接，就表示一条消息发送完毕，接收方 read() 返回0，从而得知消息结尾。</p>
+
+<p>对于长连接的 TCP 服务，分包有4种方法：</p>
+
+<ol>
+<li>消息长度固定（亦即是提前确定包长度，适合定长消息包）；</li>
+<li>使用特殊的字符或字符串作为消息的边界，例如 HTTP 协议的 headers 以“\r\n”为字段的分隔符；</li>
+<li>在每条消息的头部加一个长度字段，最常见的做法；</li>
+<li>利用消息本身的格式来分包，例如 XML 格式的消息中<root>&hellip;</rrot>的配对，或者json格式中的{&hellip;}的配对。解析这种消息格式通常会用到状态机。</li>
+</ol>
 
 <h2 id="粘包问题">粘包问题</h2>
 
-<p>粘包问题是由 TCP 是<strong>“字节流”</strong>协议，没有消息边界所引起的。而 UDP/HTTP 具有消息边界，所以不存在断包粘包问题。</p>
+<p>一个完整的消息可能会被TCP拆分成多个包进行发送，也有可能把多个小的包封装成一个大的数据包发送。粘包是指发送方发送的若干包数据到接收方接收时粘成一包，从接收缓冲区看，后一包数据的头紧接着前一包数据的尾。</p>
 
-<p>另外：</p>
+<p>粘包问题是由 TCP 是面向字节流协议因此没有消息边界所引起的。而 UDP 是面向数据报的协议，所以不存在拆包粘包问题。</p>
+
+<p>存在以下特殊情况：</p>
 
 <ol>
-<li>如果发送数据无结构，如文件传输，这样发送方只管发送，接收方只管接收存储就 ok，也不用考虑粘包；</li>
+<li>如果发送数据无结构，如文件传输，这样发送方只管发送，接收方只管接收存储就 ok，不用考虑粘包；</li>
 <li>如果利用 TCP 短连接时，不会出现粘包问题；</li>
-<li>当发送数据存在一定结构，并且需要维护长连接时，则需要考虑粘包问题；</li>
+<li>当发送数据<strong>存在一定结构，并且需要维护长连接时</strong>，则需要考虑粘包问题；</li>
 </ol>
 
 <h2 id="问题原因">问题原因</h2>
 
-<p>出现粘包现象的原因既可能由发送方造成，也可能由接收方造成:</p>
+<p>出现拆包粘包现象的原因既可能由发送方造成，也可能由接收方造成:</p>
 
 <ol>
-<li>发送端需要等缓冲区满才发送出去，造成粘包;</li>
-<li>接收方没能及时地接收缓冲区的包，造成多个包接收;</li>
+<li>要发送的数据大于TCP发送缓冲区剩余空间大小，发生拆包；</li>
+<li>待发送数据大于MSS（最大报文长度），TCP在传输前进行拆包；</li>
+<li>要发送的数据小于TCP发送缓冲区的大小，TCP将多次写入缓冲区的数据一次发送出去，造成粘包;</li>
+<li>接收方没能及时地接收缓冲区的数据，造成粘包;</li>
 </ol>
 
 <h2 id="解决方法">解决方法</h2>
 
-<p>为了避免粘包现象，可采取以下几种措施。</p>
+<p>解决粘包的方法，是由应用层进行<strong>分包处理</strong>，本质上就是由<strong>应用层</strong>来维护消息和消息的边界（即定义自己的会话层和表示层协议）。</p>
+
+<p>本文处理办法：</p>
 
 <ol>
-<li><p>对于发送方引起的粘包现象，用户可通过编程设置来避免，TCP 提供了强制数据立即传送的操作指令 push，TCP 软件收到该操作指令后，就立即将本段数据发送出去，而不必等待发送缓冲区满；</p>
+<li>发送方在每次发送消息时将数据报长度写入一个int32作为包头一并发送出去, 称之为Encode；</li>
 
-<p>缺点: 第一种编程设置方法虽然可以避免发送方引起的粘包，但它关闭了优化算法，降低了网络发送效率，影响应用程序的性能，一般不建议使用。</p></li>
+<li><p>接受方则先读取一个int32的长度的消息长度信息, 再根据长度读取相应长的byte数据, 称之为Decode；</p>
 
-<li><p>对于接收方引起的粘包，则可通过优化程序设计、精简接收进程工作量、提高接收进程优先级等措施，使其及时接收数据，从而尽量避免出现粘包现象；</p>
+<pre><code>//codec.go
 
-<p>缺点: 第二种方法只能减少出现粘包的可能性，但并不能完全避免粘包，当发送频率较高时，或由于网络突发可能使某个时间段数据包到达接收方较快，接收方还是有可能来不及接收，从而导致粘包。</p></li>
-</ol>
+package codec
 
-<p>既能保证效率又能比较好地解决粘包的方法，是由应用层进行<strong>分包处理</strong>，本质上就是由<strong>应用层</strong>来维护消息和消息的边界。主要是采用以下两种方式：</p>
+import (
+    &quot;bufio&quot;
+    &quot;bytes&quot;
+    &quot;encoding/binary&quot;
+)
 
-<ol>
-<li>以<strong>特殊字符</strong>作为消息的分界符;</li>
-<li>在消息头部加入整个消息的<strong>长度信息</strong>。</li>
+func Encode(message string) ([]byte, error) {
+    // 读取消息的长度
+    var length int32 = int32(len(message))
+    var pkg *bytes.Buffer = new(bytes.Buffer)
+    // 写入消息头
+    err := binary.Write(pkg, binary.LittleEndian, length)
+    if err != nil {
+        return nil, err
+    }
+    // 写入消息实体
+    err = binary.Write(pkg, binary.LittleEndian, []byte(message))
+    if err != nil {
+        return nil, err
+    }
+
+    return pkg.Bytes(), nil
+}
+
+func Decode(reader *bufio.Reader) (string, error) {
+    // 读取消息的长度
+    lengthByte, _ := reader.Peek(4)
+    lengthBuff := bytes.NewBuffer(lengthByte)
+    var length int32
+    err := binary.Read(lengthBuff, binary.LittleEndian, &amp;length)
+    if err != nil {
+        return &quot;&quot;, err
+    }
+    if int32(reader.Buffered()) &lt; length+4 {
+        return &quot;&quot;, err
+    }
+
+    // 读取消息真正的内容
+    pack := make([]byte, int(4+length))
+    _, err = reader.Read(pack)
+    if err != nil {
+        return &quot;&quot;, err
+    }
+    return string(pack[4:]), nil
+}
+</code></pre></li>
 </ol>
 
 
@@ -282,13 +345,13 @@
   <div class="pure-u-10-24">
     
     <nav class="next">
-      <a href="http://wiesen.github.io/post/IO%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E6%A8%A1%E5%BC%8F/">I/O多路复用设计模式</a>
+      <a href="http://wiesen.github.io/post/IO-Event-Handling-Design-Patterns/">I/O Event Handling Design Patterns</a>
     </nav>
     
   </div>
   <div class="pure-u-1-24" style="text-align: right;">
     
-    <a href="http://wiesen.github.io/post/IO%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E6%A8%A1%E5%BC%8F/"><i class="fa fa-chevron-right"></i></a>
+    <a href="http://wiesen.github.io/post/IO-Event-Handling-Design-Patterns/"><i class="fa fa-chevron-right"></i></a>
     
   </div>
 </div>
