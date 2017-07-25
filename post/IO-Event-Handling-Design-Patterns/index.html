@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.18" />
+
+  <title>I/O Event Handling Design Patterns &middot; Wiesen&#39;s Blog</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="http://wiesen.github.io/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/monokai-sublime.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="http://wiesen.github.io/img/favicon.ico" type="image/x-icon" />
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+  <a class="pure-menu-heading brand" href="http://wiesen.github.io/">Wiesen</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/topics/"><i class='fa fa-folder fa-fw'></i>Topics</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/about/"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/contact/"><i class='fa fa-phone fa-fw'></i>Contact</a>
+      
+        </li>
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://facebook.com/100010837531785" target="_blank"><i class="fa fa-facebook-square fa-fw"></i>Facebook</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/Wiesen" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+
+<div class="header">
+  <h1>I/O Event Handling Design Patterns</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+    <i class="fa fa-calendar fa-fw"></i>
+    <time>24 Nov 2016, 21:31</time>
+  </div>
+
+  
+
+  
+  
+  
+  <div>
+    <i class="fa fa-folder fa-fw"></i>
+    
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/high-performance-server">High Performance Server</a>
+    
+  </div>
+  
+  
+
+  
+
+</div>
+
+  
+
+<h2 id="introduction">Introduction</h2>
+
+<p>System I/O can be blocking, or non-blocking synchronous, or non-blocking asynchronous:</p>
+
+<ul>
+<li>Blocking I/O means that the calling system does not return control to the caller until the operation is finished</li>
+<li>a non-blocking synchronous call returns control to the caller immediately</li>
+</ul>
+
+<p>I/O multiplexing mechanisms rely on an event demultiplexor: dispatches I/O events from a limited number of sources to the appropriate read/write event handlers.</p>
+
+<p>There are two non-blocking I/O multiplexing mechanisms: reactor &amp;&amp; proactor.</p>
+
+<h2 id="mechanism">Mechanism</h2>
+
+<ol>
+<li><p>Reactor</p>
+
+<p>In the Reactor pattern, the event demultiplexor waits for events that indicate when a file descriptor or socket is ready for a read or write operation.</p>
+
+<p>Structure:</p>
+
+<ul>
+<li>Request Event Dispatcher (<strong>synchronous</strong> event demultiplexer): uses an event loop to block on all resources, and dispatches resources from the demultiplexer to the associated event handler</li>
+<li>Request Event Handler (user handler): performs the actual I/O operation, handles data, , declares renewed interest in I/O events, and returns control to the dispatcher</li>
+</ul>
+
+<p>Benific:</p>
+
+<ul>
+<li>separates application specific code from the reactor implementation</li>
+<li>allows for simple coarse-grain concurrency while not adding the complexity of multiple threads to the system</li>
+</ul>
+
+<p>Limitations:</p>
+
+<ul>
+<li>more difficult to debug than a procedural pattern due to the inverted flow of control</li>
+<li>by only calling event handlers synchronously, it limits maximum concurrency, especially on symmetric multiprocessing hardware</li>
+<li>The scalability of the reactor pattern is limited by event handler and demultiplexer
+<br /></li>
+</ul></li>
+
+<li><p>Proactor</p>
+
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/Proactor.png" alt="proactor" /></p>
+
+<p>In the Proactor pattern, the initiator (event demultiplexor) initiates asynchronous I/O operations. The I/O operation itself is <strong>performed by OS</strong>.</p>
+
+<p>A completion handler is called after the asynchronous part has terminated. The proactor pattern can be considered to be an <strong>asynchronous variant</strong> of the synchronous reactor pattern.</p>
+
+<p>The implementation of this classic asynchronous pattern is based on an asynchronous OS-level API, which is called it &ldquo;system-level&rdquo; or &ldquo;true&rdquo; async.</p>
+
+<p>Structure:</p>
+
+<ul>
+<li>Proactive Initiator : initiates asynchronous I/O operations</li>
+<li>Completion Event Dispatcher (event demultiplexor): waits for events that indicate the completion of the I/O operation, and forwards those events to the appropriate handlers</li>
+<li>Completion Event Handler (user handler): handles the data from user defined buffer, starts a new asynchronous operation, and returns control to the dispatcher</li>
+</ul></li>
+</ol>
+
+<h2 id="emulated-proactor-implementation">Emulated Proactor Implementation</h2>
+
+<p>A solution to the challenge of designing a portable framework for the Proactor and Reactor I/O patterns: transform a Reactor demultiplexor I/O solution to an emulated async I/O by moving read/write operations from event handlers inside the demultiplexor (this is &ldquo;emulated async&rdquo; approach).</p>
+
+<p>We simply shifted responsibilities between different actors. By adding functionality to the demultiplexor I/O pattern, we were able to convert the Reactor pattern to a Proactor pattern.</p>
+
+<p>Structure:</p>
+
+<ul>
+<li>Dispatcher (<strong>asynchronous</strong> event demultiplexer): performs a non-blocking I/O operation and on completion calls the appropriate handler</li>
+<li>Event Handler (user handler): handles data from the user-defined buffer, declares new interes, then returns control to the dispatcher</li>
+</ul>
+
+<hr />
+
+<p>Reference：</p>
+
+<blockquote>
+<p><a href="http://www.artima.com/articles/io_design_patternsP.html">Comparing Two High-Performance I/O Design Patterns</a></p>
+
+<p><a href="https://en.wikipedia.org/wiki/Reactor_pattern">Reactor pattern</a></p>
+
+<p><a href="https://en.wikipedia.org/wiki/Proactor_pattern">Proactor pattern</a></p>
+</blockquote>
+
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="http://wiesen.github.io/post/TCP%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="http://wiesen.github.io/post/TCP%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/">TCP粘包问题：分包</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="http://wiesen.github.io/post/leveldb-Introduction/">Leveldb: Introduction</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="http://wiesen.github.io/post/leveldb-Introduction/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Wiesen';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="http://wiesen.github.io/js/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-73790691-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

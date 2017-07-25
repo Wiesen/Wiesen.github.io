@@ -2,16 +2,1477 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Posts on Wiesen&#39;s Blog</title>
-    <link>http://wiesen.github.io/post/</link>
+    <link>http://wiesen.github.io/post/index.xml</link>
     <description>Recent content in Posts on Wiesen&#39;s Blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>&amp;copy; 2016. All rights reserved.</copyright>
-    <lastBuildDate>Fri, 10 Jun 2016 21:32:46 +0800</lastBuildDate>
+    <lastBuildDate>Sat, 28 Jan 2017 21:31:20 +0800</lastBuildDate>
     <atom:link href="http://wiesen.github.io/post/index.xml" rel="self" type="application/rss+xml" />
     
     <item>
-      <title>MIT 6.824 lab2 Raft Consensus Algorithm Implementation</title>
+      <title>Leveldb: Log</title>
+      <link>http://wiesen.github.io/post/Leveldb-Storage-Log/</link>
+      <pubDate>Sat, 28 Jan 2017 21:31:20 +0800</pubDate>
+      
+      <guid>http://wiesen.github.io/post/Leveldb-Storage-Log/</guid>
+      <description>
+
+&lt;p&gt;Log：(&lt;code&gt;db/log_format.h&lt;/code&gt;,&lt;code&gt;db/log_writer.h&amp;amp;.cc&lt;/code&gt;,&lt;code&gt;db/log_reader.h&amp;amp;.cc&lt;/code&gt;)&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;Introduction&lt;/p&gt;
+
+&lt;p&gt;why log：log 文件在 LevelDb 中的主要作用是系统故障恢复时进行数据恢复。利用 WAL，即使系统发生故障，Memtable 中的数据没有来得及 Dump 到磁盘的 SSTable 文件，LevelDB 也可以根据 log 文件恢复 Memtable 中的数据。&lt;/p&gt;
+
+&lt;p&gt;block of log：log 文件中的数据也是以 block 为单位组织（32k）。写日志时，一致性考虑，并没有按 block 单位写，每次更新均对 log 文件进行 IO，根据 WriteOption::sync 决定是否做强制 sync，读取时以 block 为单位做 IO 以及校验。&lt;/p&gt;
+
+&lt;p&gt;log 的写入是顺序写，读取只会在启动时发生，不会是性能的瓶颈（每次写都 sync 会有影响），log 中的数据也就没有进行压缩处理。&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Format&lt;/p&gt;
+
+&lt;p&gt;block of log 的整体结构，以及 record 的组成：&lt;/p&gt;
+
+&lt;table&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;record0&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;record1&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;record2&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;...&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+&lt;table&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;checksum (uint32)&lt;/td&gt;&lt;td&gt;length (uint16)&lt;/td&gt;&lt;td&gt;type (uint8)&lt;/td&gt;&lt;td&gt;data (length)&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+   
+
+&lt;ol&gt;
+&lt;li&gt;record： 每次更新写入作为一个 record
+
+&lt;ul&gt;
+&lt;li&gt;checksum 记录的是 type 和 data 的 crc 校验;   每个record都带上了32bit的checksum。对于每条记录多4字节还是很大开销的，这反映了leveldb的定位：针对fault-tolerant的分布式系统设计。&lt;/li&gt;
+&lt;li&gt;length 是 record 内保存的 data 长度（little-endian）。&lt;/li&gt;
+&lt;li&gt;为了避免 block 内部碎片的产生， 一份 record 可能会跨 block，所以根据 record 内保存数据占更新写入数据的完整与否， 当前分为 4 种 type： FULL， FIRST， MIDDLE， LAST, LAST，依次表示 record 内保存的是完整数据的全部，开始，中间或者最后部分。&lt;/li&gt;
+&lt;li&gt;data 即是保存的数据。&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;trailer： 如果 block 最后剩余的部分小于 record 的头长度(checksum/length/type 共 7bytes),则剩余的部分作为 block 的 trailer，填 0 不使用，record 写入下一个 block。&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;log 文件格式：&lt;/p&gt;
+
+&lt;table&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;init_data&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;block1&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;block2&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;blockN&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+&lt;ol&gt;
+&lt;li&gt;init_data: log 文件开头可以添加一些信息，读取写入的时候，跳过这些数据。&lt;/li&gt;
+&lt;li&gt;block:实际的数据，binlog 以及 MANIFEST 文件都使用了这种 log 的格式。&lt;/li&gt;
+&lt;/ol&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Analysis&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;写入 （&lt;code&gt;Writer::AddRecord() log_writer.cc&lt;/code&gt;）&lt;/p&gt;
+
+&lt;p&gt;对 log 的每次写入作为 record 添加：&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;如果当前 block 剩余的 size 小于 record 头长度，填充 trailer，开始下一个 block。&lt;/li&gt;
+&lt;li&gt;根据当前 block 剩余的 size 和写入 size，划分出满足写入的最大 record，确定 record type。&lt;/li&gt;
+&lt;li&gt;写入 record（Writer::EmitPhysicalRecord()）&lt;/li&gt;
+&lt;li&gt;循环 a-c,直至写入处理完成。&lt;/li&gt;
+&lt;li&gt;根据 option 指定的 sync 决定是否做 log 文件的强制 sync。
+&lt;br /&gt;&lt;/li&gt;
+&lt;/ol&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;读取（&lt;code&gt;Reader::ReadRecord() db/log_reader.cc&lt;/code&gt;）&lt;/p&gt;
+
+&lt;p&gt;log 的读取仅发生在 db 启动的时候，每次读取出当时写入的一次完整更新：&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;第一次读取， 根据指定的 &lt;code&gt;initial_offset&lt;/code&gt;_跳过 log 文件开始的 init_data(&lt;code&gt;Reader::SkipToInitialBlock()&lt;/code&gt;)，如果从跳过的 offset 开始，当前 block 剩余的 size 小于 record 的头长度（是个 trailer），则直接跳过这个 block。当前实现中指定的initial_offset_为 0。&lt;/li&gt;
+&lt;li&gt;从 log 文件中读一个 record（&lt;code&gt;Reader::ReadPhysicalRecord()&lt;/code&gt;).&lt;/li&gt;
+&lt;li&gt;根据读到 record 的 type 做进一步处理&lt;/li&gt;
+&lt;li&gt;循环 a-c 直至读取出当时写入的一个完整更新。
+&lt;br /&gt;&lt;/li&gt;
+&lt;/ol&gt;&lt;/li&gt;
+&lt;/ol&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;reference&#34;&gt;Reference&lt;/h2&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;a href=&#34;http://luodw.cc/2015/10/18/leveldb-08/&#34;&gt;leveldb源码分析之读写log文件&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://mingxinglai.com/cn/2013/01/leveldb-log-and-env/&#34;&gt;LevelDB源码剖析之Env与log::Writer&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;leveldb实现解析 by 淘宝-核心系统研发-存储 那岩&lt;/li&gt;
+&lt;/ol&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Leveldb: Block Cache</title>
+      <link>http://wiesen.github.io/post/Leveldb-Cache/</link>
+      <pubDate>Wed, 25 Jan 2017 21:31:20 +0800</pubDate>
+      
+      <guid>http://wiesen.github.io/post/Leveldb-Cache/</guid>
+      <description>
+
+&lt;p&gt;Block Cache (&lt;code&gt;util/cache.cc&lt;/code&gt;)：&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;Introduction&lt;/p&gt;
+
+&lt;p&gt;Cache 的目的：减少磁盘IO，加快 CURD 速度。&lt;/p&gt;
+
+&lt;p&gt;leveldb 中的 cache 分为 Table Cache 和 Block Cache 两种，其中 Table Cache 中缓存的是 sstable 的索引数据，Block Cache 缓存的是 Block 数据（可选打开）。&lt;/p&gt;
+
+&lt;p&gt;leveldb 中支持用户自己实现 block cache 逻辑，作为 option 传入。默认使用的是内部实现的 LRU。&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;基于简单以及效率考虑，leveldb 中实现了一个简单的 hash table（LRUHandle），采用定长数组存放 node，链表解决 hash 冲突。每次 insert 后，如果 node 数量大于数组的容量（期望短的冲突链表长度），就将容量扩大2倍，做一次 rehash；&lt;/li&gt;
+&lt;li&gt;LRU 的逻辑由 LRUCache 控制， insert 和 lookup 时更新链表即可；&lt;/li&gt;
+&lt;li&gt;由于 levelDB 为多线程，每个线程访问 cache 时都会对 cache 加锁。为了保证多线程安全并且减少锁开销，又将 LRUCache 再做 shard（ShardedLRUCache）。&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;整体来看：ShardedLRUCache 内部有 16 个 LRUCache（定长），查找 Key 时根据 key 的高四位进行 hash 索引，然后在相应的 LRUCache 中进行查找或更新。当 LRUCache 使用率大于总容量后, 根据 LRU 淘汰 key.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/leveldb-cache.jpg&#34; alt=&#34;cache&#34; /&gt;&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Declaration&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;// A single shard of sharded cache.
+class LRUCache {
+ public:
+  LRUCache();
+  ~LRUCache();
+
+  // Separate from constructor so caller can easily make an array of LRUCache
+  void SetCapacity(size_t capacity) { capacity_ = capacity; }
+
+  // Like Cache methods, but with an extra &amp;quot;hash&amp;quot; parameter.
+  Cache::Handle* Insert(const Slice&amp;amp; key, uint32_t hash,
+                        void* value, size_t charge,
+                        void (*deleter)(const Slice&amp;amp; key, void* value));
+  Cache::Handle* Lookup(const Slice&amp;amp; key, uint32_t hash);
+  void Release(Cache::Handle* handle);
+  void Erase(const Slice&amp;amp; key, uint32_t hash);
+
+ private:
+  void LRU_Remove(LRUHandle* e);
+  void LRU_Append(LRUHandle* e);
+  void Unref(LRUHandle* e);
+
+  // Initialized before use.
+  size_t capacity_;
+
+  // mutex_ protects the following state.
+  port::Mutex mutex_;
+  size_t usage_;
+  uint64_t last_id_;
+
+  // Dummy head of LRU list.
+  // lru.prev is newest entry, lru.next is oldest entry.
+  LRUHandle lru_;
+  HandleTable table_;
+};
+
+struct LRUHandle {
+  void* value;//存储键值对的值
+  void (*deleter)(const Slice&amp;amp;, void* value);//这个结构体的清除函数，由外界传进去注册
+  LRUHandle* next_hash;//用于hash表冲突时使用
+  LRUHandle* next;//当前节点的下一个节点
+  LRUHandle* prev;//当前节点的上一个节点
+  size_t charge;      // 这个节点占用的内存
+  size_t key_length;//这个节点键值的长度
+  uint32_t refs;//这个节点引用次数，当引用次数为0时，即可删除
+  uint32_t hash;      // 这个键值的哈希值
+  char key_data[1];   // 存储键的字符串，也是C++柔性数组的概念。
+  Slice key() const {
+    // For cheaper lookups, we allow a temporary Handle object
+    // to store a pointer to a key in &amp;quot;value&amp;quot;.
+    if (next == this) {
+      return *(reinterpret_cast&amp;lt;Slice*&amp;gt;(value));
+    } else {
+      return Slice(key_data, key_length);
+    }
+  }//为了加速查询，有时候一个节点在value存储键。
+};
+
+class HandleTable {
+ public:
+  HandleTable() : length_(0), elems_(0), list_(NULL) { Resize(); }
+  ~HandleTable() { delete[] list_; }
+
+  LRUHandle* Lookup(const Slice&amp;amp; key, uint32_t hash) {}
+  LRUHandle* Insert(LRUHandle* h) {}
+  LRUHandle* Remove(const Slice&amp;amp; key, uint32_t hash) {}
+
+ private:
+  // The table consists of an array of buckets where each bucket is
+  // a linked list of cache entries that hash into the bucket.
+  uint32_t length_;//哈希数组的长度
+  uint32_t elems_;//哈希表存储元素的数量
+  LRUHandle** list_;//哈希数组指针，因为数组存储的是指针，所以类型必须是指针的指针
+
+
+  // Return a pointer to slot that points to a cache entry that
+  // matches key/hash.  If there is no such cache entry, return a
+  // pointer to the trailing slot in the corresponding linked list.
+  LRUHandle** FindPointer(const Slice&amp;amp; key, uint32_t hash) {}
+  void Resize() {}
+};  
+&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Analysis&lt;/p&gt;
+
+&lt;p&gt;Cache类：一个抽象类，规范外部接口，用户可定义自己的 block cache，默认是调用 &lt;code&gt;NewLRUCache&lt;/code&gt; 返回一个 SharedLRUCache 对象。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;Cache* NewLRUCache(size_t capacity) {
+  return new SharedLRUCache(capacity);
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;SharedLRUCache类：内部有16个（&lt;code&gt;kNumShards&lt;/code&gt;） LRUCache 缓冲区，该类主要作用仅是计算 hash 值，选择 LRUCache ，然后调用 LRUCache 的函数。&lt;/p&gt;
+
+&lt;p&gt;LRUCache 类：真正的缓冲区数据结构，每个缓冲区都维护了一个 LRU 双向链表和 hash 表。链表的元素类型为 LRUHandle；hash 表中的元素是 &lt;code&gt;LRUHandle *&lt;/code&gt;，用于快速判断数据是否在缓冲区中。&lt;/p&gt;
+
+&lt;p&gt;LRUHandle 类：cache 中负责存储 key/value 的数据结构，是LRU 双向链表中的元素类型。&lt;code&gt;char key_data[1];&lt;/code&gt;为存储 key 的字符串，也是C++柔性数组的概念。&lt;code&gt;void* value;&lt;/code&gt;为存储 value&lt;/p&gt;
+
+&lt;p&gt;HandleTable 类：为了保证哈希链的查找速度，尽量使平均哈希链长度为&amp;lt;=1。当元素的个数大于桶的数量时就重新 hash（resize 为当前 hash 表长度的2倍并 rehash），保证 hash 的时间复杂度为 O(1)。&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;reference&#34;&gt;Reference&lt;/h2&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;a href=&#34;http://mingxinglai.com/cn/2013/01/leveldb-cache/&#34;&gt;LevelDB源码剖析之Cache缓冲区与hash表&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://luodw.cc/2015/10/24/leveldb-11/&#34;&gt;leveldb源码分析之Cache&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://dirtysalt.github.io/leveldb.html#orgheadline188&#34;&gt;leveldb&lt;/a&gt;&lt;/li&gt;
+&lt;/ol&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Leveldb: Arena</title>
+      <link>http://wiesen.github.io/post/Leveldb-Arena/</link>
+      <pubDate>Fri, 20 Jan 2017 21:31:20 +0800</pubDate>
+      
+      <guid>http://wiesen.github.io/post/Leveldb-Arena/</guid>
+      <description>&lt;p&gt;Arena：memtable 内存管理&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;Introduction&lt;/p&gt;
+
+&lt;p&gt;Leveldb 中使用 Arena 对 memtable 进行简单的内存管理，主要出于以下三个目的：&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;封装内存操作以便进行内存使用统计：memtable 有阈值限制（write buffer size），通过统一的接口来分配不同大小的内存；&lt;/li&gt;
+&lt;li&gt;保证内存对齐：Arena 每次按 klockSize(&lt;code&gt;static const int kBlockSize = 4096;&lt;/code&gt;)单位向系统申请内存，提供地址对齐内存，方便记录内存的使用并且提高内存使用效率；&lt;/li&gt;
+&lt;li&gt;解决频繁分配小块内存降低效率，直接分配大块内存浪费内存的问题，同时避免个别大内存使用影响：当memtable申请内存时，若 &lt;code&gt;size &amp;lt;= kBlockSize / 4&lt;/code&gt; 则在当前的内存block中分配，否则直接向系统申请（new）。&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;Arena 类内存管理方法：&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;采用 vector 来存储每次分配的内存，每一次分配的内存为一个块（block），block默认大小为4096kb；&lt;/li&gt;
+&lt;li&gt;当达到阈值时将 dump to disk，完成后由析构函数完成所有内存的一次性释放，由于业务的特殊性因此无需提供内存释放的接口&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/arena.png&#34; alt=&#34;arena&#34; /&gt;&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Declaration&lt;/p&gt;
+
+&lt;p&gt;class Arena {
+     public:
+      Arena();
+      ~Arena();&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;  // Return a pointer to a newly allocated memory block of &amp;quot;bytes&amp;quot; bytes.
+  char* Allocate(size_t bytes);
+
+  // Allocate memory with the normal alignment guarantees provided by malloc
+  char* AllocateAligned(size_t bytes);
+
+  // Returns an estimate of the total memory usage of data allocated
+  // by the arena (including space allocated but not yet used for user
+  // allocations).
+  size_t MemoryUsage() const {
+    return blocks_memory_ + blocks_.capacity() * sizeof(char*);
+  }
+
+ private:
+  char* AllocateFallback(size_t bytes);
+  char* AllocateNewBlock(size_t block_bytes);
+
+  // Allocation state
+  char* alloc_ptr_;
+  size_t alloc_bytes_remaining_;
+
+  // Array of new[] allocated memory blocks
+  std::vector&amp;lt;char*&amp;gt; blocks_;
+
+  // Bytes of memory in blocks allocated so far
+  size_t blocks_memory_;
+
+  // No copying allowed
+  Arena(const Arena&amp;amp;);
+  void operator=(const Arena&amp;amp;);
+};
+&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Analysis&lt;/p&gt;
+
+&lt;p&gt;成员变量：&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;code&gt;char* alloc_ptr_;&lt;/code&gt;              // 内存的偏移量指针，即指向未使用内存的首地址&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;size_t alloc_bytes_remaining_;&lt;/code&gt; // 还剩下的内存数&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;std::vector&amp;lt;char*&amp;gt; blocks_;&lt;/code&gt;    // 关键：存储每一次分配的内存指针&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;size_t blocks_memory_;&lt;/code&gt;         // 到目前为止分配的总内存
+&lt;br /&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;共有函数（接口）&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;&lt;code&gt;inline char* Arena::Allocate(size_t bytes)&lt;/code&gt;：&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;inline char* Arena::Allocate(size_t bytes) {
+  // The semantics of what to return are a bit messy if we allow
+  // 0-byte allocations, so we disallow them here (we don&#39;t need
+  // them for our internal use).
+  assert(bytes &amp;gt; 0);
+  if (bytes &amp;lt;= alloc_bytes_remaining_) {
+    char* result = alloc_ptr_;
+    alloc_ptr_ += bytes;
+    alloc_bytes_remaining_ -= bytes;
+    return result;
+  }
+  return AllocateFallback(bytes);
+}
+
+char* Arena::AllocateFallback(size_t bytes) {
+  if (bytes &amp;gt; kBlockSize / 4) {
+    // Object is more than a quarter of our block size.  Allocate it separately
+    // to avoid wasting too much space in leftover bytes.
+    char* result = AllocateNewBlock(bytes);
+    return result;
+  }
+
+  // We waste the remaining space in the current block.
+  alloc_ptr_ = AllocateNewBlock(kBlockSize);
+  alloc_bytes_remaining_ = kBlockSize;
+
+  char* result = alloc_ptr_;
+  alloc_ptr_ += bytes;
+  alloc_bytes_remaining_ -= bytes;
+  return result;
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;ol&gt;
+&lt;li&gt;该函数返回bytes字节的内存&lt;/li&gt;
+&lt;li&gt;如果预先分配的内存(alloc_bytes&lt;em&gt;remaining&lt;/em&gt;)大于bytes,也就是说，预先分配的内存能够满足现在的需求，那就返回预先分配的内存，而不用向系统申请&lt;/li&gt;
+&lt;li&gt;如果(alloc_bytes&lt;em&gt;remaining&lt;/em&gt; &amp;lt; bytes)，也就是说，预先分配的内存不能不够用，那就调用AllocateFallback来分配内存（分&lt;code&gt;size &amp;lt;= kBlockSize / 4&lt;/code&gt;进行区别处理）
+&lt;br /&gt;&lt;/li&gt;
+&lt;/ol&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;&lt;code&gt;char* Arena::AllocateAligned(size_t bytes)&lt;/code&gt;：&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;char* Arena::AllocateAligned(size_t bytes) {
+  const int align = sizeof(void*);    // We&#39;ll align to pointer size
+  assert((align &amp;amp; (align-1)) == 0);   // Pointer size should be a power of 2
+  size_t current_mod = reinterpret_cast&amp;lt;uintptr_t&amp;gt;(alloc_ptr_) &amp;amp; (align-1);
+  size_t slop = (current_mod == 0 ? 0 : align - current_mod);
+  size_t needed = bytes + slop;
+  char* result;
+  if (needed &amp;lt;= alloc_bytes_remaining_) {
+    result = alloc_ptr_ + slop;
+    alloc_ptr_ += needed;
+    alloc_bytes_remaining_ -= needed;
+  } else {
+    // AllocateFallback always returned aligned memory
+    result = AllocateFallback(bytes);
+  }
+  assert((reinterpret_cast&amp;lt;uintptr_t&amp;gt;(result) &amp;amp; (align-1)) == 0);
+  return result;
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;ol&gt;
+&lt;li&gt;首先获取一个指针的大小&lt;code&gt;const int align = sizeof(void*)&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;然后将我们使用的char * 指针地址转换为一个无符号整型(reinterpret_cast&lt;uintptr_t&gt;(result):It is an unsigned int that is guaranteed to be the same size as a pointer.)&lt;/li&gt;
+&lt;li&gt;通过与操作来获取&lt;code&gt;size_t current_mod = reinterpret_cast&amp;lt;uintptr_t&amp;gt;(alloc_ptr_) &amp;amp; (align-1)&lt;/code&gt;;&lt;/li&gt;
+&lt;li&gt;当前指针模4的值，有了这个值以后，我们就容易知道，还差 &lt;code&gt;slop = align - current_mod&lt;/code&gt; 个字节内存才能对齐，即&lt;code&gt;result = alloc_ptr + slop&lt;/code&gt;&lt;/li&gt;
+&lt;/ol&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;&lt;code&gt;size_t MemoryUsage() const&lt;/code&gt;：仅仅是计算内存使用情况，不赘述&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;ctor &amp;amp; dtor：&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;Arena::Arena() {
+  blocks_memory_ = 0;
+  alloc_ptr_ = NULL;  // First allocation will allocate a block
+  alloc_bytes_remaining_ = 0;
+}
+
+Arena::~Arena() {
+  for (size_t i = 0; i &amp;lt; blocks_.size(); i++) {
+    delete[] blocks_[i];
+  }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;code&gt;Arena::Arena()&lt;/code&gt;：初始化各个成员变量&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;Arena::~Arena()&lt;/code&gt;：释放各个 vector block 的内存
+&lt;br /&gt;&lt;/li&gt;
+&lt;/ol&gt;&lt;/li&gt;
+&lt;/ol&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Leveldb: Storage MemTable</title>
+      <link>http://wiesen.github.io/post/leveldb-Storage-MemTable/</link>
+      <pubDate>Tue, 20 Dec 2016 21:31:20 +0800</pubDate>
+      
+      <guid>http://wiesen.github.io/post/leveldb-Storage-MemTable/</guid>
+      <description>
+
+&lt;p&gt;Leveldb 存储主要分为 SSTable（磁盘） 和 MemTable（内存，包括 MemTable 和 Immutable MemTable），此外还有一些辅助文件:Manifest, Log, Current。&lt;/p&gt;
+
+&lt;h2 id=&#34;memtable-db-skiplist-h-db-memtable-h-memtable-cc&#34;&gt;Memtable (&lt;code&gt;db/skiplist.h&lt;/code&gt;,&lt;code&gt;db/memtable.h &amp;amp; memtable.cc&lt;/code&gt;)&lt;/h2&gt;
+
+&lt;div style=&#34;text-align: center&#34;&gt;
+&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/leveldb-architecture.png&#34; width=&#34;500&#34;/&gt;
+&lt;/div&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;Introduction&lt;/p&gt;
+
+&lt;p&gt;MemTable 是 leveldb 的 kv 数据在内存中的存储结构。当 Memtable 写入的数据占用内存到达指定大小 (Options.write_buffer_size)，则自动转换为 Immutable Memtable（只读），同时生成新的 Memtable 供写操作写入新数据。后台的 compact 进程会负责将 immutable memtable dump to disk 生成 sstable。&lt;/p&gt;
+
+&lt;p&gt;MemTable 提供内存中 KV entry 的 Add 和 Get 操作接口。 Memtable 实际上并不存在 Delete 操作，删除某个 Key 的 Value 在 Memtable 内是作为插入一条记录实施的，但是会打上一个 Key 的删除标记，真正的删除操作是 Lazy 的，会在以后的 Compaction 过程中删除这个 KV。&lt;/p&gt;
+
+&lt;p&gt;Memtable 类只是一个接口类，其底层实现依赖于两大核心组件 Arena 和 SkipList。其中 Arena 内存分配器统一管理内存，SkipList 用于实际 KV 存储。&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Component&lt;/p&gt;
+
+&lt;p&gt;Arena： memtable 内存管理&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;封装内存操作以便进行内存使用统计：memtable 有阈值限制（write buffer size），通过统一的接口来分配不同大小的内存；&lt;/li&gt;
+&lt;li&gt;预先分配一整块内存来&lt;/li&gt;
+&lt;li&gt;保证内存对齐：Arena 每次按 klockSize(&lt;code&gt;static const int kBlockSize = 4096;&lt;/code&gt;)单位向系统申请内存，提供地址对齐内存，方便记录内存的使用并且提高内存使用效率；&lt;/li&gt;
+&lt;li&gt;解决频繁分配小块内存降低效率，直接分配大块内存浪费内存的问题，同时避免个别大内存使用影响：当memtable申请内存时，若 &lt;code&gt;size &amp;lt;= kBlockSize / 4&lt;/code&gt; 则在当前的内存block中分配，否则直接向系统申请（new）。&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;SkipList：memtable 的实际数据结构&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;根据上一篇 blog 中 LSM tree 的性质，table 应当保持有序性。而对一个排序结构执行插入操作开销很大（随机写），通常性能瓶颈集中在这里。一些数据结构如链表, AVL 树, B 树, skiplist 等都加速了随机写。leveldb 的 memtable 实现没有使用复杂的 B 树，采用更轻量级的 &lt;a href=&#34;https://en.wikipedia.org/wiki/Skip_list&#34;&gt;skiplist&lt;/a&gt;。&lt;/li&gt;
+&lt;li&gt;skiplist 是一种可以代替平衡树的数据结构。其从概率上保证数据平衡（依赖于系统设计时的随机假设），结构和实现比平衡树简单。概率上时间复杂度近似 O(logN)，与平衡树相同，但空间上比较节省，一个节点平均只需要 1.333 个指针。&lt;/li&gt;
+&lt;li&gt;Leveldb 中，Skiplist 中的操作不需要任何锁或者 node 的引用计数，利用内存屏障来进行线程同步，原因主要为以下两个：
+
+&lt;ol&gt;
+&lt;li&gt;Skiplist 中 node 内保存的是 InternalKey 与对应 value 组成的数据，SequenceNumber 的全局唯一保证了不会有相同的弄得出现，因此保证了不会有node更新的情况；&lt;/li&gt;
+&lt;li&gt;delete 操作等同于 put 操作，因此不会需要引用计数记录 node 的生存周期。&lt;/li&gt;
+&lt;/ol&gt;&lt;/li&gt;
+&lt;/ol&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Declaration&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;class MemTable {
+ public:
+  // MemTables are reference counted.  The initial reference count
+  // is zero and the caller must call Ref() at least once.
+  explicit MemTable(const InternalKeyComparator&amp;amp; comparator);
+
+  // Increase reference count.
+  void Ref() { ++refs_; }
+
+  // Drop reference count.  Delete if no more references exist.
+  void Unref() {
+    --refs_;
+    assert(refs_ &amp;gt;= 0);
+    if (refs_ &amp;lt;= 0) {
+      delete this;
+    }
+  }
+
+  // Returns an estimate of the number of bytes of data in use by this data structure.
+  // REQUIRES: external synchronization to prevent simultaneous operations on the same MemTable.
+  size_t ApproximateMemoryUsage();
+
+  // Return an iterator that yields the contents of the memtable.
+  //
+  // The caller must ensure that the underlying MemTable remains live
+  // while the returned iterator is live.  The keys returned by this
+  // iterator are internal keys encoded by AppendInternalKey in the
+  // db/format.{h,cc} module.
+  Iterator* NewIterator();
+
+  // Add an entry into memtable that maps key to value at the
+  // specified sequence number and with the specified type.
+  // Typically value will be empty if type==kTypeDeletion.
+  void Add(SequenceNumber seq, ValueType type,
+           const Slice&amp;amp; key,
+           const Slice&amp;amp; value);
+
+  // If memtable contains a value for key, store it in *value and return true.
+  // If memtable contains a deletion for key, store a NotFound() error in *status and return true.
+  // Else, return false.
+  bool Get(const LookupKey&amp;amp; key, std::string* value, Status* s);
+
+ private:
+  ~MemTable();  // Private since only Unref() should be used to delete it
+
+  struct KeyComparator {
+    const InternalKeyComparator comparator;
+    explicit KeyComparator(const InternalKeyComparator&amp;amp; c) : comparator(c) { }
+    int operator()(const char* a, const char* b) const;
+  };
+  friend class MemTableIterator;
+  friend class MemTableBackwardIterator;
+
+  typedef SkipList&amp;lt;const char*, KeyComparator&amp;gt; Table;
+
+  KeyComparator comparator_;
+  int refs_;
+  Arena arena_;
+  Table table_;
+
+  // No copying allowed
+  MemTable(const MemTable&amp;amp;);
+  void operator=(const MemTable&amp;amp;);
+};
+&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Coding &amp;amp; Function Analysis&lt;/p&gt;
+
+&lt;p&gt;构造和析构：MemTable 的对象构造必须显式调用，重点在于初始 Arena 和 SkipList 两大核心组件，且提供引用计数初始为 0，使用时必须先 Ref()，实际对象销毁在 Unref() 引用计数为 0 时。&lt;/p&gt;
+
+&lt;p&gt;C++ class基本功（正确管理内存和其他资源）：MemTable class 由 &lt;code&gt;Unref()&lt;/code&gt; 完成实际的内存释放操作，因此 Leveldb 中禁用了 copy ctor 和 assignment operator（声明为private，并且只提供声明，而不提供定义）（C++11 中可以使用 = delete)&lt;/p&gt;
+
+&lt;p&gt;功能：memtable 对 key 的查找和遍历是 MemTableIterator，而 MemTableIterator 实际上是 SkipList iterator wrapper。NewIterator 即是返回一个 MemTableIterator，用于有序遍历 memtable 的存储数据。&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;写入： &lt;code&gt;void Add(SequenceNumber seq, ValueType type, const Slice&amp;amp; key, const Slice&amp;amp; value)&lt;/code&gt;:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;Encode：将传入的参数封装为 &lt;code&gt;Internalkey&lt;/code&gt;，然后与 &lt;code&gt;value&lt;/code&gt; 一起编码成前述（Leveldb setting） entry&lt;/li&gt;
+&lt;li&gt;Insert 到实际数据结构：&lt;code&gt;SkipList::Insert()&lt;/code&gt;&lt;/li&gt;
+&lt;/ol&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;读取： &lt;code&gt;bool Get(const LookupKey&amp;amp; key, std::string* value, Status* s)&lt;/code&gt;:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;从传入的 &lt;code&gt;LookupKey&lt;/code&gt; 中获取 &lt;code&gt;memtable_key&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;MemTableIterator::Seek()&lt;/code&gt; 返回 &lt;code&gt;MemTableIterator&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;对 &lt;code&gt;MemTableIterator&lt;/code&gt; 的 key 进行还原，并对 key 后面的8个字节解码，以此判断消息是什么类型&lt;/li&gt;
+&lt;li&gt;a) &lt;code&gt;kTypeValue&lt;/code&gt; 表有效数据，返回对应的 &lt;code&gt;value&lt;/code&gt; 数据; b) &lt;code&gt;kTypeDeletion&lt;/code&gt; 表无效数据，设置 Status 为 NotFound&lt;/li&gt;
+&lt;/ol&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;没有删除：前面说过，memtable 的 delete 是 lazy 的，实际上是 add 一条 &lt;code&gt;ValueType&lt;/code&gt; 为 &lt;code&gt;kTypeDeletion&lt;/code&gt; 的记录。&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;reference&#34;&gt;Reference&lt;/h2&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;a href=&#34;http://blog.csdn.net/sparkliang/article/details/8567602&#34;&gt;Leveldb 源码分析 &amp;ndash;1&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://mingxinglai.com/cn/2013/01/leveldb-memtable/&#34;&gt;LevelDB : MemTable&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://luodw.cc/2015/10/16/leveldb-05/&#34;&gt;leveldb skiplist 实现分析&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://www.pandademo.com/2016/03/memtable-and-skiplist-leveldb-source-dissect-3/&#34;&gt;MemTable 与 SkipList-leveldb 源码剖析 (3)&lt;/a&gt;
+&lt;br /&gt;
+&lt;br /&gt;&lt;/li&gt;
+&lt;/ol&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Leveldb: Basic Settings</title>
+      <link>http://wiesen.github.io/post/Leveldb-Basic-Concept/</link>
+      <pubDate>Mon, 19 Dec 2016 21:31:20 +0800</pubDate>
+      
+      <guid>http://wiesen.github.io/post/Leveldb-Basic-Concept/</guid>
+      <description>
+
+&lt;p&gt;（待完善……）&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;Slice(&lt;code&gt;include/leveldb/slice.h&lt;/code&gt;)&lt;/p&gt;
+
+&lt;p&gt;为操作数据的方便，将数据和长度包装成 Slice 使用，直接操控指针以避免不必要的数据拷贝&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;class Slice {
+    … 
+    private: 
+        const char* data_; 
+        size_t size_; 
+};
+&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Optin(&lt;code&gt;include/leveldb/option.h&lt;/code&gt;)&lt;/p&gt;
+
+&lt;p&gt;leveldb 中启动时的一些配置，通过 Option 传入，get/put/delete 时，也有相应的 ReadOption/WriteOption。&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Env(&lt;code&gt;include/leveldb/env.h&lt;/code&gt; &lt;code&gt;util/evn_posix.h&lt;/code&gt;)&lt;/p&gt;
+
+&lt;p&gt;考虑到移植以及灵活性，leveldb 将系统相关的处理（文件/进程/时间之类）抽象成 Env，用户可以自己实现相应的接口，作为 Option 传入。默认使用自带的实现。&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;varint(&lt;code&gt;util/coding.h&lt;/code&gt;)&lt;/p&gt;
+
+&lt;p&gt;leveldb 采用了 protocalbuffer 里使用的变长整形编码方法，节省空间。&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;ValueType(&lt;code&gt;db/dbformat.h&lt;/code&gt;)&lt;/p&gt;
+
+&lt;p&gt;leveldb更新（put/delete）某个key时不会操控到db中的数据，每次操作都是直接新插入一份kv数据，具体的数据合并和清除由后台的compact完成。&lt;/p&gt;
+
+&lt;p&gt;所以，每次 put 都会添加一份 KV 数据，即使该 key 已经存在；而 delete 等同于 put 空的 value。为了区分 live 数据和已删除的 mock 数据，leveldb 使用 ValueType 来标识：&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;enum ValueType { 
+    kTypeDeletion = 0x0, 
+    kTypeValue = 0x1 
+};
+&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;SequenceNumber(&lt;code&gt;db/dbformat.h&lt;/code&gt;)&lt;/p&gt;
+
+&lt;p&gt;leveldb中的每次更新（put/delete) 操作都拥有一个版本，由 SequnceNumber 来标识，整个db有一个全局值保存着当前使用到的SequnceNumber。SequnceNumber 在 leveldb 有重要的地位，key 的排序，compact 以及 snapshot 都依赖于它。&lt;/p&gt;
+
+&lt;p&gt;&lt;code&gt;typedef uint64_t SequenceNumber&lt;/code&gt;: 存储时，SequnceNumber 只占用56 bits, ValueType 占用8 bits，二者共同占用 64bits（uint64_t).&lt;/p&gt;
+
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;0-56&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;56-64&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;SequnceNumber&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;ValueType&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;user_key &amp;amp; memtable_key &amp;amp; internal_key&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;user_key: 用户使用的 key&lt;/li&gt;
+&lt;li&gt;memtable_key: memtable 中使用的 key&lt;/li&gt;
+&lt;li&gt;internal_key: sstable 中使用的 key&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;InternalKey(&lt;code&gt;db/dbformat.h&lt;/code&gt;) &amp;amp; ParsedInternalKey (&lt;code&gt;db/dbformat.h&lt;/code&gt;)&lt;/p&gt;
+
+&lt;p&gt;InternalKey: userkey ＋ 元信息（8 bytes, SequnceNumber|ValueType), ParsedInternalKey 为 InternalKey 分拆得到的结构体&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;class InternalKey {
+    …
+    private:
+        std::string rep_;
+}
+
+struct ParsedInternalKey { 
+    Slice user_key; 
+    SequenceNumber sequence; 
+    ValueType type; 
+};
+&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;LookupKey(&lt;code&gt;db/dbformat.h&lt;/code&gt;)&lt;/p&gt;
+
+&lt;p&gt;db 内部为查找 memtable/sstable 方便而设置的类：&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;class LookupKey { 
+    … 
+    private: 
+        const char* start_;
+        const char* kstart_;
+        const char* end_;
+};
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;start_&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;kstart_ - end_&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;internal_key_size&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;internal_key: userkey_data + SequenceNumber&lt;/td&gt;
+&lt;/tr&gt;
+
+&lt;tr&gt;
+&lt;td&gt;(varint32)&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;(InternalKey_size: char[] + uint64)&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+&lt;p&gt;对 memtable lookup 时使用 &lt;code&gt;memtable_key&lt;/code&gt; [&lt;code&gt;start_&lt;/code&gt;,&lt;code&gt;end_&lt;/code&gt;], 对 sstable lookup 时使用 &lt;code&gt;internal_key&lt;/code&gt; [&lt;code&gt;kstart_&lt;/code&gt;, &lt;code&gt;end_&lt;/code&gt;]。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/leveldb_key.png&#34; width=&#34;450&#34;/&gt;&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;memtable entry&lt;/p&gt;
+
+&lt;p&gt;MemTable 中 entry 存储格式（实际上是字符串）：&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/leveldb_memtable_entry.png&#34; width=&#34;600&#34;/&gt;&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Comparator(&lt;code&gt;include/leveldb/comparator.h&lt;/code&gt; &lt;code&gt;util/comparator.cc&lt;/code&gt;)&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;InternalKeyComparator(&lt;code&gt;db/dbformat.h&lt;/code&gt;)&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;WriteBatch(&lt;code&gt;db/write_batch.cc&lt;/code&gt;)&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;FileMetaData(&lt;code&gt;db/version_edit.h&lt;/code&gt;)&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;block(&lt;code&gt;table/block.cc&lt;/code&gt;)&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;BlockHandle(&lt;code&gt;table/dbformat.h&lt;/code&gt;)&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;FileNumber(&lt;code&gt;db/dbformat.h&lt;/code&gt;)&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;filename(&lt;code&gt;db/dbformat.cc&lt;/code&gt;)&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Compact(&lt;code&gt;db/db_impl.cc&lt;/code&gt; &lt;code&gt;db/version_set.cc&lt;/code&gt;)&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Iterator(&lt;code&gt;include/leveldb/iterator.h&lt;/code&gt;)&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;reference&#34;&gt;Reference&lt;/h2&gt;
+
+&lt;ol&gt;
+&lt;li&gt;leveldb实现解析 by 淘宝-核心系统研发-存储 那岩&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://www.pandademo.com/2016/03/memtable-and-skiplist-leveldb-source-dissect-3/&#34;&gt;MemTable 与 SkipList-leveldb 源码剖析 (3)&lt;/a&gt;
+&lt;br /&gt;&lt;/li&gt;
+&lt;/ol&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Leveldb: Introduction</title>
+      <link>http://wiesen.github.io/post/leveldb-Introduction/</link>
+      <pubDate>Mon, 28 Nov 2016 21:31:20 +0800</pubDate>
+      
+      <guid>http://wiesen.github.io/post/leveldb-Introduction/</guid>
+      <description>
+
+&lt;p&gt;看了不少 blog 分析 leveldb，但很少看到有人从设计原因和策略上进行总结。所以这个系列对 leveldb 的实现做一点设计分析，争取将内部实现逻辑串联起来，至于源码注释之类的网上一扒拉就有很多啦。&lt;/p&gt;
+
+&lt;h2 id=&#34;introduction&#34;&gt;Introduction&lt;/h2&gt;
+
+&lt;p&gt;Leveldb 库提供持久层 kv 存储，其中 keys 和values 可以是任意字节数组。目前有 C++，golang 的实现。&lt;/p&gt;
+
+&lt;p&gt;作者 Jeff Dean, Sanjay Ghemawat 同时也是设计实现 BigTable 的作者。在 BigTable 中有两个关键部分：master server 和 tablet server。&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;master server 负责存储 meta-data，并且调度管理 tablet server；&lt;/li&gt;
+&lt;li&gt;tablet server 负责存储具体数据，并且响应读写操作。&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Leveldb 可视为 BigTable 中 tablet server 的简化实现。&lt;/p&gt;
+
+&lt;h2 id=&#34;features-limitations-performance&#34;&gt;Features, Limitations, Performance&lt;/h2&gt;
+
+&lt;p&gt;详见 &lt;a href=&#34;https://github.com/google/leveldb&#34;&gt;leveldb homepage&lt;/a&gt;&lt;/p&gt;
+
+&lt;h2 id=&#34;how-to-use&#34;&gt;How to use&lt;/h2&gt;
+
+&lt;p&gt;详见 &lt;a href=&#34;https://github.com/google/leveldb/blob/master/doc/index.html&#34;&gt;leveldb 使用文档&lt;/a&gt;&lt;/p&gt;
+
+&lt;h2 id=&#34;background&#34;&gt;Background&lt;/h2&gt;
+
+&lt;p&gt;冯诺依曼体系结构的计算机系统主要为两点：&lt;strong&gt;存储 + 计算&lt;/strong&gt;。数据库即为存储方面，依赖于存储硬件特性。&lt;/p&gt;
+
+&lt;p&gt;当前磁盘物理结构特性导致 (磁头寻道，旋转延迟)：&lt;strong&gt;随机读写慢，连续读写快&lt;/strong&gt;，相差三个数量级。内存和 SSD 同样表现，只不过原因是：连续读写可预判，因此会被优化 (相差量级也没磁盘那么大)。&lt;/p&gt;
+
+&lt;p&gt;上述说明：基于目前这样的硬件特性，我们设计存储系统时要&lt;strong&gt;尽量避免随机读写，设计为顺序读写&lt;/strong&gt;。&lt;/p&gt;
+
+&lt;p&gt;然而，顺序读和顺序写是相互矛盾的：&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;为了优化读效率，最好是将以有序方式组织数据从而写入相邻的块，以维护顺序读，而这增加了随机写；&lt;/li&gt;
+&lt;li&gt;为了优化写效率，最好是所有的写都是增量写，也就是顺序写，而这增加了随机读。&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;题外话：常见的优化读操作性能的设计有：二分、hash、B+ 树等。这些方法使用各种查找结构来组织数据，有效提升读操作性能(最少提供了O(logN))，但是增加了随机写操作，大大降低了写操作性能。&lt;/p&gt;
+
+&lt;p&gt;因此，如果一个业务&lt;strong&gt;对写操作的吞吐量十分敏感，或者写操作数量远远大于读操作&lt;/strong&gt;，那么应该采取的措施是：&lt;strong&gt;优化写操作，也就是尽量将写操作设计为增量写&lt;/strong&gt;，从而尽可能地减少寻道，以达到磁盘理论写入速度最大值。&lt;/p&gt;
+
+&lt;p&gt;这个策略常用于日志或者堆文件这种业务场景中，因为它们是完全顺序的（包括读写），所以可以提供很好的写操作性能。&lt;/p&gt;
+
+&lt;h2 id=&#34;leveldb-core-idea&#34;&gt;Leveldb Core Idea&lt;/h2&gt;
+
+&lt;p&gt;以 &lt;strong&gt;LSM(Log Structured Merge) Tree&lt;/strong&gt;组织数据从而将逻辑场景中的写请求转换为顺序写，辅以 &lt;strong&gt;Bloom Filter&lt;/strong&gt; 和 &lt;strong&gt;Shard LRU cache&lt;/strong&gt; 等策略优化随机读操作从而保证读效率。&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;&lt;a href=&#34;https://en.wikipedia.org/wiki/Log-structured_merge-tree&#34;&gt;&lt;strong&gt;LSM tree&lt;/strong&gt;&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;关于论文的部分分析详见&lt;a href=&#34;https://blog.acolyer.org/2014/11/26/the-log-structured-merge-tree-lsm-tree/&#34;&gt;链接&lt;/a&gt;&lt;/p&gt;
+
+&lt;div style=&#34;text-align: center&#34;&gt;
+&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/memtable.png&#34; width=&#34;500&#34;/&gt; &lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/compaction.png&#34; width=&#34;500&#34;/&gt;
+&lt;/div&gt;
+
+&lt;p&gt;LSM tree 针对&lt;strong&gt;写入速度瓶颈问题&lt;/strong&gt;而提出的方法，其基本思想是：&lt;strong&gt;将随机写转换为顺序写，交换读和写的随机 IO&lt;/strong&gt;。主要组成结构为：MemTable（内存中）+ SSTable (Sorted String Table)&lt;/p&gt;
+
+&lt;p&gt;首先数据更新增量写入 MemTable，其后保存为有序文件 SSTable 到磁盘中（read only），每个文件保存一段时间内的数据更新。为了均衡读写效率，SSTable 文件是一种分层次（level）管理。&lt;/p&gt;
+
+&lt;p&gt;LSM Tree 的主要措施有:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;对更新进行批量 &amp;amp; 延时处理 (超过大小阈值后将内存中的数据 dump 到磁盘中)：减少寻道，提高写操作性能；&lt;/li&gt;
+&lt;li&gt;周期性地利用归并排序对磁盘文件执行合并操作 (compaction)：移除已删除和冗余数据，减少文件个数，保证读操作性能；&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;&lt;a href=&#34;https://en.wikipedia.org/wiki/Bloom_filter&#34;&gt;&lt;strong&gt;Bloom Filter&lt;/strong&gt;&lt;/a&gt;&lt;/p&gt;
+
+&lt;div style=&#34;text-align: center&#34;&gt;
+&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/bloomfilter.png&#34; width=&#34;550&#34;/&gt;
+&lt;/div&gt;
+    
+
+&lt;p&gt;由于 LSM Tree 会产生大量文件，因此 LevelDb 利用 bloomfilter 来避免大量的读操作。&lt;/p&gt;
+
+&lt;p&gt;bloomfilter 以概率性算法高效检索一个 key 是否在一个 SSTable (核心为 hash，若判断为不存在则必定不存在，若判断为存在则可能不存在)。&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;&lt;a href=&#34;https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_Recently_Used_.28LRU.29&#34;&gt;&lt;strong&gt;Shard LRU Cache&lt;/strong&gt;&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;leveldb 中的 cache 分为 Table Cache 和 Block Cache 两种，其中 Table Cache 中缓存的是 sstable 的索引数据，Block Cache 缓存的是 Block 数据（可选打开）。&lt;/p&gt;
+
+&lt;p&gt;由于 levelDB 为多线程，每个线程访问 cache 时都会对 cache 加锁。为了保证多线程安全并且减少锁开销，leveldb 定义了一个 SharedLRUCache。&lt;/p&gt;
+
+&lt;p&gt;ShardedLRUCache 内部有 16 个 LRUCache，查找 Key 时根据 key 的高四位进行 hash 索引，然后在相应的 LRUCache 中进行查找或更新。当 LRUCache 使用率大于总容量后, 根据 LRU 淘汰 key.&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;overall-architecture&#34;&gt;Overall Architecture&lt;/h2&gt;
+
+&lt;div style=&#34;text-align: center&#34;&gt;
+&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/leveldb-architecture.png&#34; width=&#34;500&#34;/&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Leveldb 存储主要分为 SSTable 和 MemTable（即 LSM Tree），前者为不可变且存储于持久设备上，后者位于内存上并且可变。其中有两个 MemTable，一个为当前写入 MemTable，另一个为等待持久化的 Immutable MemTable。此外还有一些辅助文件，后面详述。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Write Operation&lt;/strong&gt;：当用户需要插入一条 kv 到 Leveldb 中时，首先会被存储到 log 中 &lt;strong&gt;(Write Ahead Log, WAL, 保证数据持久性)&lt;/strong&gt;；然后插入到 MemTable 中；当 MemTable 达到一定大小后会转化为 read-only Immutable MemTable，并且创建一个新的 MemTable；同时开启一个新的后台线程将 Immutable MemTable 的内容 dump 到磁盘中，创建一个新的 SSTable；&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Deletion Operation&lt;/strong&gt;：在 Leveldb 中视为特殊的 Write operation，写入一个 deletion marker。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Read Operation&lt;/strong&gt;：当 leveldb 收到一个 Get 请求时，首先会在 MemTable 进行查找；然后在 Immutable MemTable 查找；最后在 SSTable 中查找（从 level 0 到 higher level），直到匹配到一个 kv item 或者为 NULL。&lt;/p&gt;
+
+&lt;h2 id=&#34;file-layout&#34;&gt;File Layout&lt;/h2&gt;
+
+&lt;p&gt;详见 &lt;a href=&#34;https://github.com/google/leveldb/blob/master/doc/impl.html&#34;&gt;leveldb 实现文档&lt;/a&gt;&lt;/p&gt;
+
+&lt;h2 id=&#34;source-code-structure&#34;&gt;Source Code Structure&lt;/h2&gt;
+
+&lt;pre&gt;&lt;code&gt;leveldb-1.4.0  
+|
++--- port           &amp;lt;=== 提供各个平台的基本接口
+|
++--- util           &amp;lt;=== 提供一些通用工具类
+|
++--- helpers
+|      |
+|      +--- memenv  &amp;lt;=== Env 的一个具体实现(Env 是 leveldb 封装的运行环境)
+|
++--- table          &amp;lt;=== sstable 相关的数据格式定义和操作实现
+|
++--- db             &amp;lt;=== 主要逻辑的实现
+|
++--- doc
+|     |
+|     +--- table_format.txt   &amp;lt;=== 磁盘文件数据结构说明
+|     |
+|     +--- log_format.txt     &amp;lt;=== 日志文件（用于宕机恢复未刷盘的数据）数据结构说明
+|     |
+|     +--- impl.html          &amp;lt;=== 一些实现
+|     |
+|     +--- index.html         &amp;lt;=== 使用说明
+|     |
+|     +--- bench.html         &amp;lt;=== 测试数据
+|
++--- include
+     |
+     +--- leveldb           &amp;lt;=== 所有头文件
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;hr /&gt;
+
+&lt;p&gt;Reference：&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;&lt;a href=&#34;http://zouzls.github.io/2016/11/23/LevelDB%E4%B9%8BLSM-Tree/&#34;&gt;LevelDB 之 LSM-Tree&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&#34;http://brg-liuwei.github.io/tech/2014/10/15/leveldb-0.html&#34;&gt;和我一起学习 leveldb&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&#34;http://www.open-open.com/lib/view/open1424916275249.html&#34;&gt;Log Structured Merge Trees(LSM) 原理&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>I/O Event Handling Design Patterns</title>
+      <link>http://wiesen.github.io/post/IO-Event-Handling-Design-Patterns/</link>
+      <pubDate>Thu, 24 Nov 2016 21:31:20 +0800</pubDate>
+      
+      <guid>http://wiesen.github.io/post/IO-Event-Handling-Design-Patterns/</guid>
+      <description>
+
+&lt;h2 id=&#34;introduction&#34;&gt;Introduction&lt;/h2&gt;
+
+&lt;p&gt;System I/O can be blocking, or non-blocking synchronous, or non-blocking asynchronous:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Blocking I/O means that the calling system does not return control to the caller until the operation is finished&lt;/li&gt;
+&lt;li&gt;a non-blocking synchronous call returns control to the caller immediately&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;I/O multiplexing mechanisms rely on an event demultiplexor: dispatches I/O events from a limited number of sources to the appropriate read/write event handlers.&lt;/p&gt;
+
+&lt;p&gt;There are two non-blocking I/O multiplexing mechanisms: reactor &amp;amp;&amp;amp; proactor.&lt;/p&gt;
+
+&lt;h2 id=&#34;mechanism&#34;&gt;Mechanism&lt;/h2&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;Reactor&lt;/p&gt;
+
+&lt;p&gt;In the Reactor pattern, the event demultiplexor waits for events that indicate when a file descriptor or socket is ready for a read or write operation.&lt;/p&gt;
+
+&lt;p&gt;Structure:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Request Event Dispatcher (&lt;strong&gt;synchronous&lt;/strong&gt; event demultiplexer): uses an event loop to block on all resources, and dispatches resources from the demultiplexer to the associated event handler&lt;/li&gt;
+&lt;li&gt;Request Event Handler (user handler): performs the actual I/O operation, handles data, , declares renewed interest in I/O events, and returns control to the dispatcher&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Benific:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;separates application specific code from the reactor implementation&lt;/li&gt;
+&lt;li&gt;allows for simple coarse-grain concurrency while not adding the complexity of multiple threads to the system&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Limitations:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;more difficult to debug than a procedural pattern due to the inverted flow of control&lt;/li&gt;
+&lt;li&gt;by only calling event handlers synchronously, it limits maximum concurrency, especially on symmetric multiprocessing hardware&lt;/li&gt;
+&lt;li&gt;The scalability of the reactor pattern is limited by event handler and demultiplexer
+&lt;br /&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Proactor&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/Proactor.png&#34; alt=&#34;proactor&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;In the Proactor pattern, the initiator (event demultiplexor) initiates asynchronous I/O operations. The I/O operation itself is &lt;strong&gt;performed by OS&lt;/strong&gt;.&lt;/p&gt;
+
+&lt;p&gt;A completion handler is called after the asynchronous part has terminated. The proactor pattern can be considered to be an &lt;strong&gt;asynchronous variant&lt;/strong&gt; of the synchronous reactor pattern.&lt;/p&gt;
+
+&lt;p&gt;The implementation of this classic asynchronous pattern is based on an asynchronous OS-level API, which is called it &amp;ldquo;system-level&amp;rdquo; or &amp;ldquo;true&amp;rdquo; async.&lt;/p&gt;
+
+&lt;p&gt;Structure:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Proactive Initiator : initiates asynchronous I/O operations&lt;/li&gt;
+&lt;li&gt;Completion Event Dispatcher (event demultiplexor): waits for events that indicate the completion of the I/O operation, and forwards those events to the appropriate handlers&lt;/li&gt;
+&lt;li&gt;Completion Event Handler (user handler): handles the data from user defined buffer, starts a new asynchronous operation, and returns control to the dispatcher&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;emulated-proactor-implementation&#34;&gt;Emulated Proactor Implementation&lt;/h2&gt;
+
+&lt;p&gt;A solution to the challenge of designing a portable framework for the Proactor and Reactor I/O patterns: transform a Reactor demultiplexor I/O solution to an emulated async I/O by moving read/write operations from event handlers inside the demultiplexor (this is &amp;ldquo;emulated async&amp;rdquo; approach).&lt;/p&gt;
+
+&lt;p&gt;We simply shifted responsibilities between different actors. By adding functionality to the demultiplexor I/O pattern, we were able to convert the Reactor pattern to a Proactor pattern.&lt;/p&gt;
+
+&lt;p&gt;Structure:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Dispatcher (&lt;strong&gt;asynchronous&lt;/strong&gt; event demultiplexer): performs a non-blocking I/O operation and on completion calls the appropriate handler&lt;/li&gt;
+&lt;li&gt;Event Handler (user handler): handles data from the user-defined buffer, declares new interes, then returns control to the dispatcher&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;hr /&gt;
+
+&lt;p&gt;Reference：&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;&lt;a href=&#34;http://www.artima.com/articles/io_design_patternsP.html&#34;&gt;Comparing Two High-Performance I/O Design Patterns&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&#34;https://en.wikipedia.org/wiki/Reactor_pattern&#34;&gt;Reactor pattern&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&#34;https://en.wikipedia.org/wiki/Proactor_pattern&#34;&gt;Proactor pattern&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>TCP粘包问题：分包</title>
+      <link>http://wiesen.github.io/post/TCP%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/</link>
+      <pubDate>Wed, 26 Oct 2016 10:32:46 +0800</pubDate>
+      
+      <guid>http://wiesen.github.io/post/TCP%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/</guid>
+      <description>
+
+&lt;h2 id=&#34;update-2017-01-17&#34;&gt;Update 2017-01-17&lt;/h2&gt;
+
+&lt;p&gt;From Muduo：&lt;/p&gt;
+
+&lt;p&gt;TCP 是&lt;strong&gt;“字节流”&lt;/strong&gt;协议，其本身没有“消息包”的概念，因此“粘包问题”是个伪命题。但对利用 TCP 进行通信的应用层程序来说，分包是其基本需求。&lt;/p&gt;
+
+&lt;p&gt;分包指的是在发送一个消息（message）或者一帧（frame）数据时，通过一定的处理，令接收方能从字节流中识别并截取（还原）出一个个消息包。&lt;/p&gt;
+
+&lt;p&gt;对于短连接的 TCP 服务，分包不是问题。只要发送方主动关闭连接，就表示一条消息发送完毕，接收方 read() 返回0，从而得知消息结尾。&lt;/p&gt;
+
+&lt;p&gt;对于长连接的 TCP 服务，分包有4种方法：&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;消息长度固定（亦即是提前确定包长度，适合定长消息包）；&lt;/li&gt;
+&lt;li&gt;使用特殊的字符或字符串作为消息的边界，例如 HTTP 协议的 headers 以“\r\n”为字段的分隔符；&lt;/li&gt;
+&lt;li&gt;在每条消息的头部加一个长度字段，最常见的做法；&lt;/li&gt;
+&lt;li&gt;利用消息本身的格式来分包，例如 XML 格式的消息中&lt;root&gt;&amp;hellip;&lt;/rrot&gt;的配对，或者json格式中的{&amp;hellip;}的配对。解析这种消息格式通常会用到状态机。&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;粘包问题&#34;&gt;粘包问题&lt;/h2&gt;
+
+&lt;p&gt;一个完整的消息可能会被TCP拆分成多个包进行发送，也有可能把多个小的包封装成一个大的数据包发送。粘包是指发送方发送的若干包数据到接收方接收时粘成一包，从接收缓冲区看，后一包数据的头紧接着前一包数据的尾。&lt;/p&gt;
+
+&lt;p&gt;粘包问题是由 TCP 是面向字节流协议因此没有消息边界所引起的。而 UDP 是面向数据报的协议，所以不存在拆包粘包问题。&lt;/p&gt;
+
+&lt;p&gt;存在以下特殊情况：&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;如果发送数据无结构，如文件传输，这样发送方只管发送，接收方只管接收存储就 ok，不用考虑粘包；&lt;/li&gt;
+&lt;li&gt;如果利用 TCP 短连接时，不会出现粘包问题；&lt;/li&gt;
+&lt;li&gt;当发送数据&lt;strong&gt;存在一定结构，并且需要维护长连接时&lt;/strong&gt;，则需要考虑粘包问题；&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;问题原因&#34;&gt;问题原因&lt;/h2&gt;
+
+&lt;p&gt;出现拆包粘包现象的原因既可能由发送方造成，也可能由接收方造成:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;要发送的数据大于TCP发送缓冲区剩余空间大小，发生拆包；&lt;/li&gt;
+&lt;li&gt;待发送数据大于MSS（最大报文长度），TCP在传输前进行拆包；&lt;/li&gt;
+&lt;li&gt;要发送的数据小于TCP发送缓冲区的大小，TCP将多次写入缓冲区的数据一次发送出去，造成粘包;&lt;/li&gt;
+&lt;li&gt;接收方没能及时地接收缓冲区的数据，造成粘包;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;解决方法&#34;&gt;解决方法&lt;/h2&gt;
+
+&lt;p&gt;解决粘包的方法，是由应用层进行&lt;strong&gt;分包处理&lt;/strong&gt;，本质上就是由&lt;strong&gt;应用层&lt;/strong&gt;来维护消息和消息的边界（即定义自己的会话层和表示层协议）。&lt;/p&gt;
+
+&lt;p&gt;本文处理办法：&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;发送方在每次发送消息时将数据报长度写入一个int32作为包头一并发送出去, 称之为Encode；&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;接受方则先读取一个int32的长度的消息长度信息, 再根据长度读取相应长的byte数据, 称之为Decode；&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;//codec.go
+
+package codec
+
+import (
+    &amp;quot;bufio&amp;quot;
+    &amp;quot;bytes&amp;quot;
+    &amp;quot;encoding/binary&amp;quot;
+)
+
+func Encode(message string) ([]byte, error) {
+    // 读取消息的长度
+    var length int32 = int32(len(message))
+    var pkg *bytes.Buffer = new(bytes.Buffer)
+    // 写入消息头
+    err := binary.Write(pkg, binary.LittleEndian, length)
+    if err != nil {
+        return nil, err
+    }
+    // 写入消息实体
+    err = binary.Write(pkg, binary.LittleEndian, []byte(message))
+    if err != nil {
+        return nil, err
+    }
+
+    return pkg.Bytes(), nil
+}
+
+func Decode(reader *bufio.Reader) (string, error) {
+    // 读取消息的长度
+    lengthByte, _ := reader.Peek(4)
+    lengthBuff := bytes.NewBuffer(lengthByte)
+    var length int32
+    err := binary.Read(lengthBuff, binary.LittleEndian, &amp;amp;length)
+    if err != nil {
+        return &amp;quot;&amp;quot;, err
+    }
+    if int32(reader.Buffered()) &amp;lt; length+4 {
+        return &amp;quot;&amp;quot;, err
+    }
+
+    // 读取消息真正的内容
+    pack := make([]byte, int(4+length))
+    _, err = reader.Read(pack)
+    if err != nil {
+        return &amp;quot;&amp;quot;, err
+    }
+    return string(pack[4:]), nil
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
+&lt;/ol&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Solution to Raspberry Pi ROS rivz Core Dumped</title>
+      <link>http://wiesen.github.io/post/Solution-to-Raspberry-Pi-ROS-rivz-Segmentation-Fault/</link>
+      <pubDate>Sun, 18 Sep 2016 17:32:46 +0800</pubDate>
+      
+      <guid>http://wiesen.github.io/post/Solution-to-Raspberry-Pi-ROS-rivz-Segmentation-Fault/</guid>
+      <description>&lt;p&gt;Recently I installed ROS on Raspberry Pi2 (both Jessie and Ubuntu 14.04) in order to implement SLAM algorithm on it. However when runs the rviz (rosrun rviz rviz) I get core dumped message.&lt;/p&gt;
+
+&lt;p&gt;After searching I found the solution &lt;a href=&#34;https://github.com/ros/robot_model/issues/110&#34;&gt;here&lt;/a&gt;. What I do is upgrade libpcre3 to 3_8.35 (upgrade collada-dom to 2.4.4 does not help). &lt;a href=&#34;http://ports.ubuntu.com/pool/main/p/pcre3/libpcre3_8.35-7.1ubuntu1_armhf.deb&#34;&gt;Here&lt;/a&gt; is the download link.&lt;/p&gt;
+
+&lt;p&gt;I confirm that rviz now works properly on my Raspberry Pi2 running the official ubuntu 14.04 image.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>MIT 6.824: Lab 4 Sharded KeyValue Service Implementation</title>
+      <link>http://wiesen.github.io/post/MIT-6.824-Lab4-Sharded-KeyValue-Service/</link>
+      <pubDate>Fri, 09 Sep 2016 17:32:46 +0800</pubDate>
+      
+      <guid>http://wiesen.github.io/post/MIT-6.824-Lab4-Sharded-KeyValue-Service/</guid>
+      <description>
+
+&lt;p&gt;lab4 是基于 lab2 和 lab3 实现的 Raft Consensus Algorithm 之上实现 Sharded KeyValue Service。主要分为两部分：&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Part A：The Shard Master&lt;/li&gt;
+&lt;li&gt;Part B: Sharded Key/Value Server&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;除了最后一个 challenge test case &lt;code&gt;TestDelete()&lt;/code&gt; 以外，目前代码其余都可以 pass。但偶尔会 fail 在 unreliable test case，目前的定位是 raft 的实现还有点 bug。&lt;/p&gt;
+
+&lt;p&gt;Code Link:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;https://github.com/Wiesen/MIT-6.824/tree/master/2016/shardmaster&#34;&gt;PART A&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://github.com/Wiesen/MIT-6.824/tree/master/2016/shardkv&#34;&gt;PART B&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&#34;architecture&#34;&gt;Architecture&lt;/h2&gt;
+
+&lt;p&gt;lab4 的架构是典型的 M/S 架构（a configuration service and a set of replica groups)，不过实现十分基础，很多功能没有实现：1) shards 之间的传递很慢并且不允许 concurrent client acess；2) 每个 raft group 中的 member 不会改变。&lt;/p&gt;
+
+&lt;p&gt;configuration service&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;由若干 shardmaster 利用 raft 协议保证一致性的集群；&lt;/li&gt;
+&lt;li&gt;管理 configurations 的顺序：每个 configuration 描述 replica group 以及每个 group 分别负责存储哪些 shards；&lt;/li&gt;
+&lt;li&gt;响应 Join/Leave/Move/Query 请求，并且对 configuration 做出相应的改变；&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;replica group&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;由若干 shardkv 利用 raft 协议保证一致性的集群；&lt;/li&gt;
+&lt;li&gt;负责具体数据的存储（一部分），组合所有 group 的数据即为整个 database 的数据；&lt;/li&gt;
+&lt;li&gt;响应对应 shards 的 Get/PutAppend 请求，并保证 linearized；&lt;/li&gt;
+&lt;li&gt;周期性向 shardmaster 进行 query 获取 configuration，并且进行 migration 和 update；&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&#34;part-a-the-shard-master&#34;&gt;Part A：The Shard Master&lt;/h2&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;RPC Join/leave/Move/Query&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;Client:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;at most once semantics：每个 Client 及 每个 Request 赋予唯一的 id；&lt;/li&gt;
+&lt;li&gt;sequential consistency：对于每个 Client，仅有一条 Request RPC 在显式执行；&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Server:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;异步：开一个 goroutine 来监听和处理 accept entry，与各 RPC 中的 start entry 分离，利用 channel 进行同步和通信；&lt;/li&gt;
+&lt;li&gt;at most once semantics：主要针对写操作，本文在 accept operation 处进行 duplicated check (也可以在 start operation 处再加一层)，对于重复的 request，仅向 client 回复操作结果；&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Rebanlancing&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;lab4 对 shards 分配的要求是: divide the shards as evenly as possible among the groups, and should move as few shards as possible to achieve that goal.&lt;/p&gt;
+
+&lt;p&gt;最直接的做法是: 首先计算每个 replica group 分配多少个 shards ( &lt;code&gt;quota = num_of_shards / num_of_group&lt;/code&gt;, &lt;code&gt;remain = num_of_shards - num_of_group * quota&lt;/code&gt;，然后依据 &lt;code&gt;num_of_server&lt;/code&gt; 对 replica group 进行排序，server 数量多的 group 分配 shards 个数 &lt;code&gt;quota + 1&lt;/code&gt;，其余分配 &lt;code&gt;quota&lt;/code&gt; )，最后把 shards 从多的 group 移动到少的 group。&lt;/p&gt;
+
+&lt;p&gt;然而，在 go 中实现上面的做法并不是那么 clean，很多特性在语言层面上并不支持，比如: 1) get map.keys(); 2) 根据特定的字段进行排序等，自行实现实在麻烦。&lt;/p&gt;
+
+&lt;p&gt;因此，由于 lab 中只有 join/leave 会造成 imbalance，并且 group 是逐个 join/leave。所以 make it simple。我们首先统计 prior config 中每个 group 有多少个 shards，并且计算 present config 中平均每个 group 分配多少个 shards (&lt;code&gt;quota = num_of_shards / num_of_group&lt;/code&gt;)，然后循环将 max_shards_group/leaving_group 中的 shards 分配给 joining_group/min_shards_group.&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;part-b-sharded-key-value-server&#34;&gt;Part B: Sharded Key/Value Server&lt;/h2&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;RPC PutAppend/Get/TransferShard&lt;/strong&gt;&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;Hint: Think about how the shardkv client and server should deal with ErrWrongGroup. Should the client change the sequence number if it receives ErrWrongGroup ? Should the server update the client state if it returns ErrWrongGroup when executing a Get / Put request?&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;绝大部分与 Part A 一样，除了 ErrWrongGroup 的异常处理。&lt;/p&gt;
+
+&lt;p&gt;当 server 发现 ErrWrongGroup 时，不需要 update client state；当 client 收到 ErrWrongGroup 时，不需要改变 operation sequence number，换个 group 继续 request 即可。&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Migrating Shard&lt;/strong&gt;&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;Hint: When groups move shards, they need to move some duplicate detection state as well as the key/value data. Think about how the receiver of a shard should update its own duplicate detection state. Is it correct for the receiver to entirely replace its state with the received one?&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;假设&lt;/strong&gt;: configuration 由 cfg1 —&amp;gt; cfg2，shard S1 由 G1 -&amp;gt; G2&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;How to migrate - push or pull&lt;/strong&gt;: 这时应该由 G1 push S1 还是由 G2 pull S1？一般来说，G2 完成 reconfig 操作后，随时会有针对 migrated shard 的 get/put/append 操作。如果由 G1 push S1，那么就无法保证 migrated shard 什么时候完成，出现错误。所以应该由 G2 在进行 reconfig 时进行 pull;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Response to migration&lt;/strong&gt;: 由于 lab 中 group 是逐个 join/leave，同一个 group 不会同时迁入和迁出 shards，亦即是迁入和迁出 shards 的 groups 不会相交。因此当 G1 处于 cfg2 时，G1 已经不再负责 S1，之后可随时响应 migration 迁出 S1。亦即是：当 G1.cfg.num &amp;gt; G2.cfg.num 才能响应 migration，否则必须等待 G1 更新完毕 (避免互相请求出现死锁)。&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Reconfiguration&lt;/strong&gt;&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;Hint: Process re-configurations one at a time, in order.&lt;/p&gt;
+
+&lt;p&gt;Hint: When group G1 needs a shard from G2 during a configuration change, does it matter at what point during its processing of log entries G2 sends the shard to G1?&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Detect&lt;/strong&gt;: 开一个 goroutine 来周期性地向 shardmaster query 最新的 configuration (由 group leader 完成)，当发现 configuration 更新时 (one by one in order)，即向其余 group 获取需要的 shards (migrating shard)；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;When to reconfigurate&lt;/strong&gt;: Reconfiguration operation 仅仅是 group leader 从 shardmaster 获取到了 operation proposal，然而新的 configuration 什么时候生效是由各个 group 自行决定。本文的实现是当 group 获取到需要的 shards 后再进行 reconfiguration update。因此会出现当 client 根据新的 configuration 向 shardkv 发起 request 时，各个 group 都还没完成 configuration update。不过这并没什么影响，我们可以让 client 一直 loop 向每个 replica group 发起 request (当然是一直被拒)，直到目标 group 完成 reconfiguration update;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Consistency&lt;/strong&gt;: Reconfiguration operation 会影响到 PutAPpend/Get，因此同样需要利用 raft 保证 group 内的一致性，确保集群内完成了之前的操作后同时进行 Reconfiguration；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Replace What&lt;/strong&gt;: 包括 config，StoreShard (data) 以及 Ack (duplicate detection)，其中 Ack 不是 replace entirely，仅当 kv.ack[clientId] &amp;lt; migration.Ack[clientId] 才更新；
+&lt;br /&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;reference&#34;&gt;Reference&lt;/h2&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;&lt;a href=&#34;https://github.com/bluesea147/6.824/blob/master/src/shardmaster/server.go&#34;&gt;bluesea147/6.824/shardmaster&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&#34;https://github.com/bluesea147/6.824/blob/master/src/shardkv/server.go&#34;&gt;bluesea147/6.824/shardkv&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Robotics: Estimation and learning</title>
+      <link>http://wiesen.github.io/post/Robotics-Estimation-and-Learning/</link>
+      <pubDate>Tue, 16 Aug 2016 17:32:46 +0800</pubDate>
+      
+      <guid>http://wiesen.github.io/post/Robotics-Estimation-and-Learning/</guid>
+      <description>&lt;p&gt;&lt;a href=&#34;https://www.coursera.org/learn/robotics-learning&#34;&gt;Course Link&lt;/a&gt;: One of the course of Robotics in Coursera from the University of Pennsylvania. It is helpful to learn the classical algorithm of robotics.&lt;/p&gt;
+
+&lt;p&gt;Here are some course notes in Chinese collected from Zhihu. These notes introduce algorithm in a little more detial than course.&lt;/p&gt;
+
+&lt;p&gt;However, the code in these notes has bug and even can not run normally, which are no worthy of learning. The code in my GitHub pass all homeworks.&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;Gaussian Model Learning: &lt;a href=&#34;https://zhuanlan.zhihu.com/p/21648507?refer=robotics-learning&#34;&gt;从高斯分布、机器人误差、EM 算法到小球检测&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Bayesian Estimation - Target Tracking: &lt;a href=&#34;https://zhuanlan.zhihu.com/p/21692854?refer=robotics-learning&#34;&gt;目标追踪之卡尔曼滤波&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Mapping: &lt;a href=&#34;https://zhuanlan.zhihu.com/p/21738718?refer=robotics-learning&#34;&gt;占据栅格地图（Occupancy Grid Map）&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Bayesian Estimation - Localization: &lt;a href=&#34;https://zhuanlan.zhihu.com/p/21974439&#34;&gt;蒙特卡罗定位（Particle Filter Localization）&lt;/a&gt;&lt;/li&gt;
+&lt;/ol&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>MIT 6.824: lab3 Fault-Tolerant Key/Value Service Implementation</title>
+      <link>http://wiesen.github.io/post/MIT-6.824-lab3-Fault-Tolerant-KVService-Implementation/</link>
+      <pubDate>Sat, 06 Aug 2016 17:32:46 +0800</pubDate>
+      
+      <guid>http://wiesen.github.io/post/MIT-6.824-lab3-Fault-Tolerant-KVService-Implementation/</guid>
+      <description>
+
+&lt;p&gt;lab3 是基于 lab2 实现的 Raft Consensus Algorithm 之上实现 KV Service。主要分为两部分：&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;Part A：Key/value service without log compaction，即实现基本的分布式存储服务。&lt;/li&gt;
+&lt;li&gt;Part B: Key/value service with log compaction，即在 Part A 基础上实现 log compaction。&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;代码分别可以 pass 各个 test case，但所有一起跑时有时会卡在 &lt;code&gt;TestPersistPartition()&lt;/code&gt; 这里，初步猜测是 raft 的实现还有点 bug。&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&#34;https://github.com/Wiesen/MIT-6.824/tree/master/2016/kvraft&#34;&gt;Code Link&lt;/a&gt;&lt;/p&gt;
+
+&lt;h2 id=&#34;part-a-key-value-service&#34;&gt;Part A：Key/value service&lt;/h2&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;KV Database Client API&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;key/value database 的 client API 必须满足以下要求：&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;保证仅执行一次(at most once semantics)：API 必须为每个 Client 及 每个 Request 赋予唯一的 id；&lt;/li&gt;
+&lt;li&gt;必须向使用该 API 的应用提供 sequential consistency：对于每个 Client，仅有一条 Request RPC 在显式执行(利用 lock 实现)；&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;此外，API 应当一直尝试向 key/value server 发起 RPC 直到收到 positive reply；并且记住 leader id，从而尽可能避免失败次数。&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Raft Handler&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;Raft Server Handler 需要满足以下要求：&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;p&gt;保证每个 client 的每条 request (主要是写操作) 仅执行一次：对于重复的 request，仅向 client 回复操作结果；&lt;/p&gt;
+
+&lt;p&gt;本文为每个 client 维护一个已执行的最大 requestId 值 (&lt;code&gt;map[int64]int&lt;/code&gt;)，从而检测并过滤重复的 request&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt; func (kv *RaftKV) isDuplicated(clientId int64, requestId int) bool {
+    kv.mu.Lock()
+    defer kv.mu.Unlock()
+    if value, ok := kv.ack[clientId]; ok &amp;amp;&amp;amp; value &amp;gt;= requestId {
+        return true
+    }
+    kv.ack[clientId] = requestId
+    return false
+ }
+&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;在向 raft 添加等待结果的同时，需要一直监听返回管道 &lt;code&gt;applyCh&lt;/code&gt; ，以接收已经达成一致的 entry；&lt;/p&gt;
+
+&lt;p&gt;我们开一个 goroutine &lt;code&gt;update()&lt;/code&gt; 一直监听 &lt;code&gt;applyCh&lt;/code&gt;，并且基于 entry 的 index 各维护一个管道 (&lt;code&gt;map[int]chan Result&lt;/code&gt;)，存放在 raft servers 间达成一致的 entry，等待 handler 的读取或者直接丢弃。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt; func (kv *RaftKV) Update() {   // ignore snapshot
+    for true {
+        msg := &amp;lt;- kv.applyCh
+        request := msg.Command.(Op)
+        var result Result
+        ...                     // set variable value
+        result.reply = kv.Apply(request, kv.isDuplicated(clientId, requestId))
+        kv.sendResult(msg.Index, result);
+    }
+  }
+
+ func (kv *RaftKV) sendResult(index int, result Result) {
+    kv.mu.Lock()
+    defer kv.mu.Unlock()
+    if _, ok := kv.messages[index]; !ok {
+        kv.messages[index] = make(chan Result, 1)
+    } else {
+        select {
+        case &amp;lt;- kv.messages[index]:
+        default:
+        }
+    }
+    kv.messages[index] &amp;lt;- result
+ }
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;key/value server 向 raft 添加一个 entry 后，阻塞读取其 index 对应的管道，直到接收到结果或者超时（本文设置为 1s）。当接收到的结果 clientId 或者 requestId 不一致时，表明 leader 已经发生了更替，由 Client 重新向 server 发起 RPC。&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;有一个需要注意的地方是，&lt;strong&gt;必须利用 &lt;code&gt;gob.Register()&lt;/code&gt; 注册需要通过 RPC 发送的结构体&lt;/strong&gt;，这样结构体才能够被解析，否则发送过去就是一个 &lt;code&gt;nil&lt;/code&gt;。&lt;/p&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;part-b-log-compaction&#34;&gt;Part B: log compaction&lt;/h2&gt;
+
+&lt;p&gt;随着运行时间的增加，raft server 的 log table 会越来越大，不仅会占用越多空间，而且一旦出现宕机则 replay 也需要越长时间。比如不加以管理，则势必影响服务的可用性。为了令其维持合理长度不至于无限增加，必须在适当的时候抛弃旧的 log entries。&lt;/p&gt;
+
+&lt;p&gt;这部分主要有以下实现点：&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Take snapshots independently&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;这里各个 raft server 各自独立进行 snapshot，而这并不会影响 raft 的一致性。因为数据始终从 leader 流向 follower，各个 raft server 只是将数据重新组织而已。&lt;/p&gt;
+
+&lt;p&gt;这部分主要解决的问题是：&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;(When)&lt;/strong&gt; 什么时候进行 snapshot：由 key/value server 检测所连接的 raft server 存储大小是否即将超过阈值，然后通知该 raft server 进行 snapshot；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;(What)&lt;/strong&gt; 在 snapshot 中存储什么信息：如 raft-extended paper Figure 12 里的描述，主要包括当前 &lt;code&gt;LastIncludedIndex&lt;/code&gt;, &lt;code&gt;LastIncludedTerm&lt;/code&gt; 以及 &lt;code&gt;data&lt;/code&gt;，其中 &lt;code&gt;data&lt;/code&gt; 是状态机状态，来自于 key/value server。一点需要注意的是，必须保存用于检测 duplicate client requests 的数据，因此 &lt;code&gt;data&lt;/code&gt; 在这里包括整个数据库和检测重复的 map；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;(How)&lt;/strong&gt; 如何令 raft 在仅有最新一部分 log 的情况下保持正常运行：主要是将 &lt;code&gt;rf.logTable[0]&lt;/code&gt; 作为起始 entry，一旦有 follower 请求更老的 entries，则应该发送 InstallSnapshot RPC；
+&lt;br /&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;需要增加和修改的地方如下：&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;update()&lt;/code&gt;： 在每次接收到 raft server 返回的 entry 时，检测 raft state size，若临近阈值则将封装 &lt;code&gt;data&lt;/code&gt;，然后通知 raft 从 &lt;code&gt;entry.index&lt;/code&gt; 开始 snapshotting；&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;StartSnapshot(data []byte, index int)&lt;/code&gt;：删除 log table 中序号小于 &lt;code&gt;index&lt;/code&gt; 的 entries，并且在 &lt;code&gt;data&lt;/code&gt; 后添加最后包括的 entry 的相关数据，最后持久化保存；&lt;/li&gt;
+&lt;li&gt;其余琐碎并且细节的修改还包括：对 entry 增加一个字段 &lt;code&gt;index&lt;/code&gt;，记录其在所在 &lt;code&gt;term&lt;/code&gt; 的序号，在需要对 log table 进行操作地方（尤其是涉及对 entry 在 table 中的位置），注意 log table 中的起始序号：&lt;code&gt;baseLogIndex := rf.logTable[0].Index&lt;/code&gt; 再进行处理；&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;InstallSnapshot RPC&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;当一个 follower 远远落后于 leader（即无法在 log table 中找到匹配的 entry），则应该发送 InstallSnapshot RPC。我们参考 raft-extended paper Figure 13 设置数据结构，但有所简化：由于 lab 里的 Snapshot 不大，因此没有设置 chunk，也就是不需要对 snapshot 进行切分。&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;InstallSnapshot RPC sender&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;当 heartbeat timeout 时 leader 检测 follower 的 log table 是否与自身一致，如果 &lt;code&gt;rf.nextIndex[server] &amp;lt;= baseLogIndex&lt;/code&gt;，则 leader 应该向 follower &lt;code&gt;server&lt;/code&gt; 发送 InstallSnapshot RPC,否则 &lt;code&gt;AppendEntries&lt;/code&gt;。这里发送设置好相应的参数即可，跟发送 &lt;code&gt;AppendEntries&lt;/code&gt; 差不多，收到正确的 reply 则 更新 &lt;code&gt;matchIndex&lt;/code&gt; 和 &lt;code&gt;nextIndex&lt;/code&gt;。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt; baseLogIndex := rf.logTable[0].Index
+ if rf.nextIndex[server] &amp;lt;= baseLogIndex {
+    ...             // set variable value
+    var reply InstallSnapshotReply
+    if rf.sendInstallSnapshot(server, args, &amp;amp;reply) {
+        if rf.role != Leader {
+            return
+        }
+        if args.Term != rf.currentTerm || reply.Term &amp;gt; args.Term {
+            if reply.Term &amp;gt; args.Term {
+                ... // update term and role
+            }
+            return
+        }
+        rf.matchIndex[server] = baseLogIndex
+        rf.nextIndex[server] = baseLogIndex + 1
+        return
+    }
+ }
+&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;InstallSnapshot RPC handler&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;由于没有设置 chunk，所以这里的 handler 比 paper 中的 implementation 简化不少：&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;首先检测 &lt;code&gt;args.Term &amp;lt; rf.currentTerm&lt;/code&gt;，满足则直接返回自身 term 即可；&lt;/li&gt;
+&lt;li&gt;其次检测 &lt;code&gt;rf.currentTerm &amp;lt; args.Term&lt;/code&gt;,满足则更新自身 term 和 role;&lt;/li&gt;
+&lt;li&gt;然后更新自身的 log table，把 LastIncluded entry 前的丢弃；&lt;/li&gt;
+&lt;li&gt;最后将 snapshot 发送给 key/value server，以重置数据库数据，更新状态。&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;最后&#34;&gt;最后&lt;/h2&gt;
+
+&lt;p&gt;写 lab3 的时候，对 lab2 的代码调整很大，发现了不少 bug 和逻辑不合理的地方，整体上对 raft 的理解更加深入了。&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>MIT 6.824: lab2 Raft Consensus Algorithm Implementation</title>
       <link>http://wiesen.github.io/post/MIT-6.824-lab2-Raft-Consensus-Algorithm-Implementation/</link>
       <pubDate>Fri, 10 Jun 2016 21:32:46 +0800</pubDate>
       
@@ -36,8 +1497,6 @@
 
 &lt;p&gt;其中，本文主要参考 Raft paper，其中的 &lt;strong&gt;figure 2&lt;/strong&gt; 作用很大。本文实现&lt;strong&gt;大量依赖 channel 实现消息传递和线程同步&lt;/strong&gt;。&lt;/p&gt;
 
-&lt;p&gt;仍然存在&lt;strong&gt;少量 bug&lt;/strong&gt;，主要是 fail to pass unreliable test case，有待继续优化（主要是分布式调试无从下手）。&lt;/p&gt;
-
 &lt;p&gt;&lt;a href=&#34;https://github.com/Wiesen/MIT-6.824/blob/master/2016/raft/raft.go&#34;&gt;Code Link&lt;/a&gt;&lt;/p&gt;
 
 &lt;h2 id=&#34;leader-election-and-heartbeat&#34;&gt;Leader Election and Heartbeat&lt;/h2&gt;
@@ -51,18 +1510,24 @@
 
 &lt;p&gt;有一点&lt;strong&gt;注意&lt;/strong&gt;的是，&lt;code&gt;nextIndex[]&lt;/code&gt; 和 &lt;code&gt;matchindex[]&lt;/code&gt; 需要在 election 后进行 reinitialize。&lt;/p&gt;
 
-&lt;pre&gt;&lt;code&gt;func (rf *Raft) changeRole(role Role) {
-    rf.mu.Lock()
-    defer rf.mu.Unlock()
-    rf.role = role
-    switch rf.role {
-    case Leader:
-        rf.reinitialize()    // reinitialized after election
-        go rf.runAsLeader()
-    case Candidate:
-        go rf.runAsCandidate()
-    case Follower:
-        go rf.runAsFollower()
+&lt;pre&gt;&lt;code&gt;func (rf *Raft) changeRole() {
+    for true {
+        switch rf.role {
+        case Leader:
+            for i := range rf.peers {
+                rf.nextIndex[i] = rf.logTable[len(rf.logTable)-1].Index + 1
+                rf.matchIndex[i] = 0
+            }
+            go rf.doHeartbeat()
+            &amp;lt;-rf.chanRole
+        case Candidate:
+            chanQuitElect := make(chan bool)
+            go rf.startElection(chanQuitElect)
+            &amp;lt;-rf.chanRole
+            close(chanQuitElect)
+        case Follower:
+            &amp;lt;-rf.chanRole
+        }
     }
 }
 &lt;/code&gt;&lt;/pre&gt;
@@ -177,20 +1642,20 @@ func (rf *Raft) RequestVote(args RequestVoteArgs, reply *RequestVoteReply) {
 
 &lt;pre&gt;&lt;code&gt;// temporary AppendEntries RPC handler.
 func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply) {
-if args.Term &amp;lt; rf.currentTerm {
-    reply.Term = rf.currentTerm
-    reply.Success = false
-    return
-}
-//! update current term and only one leader granted in one term
-if rf.currentTerm &amp;lt; args.Term {
-    rf.currentTerm = args.Term
-    rf.votedFor = -1
-    rf.leaderId = args.LeaderId
-    rf.chanRole &amp;lt;- Follower
-}
-rf.chanHeartbeat &amp;lt;- true
-reply.Term = args.Term
+    if args.Term &amp;lt; rf.currentTerm {
+        reply.Term = rf.currentTerm
+        reply.Success = false
+        return
+    }
+    //! update current term and only one leader granted in one term
+    if rf.currentTerm &amp;lt; args.Term {
+        rf.currentTerm = args.Term
+        rf.votedFor = -1
+        rf.leaderId = args.LeaderId
+        rf.chanRole &amp;lt;- Follower
+    }
+    rf.chanHeartbeat &amp;lt;- true
+    reply.Term = args.Term
 }
 &lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
 &lt;/ul&gt;&lt;/li&gt;
@@ -203,9 +1668,7 @@ reply.Term = args.Term
 &lt;ol&gt;
 &lt;li&gt;&lt;p&gt;&lt;strong&gt;AppendEntries RPC sender&lt;/strong&gt;&lt;/p&gt;
 
-&lt;p&gt;在 Raft 中，只有 leader 允许添加 log，并且通过发送含有log 的 AppendEntries RPC 给其余机器令其 log 保持一致。&lt;/p&gt;
-
-&lt;p&gt;除了 heartbeat 时会发送 AppendEntries RPC 外，当 Leader 收到 client 的 Request 后也有进行 replica 操作，同样是异步并发提升性能。&lt;/p&gt;
+&lt;p&gt;在 Raft 中，只有 leader 允许添加 log，并且通过发送含有 log 的 AppendEntries RPC 给其余机器令其 log 保持一致。&lt;/p&gt;
 
 &lt;pre&gt;&lt;code&gt;func (rf *Raft) Replica() {
 // replica log
@@ -218,80 +1681,84 @@ for server := range rf.peers {
 
 &lt;p&gt;接下来主要是 &lt;code&gt;doAppendEntries(server int)&lt;/code&gt; 的实现细节。&lt;/p&gt;
 
-&lt;p&gt;当 Leader 的 log 比某 server 长时，亦即是 &lt;code&gt;len(rf.logTable) - 1 &amp;gt;= rf.nextIndex[server]&lt;/code&gt;，则需要发送 entry，并且直到该 server&amp;rsquo;s log has caught up leader&amp;rsquo;s log。&lt;/p&gt;
+&lt;p&gt;当 Leader 的 log 比某 server 长时，亦即是 &lt;code&gt;rf.nextIndex[server] &amp;lt; len(rf.logTable)&lt;/code&gt;，则需要发送 entry&lt;/p&gt;
 
-&lt;p&gt;有一点要&lt;strong&gt;注意&lt;/strong&gt;的是：Leader 在对某 server 进行上述的连续发送时间或者等待 reply 的时间可能会大于 heartbeat timeout，因此触发 AppendEntries RPC；或者在上述时间内 client 向 Leader 提交了新的 log，这时候再次触发了 AppendEntries RPC。然而 Leader 本身已经在向该 server 发送 AppendEntries RPC，这时候对该 server 进行 heartbeat 是多余的。&lt;/p&gt;
+&lt;p&gt;有一点要&lt;strong&gt;注意&lt;/strong&gt;的是：Leader 在对某 server 进行上述的连续发送时间或者等待 reply 的时间可能会大于 heartbeat timeout，因此触发 AppendEntries RPC。然而 Leader 本身正在等待 reply，这时候重复发送是多余的。&lt;/p&gt;
 
-&lt;p&gt;本文检测 Leader 是否在向某 server 发送 AppendEntries RPC，若是则直接退出不再重复操作。这里设计为 Leader 为每一 server 维护一个带有&lt;strong&gt;一个缓存&lt;/strong&gt;的 channel，要对某 server 进行 AppendEntries RPC 必须先 read channel。&lt;/p&gt;
+&lt;p&gt;本文检测 Leader 是否在向某 server 发送 AppendEntries RPC，若是则直接退出不再重复操作：这里设计为 Leader 为每一 server 维护一个带有&lt;strong&gt;一个缓存&lt;/strong&gt;的管道，这样某 server 进行 AppendEntries RPC 前可以确认是否正在处理。&lt;/p&gt;
 
 &lt;p&gt;最后如果 RPC failed 则直接退出，否则收到 AppendEntries RPC 的 reply 时：&lt;/p&gt;
 
 &lt;ul&gt;
 &lt;li&gt;首先判断是否 &lt;code&gt;reply.Term &amp;gt; args.Term&lt;/code&gt;，若是则 Leader 需要更新自身 currentTerm，并且转换为 Follower 状态。&lt;/li&gt;
 
-&lt;li&gt;&lt;p&gt;接着如果 args 中带有 log entry，则 &lt;code&gt;reply.Success&lt;/code&gt; 会指示是否添加成功。如果成功则更新 &lt;code&gt;rf.matchIndex[server]&lt;/code&gt; 和 &lt;code&gt;rf.nextIndex[server]&lt;/code&gt;；否则 &lt;code&gt;rf.nextIndex[server]--&lt;/code&gt; 直至等于 &lt;code&gt;rf.matchIndex[server]&lt;/code&gt;（后续优化）。&lt;/p&gt;
+&lt;li&gt;&lt;p&gt;若 &lt;code&gt;reply.Success&lt;/code&gt; 会表明达成一致，更新 &lt;code&gt;rf.matchIndex[server]&lt;/code&gt; 和 &lt;code&gt;rf.nextIndex[server]&lt;/code&gt;；否则仅更新 &lt;code&gt;rf.nextIndex[server]&lt;/code&gt;（这里涉及到 3 中的优化）。&lt;/p&gt;
 
 &lt;pre&gt;&lt;code&gt;func (rf *Raft) doAppendEntries(server int) {
+    //! make a lock for every follower to serialize
     select {
     case &amp;lt;- rf.chanAppend[server]:
-    default:return
+    default: return
     }
-    isAppend := true
-    for isAppend &amp;amp;&amp;amp; rf.getRole() == Leader {
+    defer func() {rf.chanAppend[server] &amp;lt;- true}()
+
+    for rf.getRole() == Leader {
+        rf.mu.Lock()
         var args AppendEntriesArgs
-        // Set the basic arguments of arg
-        ...
-        if (len(rf.logTable) - 1 &amp;gt;= rf.nextIndex[server]) {
-            args.Entries = append(args.Entries, rf.logTable[rf.nextIndex[server]])
-        } else {
-            isAppend = false
+        ...             // set variable value
+        if rf.nextIndex[server] &amp;lt; len(rf.logTable) {
+            args.Entry = rf.logTable[rf.nextIndex[server]:]
         }
-        // Copy with reply
+        rf.mu.Unlock()
+
         var reply AppendEntriesReply
         if rf.sendAppendEntries(server, args, &amp;amp;reply) {
-            if reply.Term &amp;gt; args.Term {
-                rf.currentTerm = args.Term
-                rf.votedFor = -1
-                rf.chanRole &amp;lt;- Follower
-                break
+            if rf.role != Leader {
+                return
             }
-            if isAppend {
-                if reply.Success {
-                    rf.matchIndex[server] = rf.nextIndex[server]
-                    rf.nextIndex[server]++
-                } else {
-                    // later explain in AppendEntries RPC optimization
-                    if reply.FailIndex &amp;gt; rf.matchIndex[server] {
-                      rf.nextIndex[server] = reply.FailIndex
-                    } else {
-                        rf.nextIndex[server] = rf.matchIndex[server] + 1
-                    }     
+            if args.Term != rf.currentTerm || reply.Term &amp;gt; args.Term {
+                if reply.Term &amp;gt; args.Term {
+                    ... // update term and role
                 }
+                return
             }
-        } else {
-            break
+            if reply.Success {
+                rf.matchIndex[server] = reply.NextIndex - 1
+                rf.nextIndex[server] = reply.NextIndex
+            } else {
+                rf.nextIndex[server] = reply.NextIndex
+            }
         }
     }
-    rf.chanAppend[server] &amp;lt;- true
 }
 &lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
 &lt;/ul&gt;&lt;/li&gt;
 
-&lt;li&gt;&lt;p&gt;&lt;strong&gt;AppendEntries RPC handler&lt;/strong&gt;&lt;/p&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;AppendEntries RPC handler&lt;/strong&gt; (2016.8.5 Update)&lt;/p&gt;
 
-&lt;p&gt;一个机器接收到含有 log entry 的 AppendEntries RPC，前一部分跟处理 heartbeat 一样，剩下的部分则是决定是否更新自身的 log。&lt;/p&gt;
+&lt;p&gt;一个机器接收到含有 log entry 的 AppendEntries RPC，前一部分跟处理 heartbeat 一样，剩下的部分则是决定是否更新自身的 log。根据 Raft paper 中的 figure 2 按部就班实现就好了。&lt;/p&gt;
 
-&lt;p&gt;剩下根据 Raft paper 中的 figure 2 按部就班实现就好了 【好像并没有什么值得特别提的……&lt;/p&gt;&lt;/li&gt;
+&lt;p&gt;Update：处理 log entries array 还是需要注意一下：首先决定是否更新 log table，当满足条件决定更新后，主要存在三种更新情况：（1）更新旧 index；（2）更新旧 index，且添加新 index；（3）仅添加新 index。（如下图）&lt;/p&gt;
 
-&lt;li&gt;&lt;p&gt;&lt;strong&gt;AppendEntries RPC optimization&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/raft-appendentries.bmp&#34; alt=&#34;raft-appendentries&#34; /&gt;&lt;/p&gt;
 
-&lt;p&gt;这一部分主要是优化 AppendEntries RPC，当发生拒绝 append 时减少 master 需要发送 RPC 的次数。虽然 Raft paper 中怀疑这个优化操作是否有必要，但 lab2 中有些 unreliable test case 偏偏需要你实现这个优化操作……&lt;/p&gt;
+&lt;p&gt;本文方法是：首先记录下当前开始处理的 &lt;code&gt;basicIndex := args.PrevLogIndex + 1&lt;/code&gt;（即 &lt;code&gt;args.Entry&lt;/code&gt; 中的起始 index），然后遍历 &lt;code&gt;args.Entry&lt;/code&gt;，一旦 index 已达 logTable 末端或者某个 entry 的 term 不匹配，则清除 logTable 中当前及后续的 entry，并且将 &lt;code&gt;args.Entry&lt;/code&gt; 的当前及后续 entry 添加到 logTable中。&lt;/p&gt;&lt;/li&gt;
 
-&lt;p&gt;首先需要在 struct AppendEntriesReply 中添加两个数据：&lt;code&gt;FailIndex int, FailTerm int&lt;/code&gt;，分别用于指示 conflicting entry 所在 term 以及在该 term 中存储的 first index；&lt;/p&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;AppendEntries RPC optimization&lt;/strong&gt; (2016.8.5 Update)&lt;/p&gt;
 
-&lt;p&gt;在 handler 的优化如下：如果 log unmatched，首先记录 &lt;code&gt;FailTerm&lt;/code&gt;，然后从当前 conflicting entry 开始向前扫描，直到到达前一个 term，记录下 &lt;code&gt;FailIndex&lt;/code&gt;；&lt;/p&gt;
+&lt;p&gt;这一部分主要是优化 AppendEntries RPC，当发生拒绝 append 时减少 master 需要发送 RPC 的次数。虽然 Raft paper 中怀疑这个优化操作是否有必要，但 lab2 中有些 unreliable test case 就需要你实现这个优化操作…&lt;/p&gt;
 
-&lt;p&gt;在 sender 的优化如下：当 append 失败时，如果 &lt;code&gt;FailIndex &amp;gt; matchIndex[server]&lt;/code&gt;，则 &lt;code&gt;nextIndex[server]&lt;/code&gt; 直接退至 &lt;code&gt;FailIndex&lt;/code&gt;，减少了需要尝试 append 的 RPC 次数；否则 &lt;code&gt;nextIndex[server]&lt;/code&gt; 退回到 &lt;code&gt;matchIndex[server] + 1&lt;/code&gt;。&lt;/p&gt;
+&lt;p&gt;首先需要在 struct AppendEntriesReply 中添加两个数据：&lt;code&gt;NextIndex int&lt;/code&gt;,  &lt;code&gt;FailTerm int&lt;/code&gt;，分别用于指示 conflicting entry 所在 term，以及在该 term 中存储的第一个 entry 的 index；&lt;/p&gt;
+
+&lt;p&gt;在 handler 的优化如下：如果 log unmatched，存在两种情况：&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;len(rf.logTable) &amp;lt;= args.PrevLogIndex&lt;/code&gt;：则直接返回 &lt;code&gt;NextIndex = len(rf.logTable)&lt;/code&gt; 即可；&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;rf.logTable[args.PrevLogIndex].Term != args.PrevLogTerm&lt;/code&gt;：首先记录 &lt;code&gt;FailTerm&lt;/code&gt;，然后从当前 conflicting entry 开始向前扫描，直到 index 为 0 或者 term 不匹配，然后记录下该 term 的第一个 index；
+&lt;br /&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;在 sender 的优化如下：当 append 失败时，如果 &lt;code&gt;NextIndex &amp;gt; matchIndex[server]&lt;/code&gt;，则 &lt;code&gt;nextIndex[server]&lt;/code&gt; 直接退至 &lt;code&gt;NextIndex&lt;/code&gt;，减少了需要尝试 append 的 RPC 次数；否则 &lt;code&gt;nextIndex[server]&lt;/code&gt; 退回到 &lt;code&gt;matchIndex[server] + 1&lt;/code&gt;。&lt;/p&gt;
 
 &lt;p&gt;&lt;strong&gt;STEP 4. Apply committed entries to local service replica&lt;/strong&gt;&lt;/p&gt;
 
@@ -302,7 +1769,10 @@ for server := range rf.peers {
 &lt;p&gt;一旦当前 term 的某条 log entry L 是通过上述方式 commit 的，则根据 Raft 的 &lt;strong&gt;Log Matching Property&lt;/strong&gt;，Leader 可以 commit 先于 L 添加到 log 的所有 entry。&lt;/p&gt;
 
 &lt;pre&gt;&lt;code&gt;func (rf *Raft) updateLeaderCommit() {
-    oldIndex := rf.getCommitIndex()
+    rf.mu.Lock()
+    defer rf.mu.Unlock()
+    defer rf.persist()
+    oldIndex := rf.commitIndex
     newIndex := oldIndex
     for i := len(rf.logTable)-1; i&amp;gt;oldIndex &amp;amp;&amp;amp; rf.logTable[i].Term==rf.getCurrentTerm(); i-- {
         countServer := 1
@@ -319,15 +1789,17 @@ for server := range rf.peers {
     if oldIndex == newIndex {
         return
     }
+    rf.commitIndex = newIndex
+
     //! update the log added in previous term
     for i := oldIndex + 1; i &amp;lt;= newIndex; i++ {
         rf.chanCommitted &amp;lt;- ApplyMsg{Index:i, Command:rf.logTable[i].Command}
+        rf.lastApplied = i
     }
-    rf.setCommitIndex(newIndex)
 }
 &lt;/code&gt;&lt;/pre&gt;
 
-&lt;p&gt;对于 Follower 而言，只需要根据 AppendEntries RPC 中的 &lt;code&gt;leaderCommit&lt;/code&gt; 值及其自身的 &lt;code&gt;commitIndex&lt;/code&gt; 值，然后 commit 之中的 entry 即可。&lt;/p&gt;&lt;/li&gt;
+&lt;p&gt;对于 Follower 而言，则：&lt;code&gt;commitIndex = min(leaderCommit, index of last new entry)&lt;/code&gt;。&lt;/p&gt;&lt;/li&gt;
 &lt;/ol&gt;
 
 &lt;h2 id=&#34;persistence&#34;&gt;Persistence&lt;/h2&gt;
@@ -356,6 +1828,32 @@ for server := range rf.peers {
 &lt;p&gt;本文还有些不足，有待后续优化。主要是&lt;strong&gt;不能稳定地&lt;/strong&gt; pass &lt;code&gt;TestUnreliableAgree()&lt;/code&gt; + &lt;strong&gt;不能&lt;/strong&gt; pass &lt;code&gt;TestFigure8Unreliable()&lt;/code&gt;&lt;/p&gt;
 
 &lt;p&gt;To Be Continue&amp;hellip;&lt;/p&gt;
+
+&lt;h2 id=&#34;2016-8-11-update&#34;&gt;2016-8-11 Update&lt;/h2&gt;
+
+&lt;p&gt;最近几天 debug 了之前的代码，发现了若干个问题。目前的代码实现已经&lt;strong&gt;比较稳定&lt;/strong&gt;地 pass 所有的 test case，上面的代码段也已经修改了。但仍然存在一个 bug: 在过 TestUnreliableAgree() 时 fail to reach agreement。这个 bug 的触发几率很低，还没想明白哪里出问题。&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;LEADER ELECTION: Role Transfer (state machine)&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;之前实现 server state machine 的方法是利用 channel 来进行状态修改操作，并且会新开一个 goroutine 进行该状态死循环，而没有其他状态的处理逻辑。本文由一个 goroutine 阻塞读取该 channel，从而处理 server 的状态转换。然而，channel 同步是存在延时的，只有在当前 goroutine 被挂起或者休眠等时，才会转去处理。&lt;/p&gt;
+
+&lt;p&gt;这样的方法存在一个 bug：新 Leader 产生后，旧 Leader 收到消息应该更新自身的 term 并且转换为 Follower；然而由于 channel 同步并非立即执行，旧 Leader 在自身状态被重新赋值前仍然会执行 Leader 的代码；这时候就会出现两个 Leader 同时处理 RPC。&lt;/p&gt;
+
+&lt;p&gt;因此，修改的内容是：去掉 channel 同步方法，当需要进行状态转换时，立即修改 server 的状态，终止该 server 当前状态的执行。&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;LOG REPLICATION: AppendEntries RPC&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;之前不能 pass &lt;code&gt;TestUnreliableAgree()&lt;/code&gt; 和 &lt;code&gt;TestFigure8Unreliable()&lt;/code&gt; 时丝毫没有提示，只能等程序运行时间过长然后被杀死。后来思考了一下问题原因：&lt;strong&gt;程序运行过慢，跟不上 test case 要求的速度，所以后续的测试代码也根本没有执行&lt;/strong&gt;。&lt;/p&gt;
+
+&lt;p&gt;然后发现程序执行慢的原因是：Leader 发送 AppendEntries RPC 每次仅携带一条 log entry，导致 server 无法快速 catch up。所以修改的主要内容就是：AppendEntries RPC 每次携带从 &lt;code&gt;nextIndex&lt;/code&gt; 直到最新的 log entries。&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;reference&#34;&gt;Reference&lt;/h2&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;&lt;a href=&#34;https://www.douban.com/note/549229678/&#34;&gt;MIT 6.824 Week 3 notes&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
 </description>
     </item>
     
@@ -650,464 +2148,6 @@ DP[i-1][j][k] 仅在 i - 1 &amp;gt; 0 时存在，同理 DP[i][j-1][k] 仅在 j 
 &lt;p&gt;&lt;a href=&#34;http://cs.stackexchange.com/questions/23163/how-does-fds-flat-datacenter-storage-make-optimizations-around-locality-unnece&#34;&gt;How does FDS (flat datacenter storage) make optimizations around locality unnecessary?&lt;/a&gt;&lt;/p&gt;
 
 &lt;p&gt;&lt;a href=&#34;https://www.youtube.com/watch?v=YbOjxCxtMpU&#34;&gt;Youtube video&lt;/a&gt;&lt;/p&gt;
-&lt;/blockquote&gt;
-</description>
-    </item>
-    
-    <item>
-      <title>Chain Replication Paper Review</title>
-      <link>http://wiesen.github.io/post/Chain-Replication-Paper-Review/</link>
-      <pubDate>Sat, 19 Mar 2016 21:33:09 +0800</pubDate>
-      
-      <guid>http://wiesen.github.io/post/Chain-Replication-Paper-Review/</guid>
-      <description>
-
-&lt;p&gt;本文是读完 Van Renesse R, Schneider F B. Chain Replication for Supporting High Throughput and Availability[C]//OSDI. 2004. 的总结。&lt;/p&gt;
-
-&lt;h2 id=&#34;summary&#34;&gt;Summary&lt;/h2&gt;
-
-&lt;p&gt;Chain replication is a new approach to coordinating clusters of fail-stop storage servers.&lt;/p&gt;
-
-&lt;p&gt;Chain replication 采用 ROWAA (read one, write all available) 方法, 具有良好的 Scalability.&lt;/p&gt;
-
-&lt;p&gt;该方法目的是, &lt;strong&gt;不以牺牲强一致性为代价来实现高吞吐和高可用&lt;/strong&gt;, 从而提供分布式存储服务.&lt;/p&gt;
-
-&lt;h2 id=&#34;a-storage-service-interface&#34;&gt;A Storage Service Interface&lt;/h2&gt;
-
-&lt;p&gt;&lt;strong&gt;Clients&lt;/strong&gt; 发送 query 或 update 操作 request&lt;/p&gt;
-
-&lt;p&gt;&lt;strong&gt;The storage service&lt;/strong&gt; 为每个 request 生成 reply 发送会 client 告知其已经接收或已经处理完成, 从而 client 可以得知某 request 是否接收成功以及是否处理完成.&lt;/p&gt;
-
-&lt;p&gt;Client request type:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;&lt;code&gt;query(objId, opts) -&amp;gt; value&lt;/code&gt;: retrieve current value of &lt;em&gt;opts&lt;/em&gt; of &lt;em&gt;objId&lt;/em&gt;&lt;/li&gt;
-&lt;li&gt;&lt;code&gt;update(objId, newVal, opts) -&amp;gt; value&lt;/code&gt;: update &lt;em&gt;opts&lt;/em&gt; of &lt;em&gt;objId&lt;/em&gt; with &lt;em&gt;newVal&lt;/em&gt;&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;Client&amp;rsquo;s view of an object:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;State is:
-    Hist[objId]: history of all updates to objId
-    Pending[objId]: set of pending requests for objId
-Transitions are:
-    T1: Client request r arrives: 
-        Pending[objId] += {r}
-    // 一个 client request 接收失败 = server 忽略了该 client request
-    T2: Client request r ∈ Pending[objId] ignored: 
-        Pending[objId] -= {r}
-    T3: Client request r ∈ Pending[objId] processed: 
-        Pending[objId] -= {r}
-        if r = query(objId, opts) then 
-            reply according options opts based on Hist[objId]
-        else if r = update(objId, newVal, opts) then
-            Hist[objId] := Hist[objId] · r
-            reply according options opts based on Hist[objId]
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;h2 id=&#34;chain-replication-protocol&#34;&gt;Chain Replication Protocol&lt;/h2&gt;
-
-&lt;p&gt;&lt;strong&gt;1. Assumptions: 所有服务器均假设为 fail-stop&lt;/strong&gt;&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;each server halts in response to a failure&lt;/li&gt;
-&lt;li&gt;a server’s halted state can be detected by the environment&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;&lt;strong&gt;2. Protocol Details&lt;/strong&gt;&lt;/p&gt;
-
-&lt;p&gt;在 chain replication 中, 所有 servers 根据 &lt;em&gt;objID&lt;/em&gt; 线性排列从而组成一个链表.
-&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/the%20chain.png&#34; width=&#34;400&#34;/&gt;&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;所有 update 操作由 HEAD 结点接收并开始处理, 然后按照FIFO顺序向链表中的下一个节点传递, 直到该 update 操作被 TAIL 节点处理.&lt;/li&gt;
-&lt;li&gt;所有 query 操作由 TAIL 结点接收并处理.&lt;/li&gt;
-&lt;li&gt;所有 query 操作 / update 操作的确认由 TAIL 结点处理 (即发送 reply 给 client).
-&lt;br /&gt;&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;&lt;strong&gt;3. Coping with Server Failures&lt;/strong&gt;&lt;/p&gt;
-
-&lt;p&gt;论文中构建一个 &lt;em&gt;master&lt;/em&gt; server, 其主要功能如下 (为区分本文将其余负责数据存储的 server 称为 &lt;em&gt;data&lt;/em&gt; server):&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;检测其余 &lt;em&gt;data&lt;/em&gt; servers 的失败&lt;/li&gt;
-&lt;li&gt;在链表新增或删除节点时, 通知 &lt;em&gt;data&lt;/em&gt; servers 更新 predecessor 及 successor&lt;/li&gt;
-&lt;li&gt;告知 client 链表的 HEAD 节点和 TAIL 节点&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;论文中假设 &lt;em&gt;master&lt;/em&gt; server 永不崩溃。而实际上该论文的 prototype 利用 Paxos 协调 &lt;em&gt;master&lt;/em&gt; server 的各个 replicas 从而 behave in aggregate like a single process that does not fail, 以此避免单点故障.&lt;/p&gt;
-
-&lt;p&gt;下面仅讨论 &lt;em&gt;data&lt;/em&gt; server 故障, 即如何在链表中的节点出现故障时保证存储服务的强一致性.主要分为以下头节点, 尾节点和中间节点三种情况.&lt;/p&gt;
-
-&lt;p&gt;论文中阐述了两个性质:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;&lt;strong&gt;Update Propagation Invariant (更新传递不变性)&lt;/strong&gt;. 意即对于编号 &lt;em&gt;i&lt;/em&gt; 和 &lt;em&gt;j&lt;/em&gt;, 若有: &lt;img src=&#34;http://latex.codecogs.com/gif.latex?i%20%5Cle%20j&#34; alt=&#34;fomula&#34; /&gt; (例如 &lt;em&gt;i&lt;/em&gt; 是 &lt;em&gt;j&lt;/em&gt; 的 predecessor), 则有:  successor 的 update 操作序列 是 predecessor 的前缀 —— &lt;img src=&#34;http://latex.codecogs.com/gif.latex?Hist%5Ej_%7BobjID%7D%20%5Cpreceq%20Hist%5Ei_%7BobjID%7D&#34; alt=&#34;fomula&#34; /&gt; (该性质根据链表节点间 update 操作由 FIFO 传递得出)&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;Inprocess Requests Invariant (上下文请求不变性)&lt;/strong&gt;. 每个 server &lt;em&gt;i&lt;/em&gt; 维护一个列表 &lt;img src=&#34;http://www.forkosh.com/mathtex.cgi?Sent_i}&#34;&gt;, 其中存储着 server &lt;em&gt;i&lt;/em&gt; 已经处理并传递给 successor 节点但可能未被 tail 节点处理的 update requests. 当 tail 节点处理了一个 update request &lt;em&gt;r&lt;/em&gt; 后会发送确认 &lt;em&gt;ack&amp;reg;&lt;/em&gt; 给 predecessor, server &lt;em&gt;i&lt;/em&gt; 接收 &lt;em&gt;ack&amp;reg;&lt;/em&gt; 后将 &lt;em&gt;r&lt;/em&gt; 从 &lt;img src=&#34;http://www.forkosh.com/mathtex.cgi?Sent_i}&#34;&gt; 中删除, 然后依次向前传递. 据此, 若有: &lt;img src=&#34;http://latex.codecogs.com/gif.latex?Hist%7B%5Ei_%7BobjID%7D%7D%20%3D%20Hist%7B%5Ej_%7BobjID%7D%7D%20%5Coplus%20Sent_i&#34; alt=&#34;fomula&#34; /&gt; (根据 tail 节点接收到的 request 必定已被其所有 predecessors 接收到这一事实得出)&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;&lt;strong&gt;Head 节点故障停止&lt;/strong&gt;: 将 Head 节点从链表中移除, 其 successor 节点称为新的 Head 节点. 旧 Head 节点已经传递的 update 操作继续传递, 而丢失的 update 操作可视为 server 忽略了该 update (如前所述等同于server 接收该 client request 失败), 因此对应的 client request 将无法接收到 reply, 此时 client 会 resend request. 不影响存储服务的强一致性.&lt;/p&gt;
-
-&lt;p&gt;&lt;strong&gt;Tail 节点故障停止&lt;/strong&gt;: 将 Tail 节点从链表中移除, 其前继 Tail- 节点称为新的 Tail 节点. 由于 &lt;img src=&#34;http://latex.codecogs.com/gif.latex?Tail%5E-%20%3C%20Tail%20%5Cto%20Hist%7B%5E%7Btail%7D_%7BobjID%7D%7D%20%5Cpreceq%20Hist%7B%5E%7BTail%5E-%7D_%7BobjID%7D%7D&#34; alt=&#34;fomula&#34; /&gt;, 从用户的角度看即数据变新变多了, 因此并不影响存储服务的读一致性.&lt;/p&gt;
-
-&lt;p&gt;&lt;strong&gt;中间节点故障停止&lt;/strong&gt;: 将故障节点 S 从链表中移除, 然后 &lt;em&gt;master&lt;/em&gt; server 首先通知故障节点的后继 S+ 节点新的链表配置, 然后通知前继 S- 节点连接后继 S+ 节点并要求其处理 &lt;img src=&#34;http://www.forkosh.com/mathtex.cgi?Sent^-}&#34;&gt; 中的 update request, 后序 update 操作继续传递下去, 因此也不影响存储服务的强一致性.&lt;/p&gt;
-
-&lt;p&gt;&lt;strong&gt;扩展链表&lt;/strong&gt;: 当越来越多故障节点被移除, 链表将会缩短, 同时容错性下降.因此当链表变短时应当向链表中添加新的 servers. 理论上可以在链表的任何位置添加新 server, 但最简单的方法是在结尾添加 T+ 节点. 首先 T+ 通过复制 &lt;img src=&#34;http://www.forkosh.com/mathtex.cgi? Hist{^T_{objID}}&#34;&gt; 到 &lt;img src=&#34;http://www.forkosh.com/mathtex.cgi? Hist{^{T^+}_{objID}}&#34;&gt; 完成初始化, 然后 T+ 节点一边处理由 T 节点 forward 过来的 query request 一边处理 &lt;img src=&#34;http://www.forkosh.com/mathtex.cgi?Sent^T}&#34;&gt;, 最后 T+ 正式作为新的 tail 节点.&lt;/p&gt;
-
-&lt;h2 id=&#34;comparision-to-primary-backup-protocols&#34;&gt;Comparision to Primary/Backup Protocols&lt;/h2&gt;
-
-&lt;p&gt;Chain replication 是 primary/backup 方法的一种改进, 实际上是一种副本管理的状态机方法.&lt;/p&gt;
-
-&lt;p&gt;在 primary/backup 方法中, 有一个 &lt;em&gt;primary&lt;/em&gt; server, 负责序列化 client requests (从而保证强一致性), 然后将序列化的 client requests 或 resulting updates 分散发送到各个 &lt;em&gt;backup&lt;/em&gt; servers, 等待接收非故障 &lt;em&gt;backups&lt;/em&gt; 的确认信息, 最后发送 reply 给 client. 当 &lt;em&gt;primary&lt;/em&gt; server 故障停止, 其中一个 &lt;em&gt;backup&lt;/em&gt; server 将提升为 &lt;em&gt;primary&lt;/em&gt; server.&lt;/p&gt;
-
-&lt;p&gt;相比 primary/backup 方法, Chain replication 的不同如下:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;client requests 由两个 replicas 处理, 即 head 节点负责序列化处理 update request, tail 节点并行处理 query requests, 降低了 query requests 的 latency.&lt;/li&gt;
-&lt;li&gt;Chain replication 只能串行传递 update requests, 因此发送 reply 的 latency 与 the sum of server latencies 成比例.&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;当出现 server 故障停止时, Chain replication 和 primary/backup 方法的主要时延都是检测 server failure, 其次是 recovery.&lt;/p&gt;
-
-&lt;h2 id=&#34;simulation-experiments&#34;&gt;Simulation Experiments&lt;/h2&gt;
-
-&lt;p&gt;论文在四种情况下进行实验:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;Single Chain, No Failures&lt;/li&gt;
-&lt;li&gt;Multiple Chains, No Failures&lt;/li&gt;
-&lt;li&gt;Effects of Failures on Throughput&lt;/li&gt;
-&lt;li&gt;Large Scale Replication of Critical Data&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;h2 id=&#34;additional-application&#34;&gt;Additional: Application&lt;/h2&gt;
-
-&lt;p&gt;在 &lt;a href=&#34;https://www.usenix.org/legacy/events/usenix09/tech/full_papers/terrace/terrace.pdf&#34;&gt;CRAQ&lt;/a&gt; 论文中介绍了基于 chain replication 的 CRAQ 系统, 该系统扩展了 chain replication protocol, 使链表上的所有节点均可处理 query 操作, 提高系统的吞吐, 同时仍然提供强一致性保证.&lt;/p&gt;
-
-&lt;p&gt;微软云计算平台 &lt;a href=&#34;http://sigops.org/sosp/sosp11/current/2011-Cascais/printable/11-calder.pdf&#34;&gt;Windows Azure&lt;/a&gt;、&lt;a href=&#34;http://sigops.org/sosp/sosp11/current/2011-Cascais/printable/11-calder.pdf&#34;&gt;FDS&lt;/a&gt; 都使用 chain replication protocol 提供强一致性保证.&lt;/p&gt;
-
-&lt;hr /&gt;
-
-&lt;p&gt;&lt;strong&gt;Reference&lt;/strong&gt;&lt;/p&gt;
-
-&lt;blockquote&gt;
-&lt;p&gt;&lt;a href=&#34;https://www.youtube.com/watch?v=nEbD-qutsKo&#34;&gt;https://www.youtube.com/watch?v=nEbD-qutsKo&lt;/a&gt;&lt;/p&gt;
-
-&lt;p&gt;&lt;a href=&#34;http://blog.csdn.net/yfkiss/article/details/13772669&#34;&gt;http://blog.csdn.net/yfkiss/article/details/13772669&lt;/a&gt;&lt;/p&gt;
-
-&lt;p&gt;&lt;a href=&#34;http://blog.xiaoheshang.info/?p=883&#34;&gt;http://blog.xiaoheshang.info/?p=883&lt;/a&gt;&lt;/p&gt;
-&lt;/blockquote&gt;
-</description>
-    </item>
-    
-    <item>
-      <title>快速排序笔记</title>
-      <link>http://wiesen.github.io/post/%E5%BF%AB%E9%80%9F%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/</link>
-      <pubDate>Tue, 15 Mar 2016 21:31:20 +0800</pubDate>
-      
-      <guid>http://wiesen.github.io/post/%E5%BF%AB%E9%80%9F%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/</guid>
-      <description>
-
-&lt;p&gt;快排最引人注目的特点是原地排序（只需要一个很小的辅助栈），且将长度为 &lt;em&gt;N&lt;/em&gt; 的数组排序所需的时间和 &lt;em&gt;NlgN&lt;/em&gt; 成正比。
-而快排的主要缺点是非常脆弱，在实现时必须非常小心才能避免性能低下。&lt;/p&gt;
-
-&lt;p&gt;同前述一致：以 C++ 实现,仅针对 vector 进行操作, 并且遵循 C++ 左闭右开的区间标准: [a,b)。&lt;/p&gt;
-
-&lt;h2 id=&#34;基本算法&#34;&gt;基本算法&lt;/h2&gt;
-
-&lt;p&gt;快排也是一种分治的排序算法，快排与归并排序是互补的：&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;归并排序将数组分成两个子数组分别排序，再将有序子数组归并以将整个数组排序，其递归调用发生在处理整个数组&lt;strong&gt;之前&lt;/strong&gt;；&lt;/li&gt;
-&lt;li&gt;而快排则是先确定 &lt;code&gt;key&lt;/code&gt; 的位置，而后当两个子数组都有序时则整个数组即有序，其递归调用发生在处理整个数组&lt;strong&gt;之后&lt;/strong&gt;。&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;快排的关键在划分，划分过程需要使得数组满足以下三个条件：&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;对于某个 &lt;code&gt;key&lt;/code&gt;，&lt;code&gt;a[key]&lt;/code&gt; 已经排定；&lt;/li&gt;
-&lt;li&gt;&lt;code&gt;[low,key)&lt;/code&gt; 中所有元素都不大于 &lt;code&gt;a[key]&lt;/code&gt;；&lt;/li&gt;
-&lt;li&gt;&lt;code&gt;[key,high)&lt;/code&gt; 中所有元素都不小于 &lt;code&gt;a[key]&lt;/code&gt;。
-&lt;br /&gt;&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/quick.png&#34; alt=&#34;quick&#34; /&gt;&lt;/p&gt;
-
-&lt;p&gt;据此，快排的基本思想是:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;选取一个元素作为切分元素 &lt;code&gt;key&lt;/code&gt;，然后从数组左端开始向右扫描直到找到一个大于等于它的元素，再从数组右端开始向左扫描直到找到一个小于等于它的元素，而后交换它们的位置;&lt;/li&gt;
-&lt;li&gt;如此继续，就可以保证左指针 &lt;code&gt;left&lt;/code&gt; 的左侧元素都不大于 &lt;code&gt;key&lt;/code&gt;，右指针 &lt;code&gt;right&lt;/code&gt; 的右侧都不小于 &lt;code&gt;key&lt;/code&gt;;&lt;/li&gt;
-
-&lt;li&gt;&lt;p&gt;当左右指针相遇时 &lt;code&gt;（left &amp;gt;= right）&lt;/code&gt;，将切分元素 key 与左子数组最右元素（也就是 &lt;code&gt;right&lt;/code&gt; 最终停下的位置）交换然后返回划分位置 &lt;code&gt;right&lt;/code&gt; 即可。&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;int Partition(std::vector&amp;lt;T&amp;gt; &amp;amp;vec, int low, int high) {
-    int left = low, right = high;
-    while (true) {
-        // Avoid subscript beging out of range
-        while (vec[++left] &amp;lt; vec[low]) if (left == high - 1)break;
-        while (vec[low] &amp;lt; vec[--right]) if (right == low)break;
-        // Terminate the loop
-        if (left &amp;gt;= right)break;
-        std::swap(vec[left], vec[right]);
-    }
-    std::swap(vec[low], vec[right]);
-    return right;
-}
-&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;快排中有若干细节问题值得注意，否则会导致实现错误或者性能下降:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;越界：这里遵循左闭右开原则 [a,b)，因此左侧不能访问最右元素（右侧可以访问最左元素），否则将会出现越界。本文在内循环中左指针的 break 处理上与右指针有所差异：&lt;code&gt;if (left == high - 1) break&lt;/code&gt;。&lt;/li&gt;
-&lt;li&gt;随机性：快排是一个&lt;strong&gt;随机化&lt;/strong&gt;的算法，因此在排序前需将数组随机打乱，在 C++ 中使用    &lt;code&gt;std::random_shuffle&lt;/code&gt; 函数对数组进行处理。将数组随机化的原因是希望能够预测并依赖该算法的性能特点，后续本文阐述。&lt;/li&gt;
-&lt;li&gt;循环：当左指针大于或等于右指针时终于划分&lt;code&gt;Partition()&lt;/code&gt;中的循环,最后将切分元素 &lt;code&gt;key&lt;/code&gt; 放入正确位置： &lt;code&gt;std::swap(vec[key], vec[right])&lt;/code&gt;。而事实上， &lt;code&gt;left&lt;/code&gt; 和 &lt;code&gt;right&lt;/code&gt; 的位置正好一致或相邻。当一侧元素全部小于或大于 &lt;code&gt;key&lt;/code&gt; 时，则 &lt;code&gt;left == right&lt;/code&gt;，否则 &lt;code&gt;left - 1 == right&lt;/code&gt;。&lt;/li&gt;
-
-&lt;li&gt;&lt;p&gt;递归：当子数组为空或所含元素仅为1个时则无需再处理，在左闭右开区间 [a,b) 中即为 &lt;code&gt;b - a &amp;lt;= 1&lt;/code&gt;。否则继续处理，同时为了贯彻左闭右开原则，代码中的递归如下:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;void NormalQuick(std::vector&amp;lt;T&amp;gt; &amp;amp;vec, int low, int high) {
-    // Terminate the recursive
-    if (high - low &amp;lt;= 1){
-        Insertion(vec, low, high);
-        return;
-    }
-    int nCut = Partition(vec, low, high);
-    // Detail: Use range[low, high)
-    NormalQuick(vec, low, nCut);
-    NormalQuick(vec, nCut + 1, high);
-｝
-&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;h2 id=&#34;算法改进&#34;&gt;算法改进&lt;/h2&gt;
-
-&lt;ol&gt;
-&lt;li&gt;&lt;p&gt;&lt;strong&gt;切换到插入排序&lt;/strong&gt;&lt;/p&gt;
-
-&lt;p&gt;和大多数递归排序算法一样，改进快排性能的一个简单办法是在排序小树组时切换到插入排序，从而避免递归调用，并且对于小数组来说快排比插入排序慢。&lt;/p&gt;
-
-&lt;p&gt;经验表明，在大多数情况下 &lt;code&gt;CUTOFF&lt;/code&gt; 取值 5~15 能够取得比较好的性能。&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;if (high - low &amp;lt;= CUTOFF) {
-    Insertion(vec, low, high);
-    return;
-}
-&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
-
-&lt;li&gt;&lt;p&gt;&lt;strong&gt;三取样切分&lt;/strong&gt;&lt;/p&gt;
-
-&lt;p&gt;待补充&lt;/p&gt;&lt;/li&gt;
-
-&lt;li&gt;&lt;p&gt;&lt;strong&gt;熵最优快排——三向切分&lt;/strong&gt;&lt;/p&gt;
-
-&lt;p&gt;所谓的“熵最优”是指：对于任意分布的输入，最优的基于比较的排序算法平均所需的比较次数与三向切分快排平均所需的比较次数相比，处于常数因子范围之内。当然前提是需要将数组进行随机化。&lt;/p&gt;
-
-&lt;p&gt;进一步使用信息论来解释快排性能可参考 Algs4 中的快排章节，Mackayd的&lt;a href=&#34;http://users.aims.ac.za/~mackay/sorting/sorting.html&#34;&gt;Heapsort, Quicksort, and Entropy&lt;/a&gt;。刘未鹏的&lt;a href=&#34;http://mindhacks.cn/2008/06/13/why-is-quicksort-so-quick/&#34;&gt;数学之美番外篇：快排为什么那样快&lt;/a&gt;也值得一看，浅显易懂。&lt;/p&gt;
-
-&lt;p&gt;三向切分快排的运行时间和输入的信息量的 &lt;em&gt;N&lt;/em&gt; 倍成正比。对于含有大量重复元素的数组，它将快排的排序时间从&lt;strong&gt;线性对数级&lt;/strong&gt;降低到&lt;strong&gt;线性级别&lt;/strong&gt;。&lt;/p&gt;
-
-&lt;p&gt;基本想法是将数组切分为三部分，分别对应小于、等于和大于切分元素的数组元素。&lt;/p&gt;
-
-&lt;p&gt;&lt;strong&gt;Dijkstra 三向切分&lt;/strong&gt;&lt;/p&gt;
-
-&lt;p&gt;Dijkstra 提出的“三向切分快速排序”极为简洁。这里的额外交换用于和切分元素&lt;strong&gt;不等&lt;/strong&gt;的元素。 其从左到右遍历数组一次：&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;维护指针 &lt;code&gt;left&lt;/code&gt; 使得 &lt;code&gt;[low, left)&lt;/code&gt; 中的元素均小于 key；&lt;/li&gt;
-&lt;li&gt;维护一个指针 &lt;code&gt;right&lt;/code&gt; 使得 &lt;code&gt;[right, high)&lt;/code&gt; 中的元素均大于 key；&lt;/li&gt;
-&lt;li&gt;&lt;code&gt;nMid&lt;/code&gt; 使得 &lt;code&gt;[left, nMid)&lt;/code&gt; 中的元素均等于 key；&lt;/li&gt;
-&lt;li&gt;余下 &lt;code&gt;[nMid, right)&lt;/code&gt; 中的元素尚未排定。&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/3-wayquick.png&#34; alt=&#34;3wayquick&#34; /&gt;&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;void OptimalQuick(std::vector&amp;lt;T&amp;gt; &amp;amp;vec, int low, int high) {
-    if (high - low &amp;lt;= CUTOFF){
-        Insertion(vec, low, high);
-        return;
-    }
-    int left = low, nMid = low + 1, right = high - 1;
-    T key = vec[low];
-    while (nMid &amp;lt;= right)
-    {
-        if (vec[nMid] &amp;lt; key){
-            std::swap(vec[left], vec[nMid]);
-            left++; nMid++;
-        }
-        else if (key &amp;lt; vec[nMid]){
-            std::swap(vec[nMid], vec[right]);
-            right--;
-        }
-        else nMid++;
-    }
-    OptimalQuick(vec, low, nMid);
-    OptimalQuick(vec, right + 1, high);
-}
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;&lt;strong&gt;快速三向切分（J.Bently, D.McIlroy)&lt;/strong&gt;&lt;/p&gt;
-
-&lt;p&gt;通过将重复元素置于子数组两端，从而实现一个信息量最优的排序算法。该方法与上述方法是等价的，只是快速三向切分中的额外交换用于和切分元素&lt;strong&gt;相等&lt;/strong&gt;的元素。过程如下：&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;维护指针 &lt;code&gt;p&lt;/code&gt; 和 &lt;code&gt;q&lt;/code&gt; 使得 &lt;code&gt;vec[low, p)&lt;/code&gt; 和 &lt;code&gt;vec[q, high)&lt;/code&gt; 中的元素都和 &lt;code&gt;key&lt;/code&gt; 相等;&lt;/li&gt;
-&lt;li&gt;维护指针 &lt;code&gt;i&lt;/code&gt; 和 &lt;code&gt;j&lt;/code&gt; 使得 &lt;code&gt;vec[p, i)&lt;/code&gt; 中的元素小于 &lt;code&gt;key&lt;/code&gt; ，&lt;code&gt;vec[j, q)&lt;/code&gt; 中的元素大于 &lt;code&gt;key&lt;/code&gt;;&lt;/li&gt;
-&lt;li&gt;在切分循环结束后将和 &lt;code&gt;key&lt;/code&gt; 相等的元素交换到正确的位置上。&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/bmquick.png&#34; alt=&#34;quickX&#34; /&gt;&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;void QuickX(std::vector&amp;lt;T&amp;gt; &amp;amp;vec, int low, int high) {
-    if (high - low &amp;lt;= CUTOFF){
-        Insertion(vec, low, high);
-        return;
-    }
-
-    int p = low, q = high, i = low, j = high;
-    T key = vec[low];
-    while (true){
-        while (vec[++i] &amp;lt; key)if (i == high - 1)break;
-        while (key &amp;lt; vec[--j])if (j == low)break;
-        if (i == j &amp;amp;&amp;amp; key == vec[i]){
-            std::swap(vec[++p], vec[i]);
-        }
-        if (i &amp;gt;= j)break;
-        std::swap(vec[i], vec[j]);
-        // exchange only when equal to key
-        if(vec[i] == key)std::swap(vec[++p], vec[i]);
-        if(vec[j] == key)std::swap(vec[--q], vec[j]);
-    }
-    // exchange to right position
-    i = j + 1;
-    while (p &amp;gt;= low)std::swap(vec[p--], vec[j--]);
-    while (q &amp;lt; high)std::swap(vec[q++], vec[i++]);
-    // recursive
-    QuickX(vec, low, j + 1);
-    QuickX(vec, i, high);
-}
-&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
-&lt;/ol&gt;
-
-&lt;hr /&gt;
-
-&lt;p&gt;Reference：&lt;/p&gt;
-
-&lt;blockquote&gt;
-&lt;p&gt;&lt;a href=&#34;http://algs4.cs.princeton.edu/home/&#34;&gt;Algs4&lt;/a&gt;&lt;/p&gt;
-
-&lt;p&gt;&lt;a href=&#34;http://users.aims.ac.za/~mackay/sorting/sorting.html&#34;&gt;Heapsort, Quicksort, and Entropy&lt;/a&gt;&lt;/p&gt;
-
-&lt;p&gt;&lt;a href=&#34;http://mindhacks.cn/2008/06/13/why-is-quicksort-so-quick/&#34;&gt;数学之美番外篇：快排为什么那样快&lt;/a&gt;&lt;/p&gt;
-&lt;/blockquote&gt;
-</description>
-    </item>
-    
-    <item>
-      <title>归并排序笔记</title>
-      <link>http://wiesen.github.io/post/%E5%BD%92%E5%B9%B6%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/</link>
-      <pubDate>Thu, 10 Mar 2016 21:24:46 +0800</pubDate>
-      
-      <guid>http://wiesen.github.io/post/%E5%BD%92%E5%B9%B6%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/</guid>
-      <description>
-
-&lt;p&gt;归并排序是一种渐近最优的基于比较排序的算法, 意即: 其在最坏情况下的比较次数和任意基于比较的排序算法所需的最少比较次数都是~NlgN。其主要的优点是可以保证将任意长度为 N 的数组排序的时间复杂度为 O(NlgN); 其主要缺点是空间复杂度为 O(N)。&lt;/p&gt;
-
-&lt;p&gt;这里均以 C++ 实现, 为了避免陷入到语言细节里所以仅针对 vector 进行操作, 并且遵循 C++ &lt;strong&gt;左闭右开&lt;/strong&gt;的区间标准: [a,b)。值得注意的是区间表示一致性这个细节对针对数组和搜索(如二分查找)的算法有着举足轻重的影响。&lt;/p&gt;
-
-&lt;p&gt;至于倾向于 [a,b) 左闭右开区间表示的原因可参考&lt;a href=&#34;http://stackoverflow.com/questions/9963401/why-are-standard-iterator-ranges-begin-end-instead-of-begin-end&#34;&gt;链接&lt;/a&gt;。简单来说主要原因有二: 一是 end-begin 即可得到区间大小; 二是当区间退化为 0 时包含左界更加&amp;rdquo;natural&amp;rdquo;。&lt;/p&gt;
-
-&lt;h1 id=&#34;自顶向下的归并排序&#34;&gt;自顶向下的归并排序&lt;/h1&gt;
-
-&lt;p&gt;递归实现的归并排序是算法设计中&lt;strong&gt;分治思想&lt;/strong&gt;的典型应用。&lt;/p&gt;
-
-&lt;p&gt;主要是两个函数: 由 &lt;code&gt;MergeSort()&lt;/code&gt; 负责递归调用, &lt;code&gt;Merge()&lt;/code&gt; 负责归并。&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;&lt;p&gt;优化一: 对小规模子数组使用插入排序&lt;/p&gt;
-
-&lt;p&gt;递归会使小规模问题中方法的调度过于频繁, 而插入或者选择在小数组上比归并要快, 所以改进对小规模子数组的处理方法可以改进整个算法。根据经验, 使用插入处理小规模子数组(&amp;lt;15)可将归并的运行时间缩短10%~15%。&lt;/p&gt;&lt;/li&gt;
-
-&lt;li&gt;&lt;p&gt;优化二: 测试子数组是否有序&lt;/p&gt;
-
-&lt;p&gt;添加一个判断条件: &lt;code&gt;if (a[mid] &amp;gt; a[mid+1])&lt;/code&gt; 再进行 &lt;code&gt;Merge()&lt;/code&gt; 操作, 否则数组已经是有序的。进行此优化可以令任意有序的子数组算法时间复杂度变为线性。&lt;/p&gt;&lt;/li&gt;
-
-&lt;li&gt;&lt;p&gt;优化三: 不将元素复制到辅助数组&lt;/p&gt;
-
-&lt;p&gt;在递归调用的每个层次交换输入数组和辅助数组的角色, 可节省将数组元素复制到用于归并的辅助数组的时间(无法节省空间)。&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;template&amp;lt;class T&amp;gt;
-void Merge(std::vector&amp;lt;T&amp;gt; &amp;amp;src, std::vector&amp;lt;T&amp;gt; &amp;amp;dest, int nHead, int nMid, int nEnd) {
-    int nLeftIndex = nHead, nRightIndex = nMid;
-    for (int i = nHead; i &amp;lt; nEnd; ++i){
-        // Detail: Use range[nHead, nEnd)
-        if (nLeftIndex &amp;gt;= nMid) dest[i] = src[nRightIndex++];
-        else if (nRightIndex &amp;gt;= nEnd) dest[i] = src[nLeftIndex++];
-        else if (src[nLeftIndex] &amp;lt; src[nRightIndex]) dest[i] = src[nLeftIndex++];
-        else dest[i] = src[nRightIndex++];
-    }
-}
-
-template&amp;lt;class T&amp;gt;
-void MergeSort(std::vector&amp;lt;T&amp;gt; &amp;amp;src, std::vector&amp;lt;T&amp;gt; &amp;amp;dest, int nHead, int nEnd) {
-    // if (nEnd - nHead &amp;lt;= 1) return; // Before optimizing
-    // Optimization 1: Use InsertSort when small scale
-    if (nEnd - nHead &amp;lt;= 15) {
-        InsertSort(dest, nHead, nEnd);
-        return;
-    }
-    int nMid = (nHead + nEnd) / 2;
-    // Optimization 2: Avoid copying to auxiliary array
-    MergeSort(dest, src, nHead, nMid);
-    MergeSort(dest, src, nMid, nEnd);
-    // Optimization 3: If the sub-array is sorted then skip merge
-    if (src[nMid - 1] &amp;lt;= src[nMid]){
-        std::copy(src.begin() + nHead, src.begin() + nEnd, dest.begin() + nHead);
-    }
-    else Merge(src, dest, nHead, nMid, nEnd);
-}
-&lt;/code&gt;&lt;/pre&gt;&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;h1 id=&#34;自底向上的归并排序&#34;&gt;自底向上的归并排序&lt;/h1&gt;
-
-&lt;p&gt;实现归并排序的另一种方法是化递归为循环自底向上进行归并, 即先归并微型子数组, 然后再成对归并得到的子数组, 如此这般直至将整个数组归并在一起。该实现比递归方法代码量少, 但复杂度一样。&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;template&amp;lt;class T&amp;gt;
-void Merge(std::vector&amp;lt;T&amp;gt; &amp;amp;vec, int nHead, int nMid, int nEnd) {
-    std::vector&amp;lt;T&amp;gt; tmp(vec);
-    int nLeftIndex = nHead, nRightIndex = nMid;
-    for (int i = nHead; i &amp;lt; nEnd; ++i){
-        if (nLeftIndex &amp;gt;= nMid) vec[i] = tmp[nRightIndex++];
-        else if (nRightIndex &amp;gt;= nEnd) vec[i] = tmp[nLeftIndex++];
-        else if (tmp[nLeftIndex] &amp;lt; tmp[nRightIndex]) vec[i] = tmp[nLeftIndex++];
-        else vec[i] = tmp[nRightIndex++];
-    }
-}
-
-template&amp;lt;class T&amp;gt;
-void MergeSortBU(std::vector&amp;lt;T&amp;gt; &amp;amp;vec, int nHead, int nEnd) {
-    int nLength = nEnd - nHead;
-    for (int sz = 1; sz &amp;lt; nLength; sz += sz){
-        for (int i = nHead; i &amp;lt; nLength - sz; i = i + sz + sz){
-            int nMin = nLength &amp;lt; i + sz + sz ? nLength : i + sz + sz;
-            Merge(vec, i, i + sz, nMin);
-        }
-    }
-}
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;hr /&gt;
-
-&lt;p&gt;Reference:&lt;/p&gt;
-
-&lt;blockquote&gt;
-&lt;p&gt;Algorithms, 4th Edition&lt;/p&gt;
-
-&lt;p&gt;&lt;a href=&#34;https://github.com/acgtyrant/Algorithm-and-Data-Structure/wiki&#34;&gt;https://github.com/acgtyrant/Algorithm-and-Data-Structure/wiki&lt;/a&gt;&lt;/p&gt;
-
-&lt;p&gt;&lt;a href=&#34;http://stackoverflow.com/questions/9963401/why-are-standard-iterator-ranges-begin-end-instead-of-begin-end&#34;&gt;http://stackoverflow.com/questions/9963401/why-are-standard-iterator-ranges-begin-end-instead-of-begin-end&lt;/a&gt;&lt;/p&gt;
 &lt;/blockquote&gt;
 </description>
     </item>

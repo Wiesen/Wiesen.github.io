@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.18" />
+
+  <title>Leveldb: Storage MemTable &middot; Wiesen&#39;s Blog</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="http://wiesen.github.io/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/github.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="http://wiesen.github.io/img/favicon.ico" type="image/x-icon" />
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+  <a class="pure-menu-heading brand" href="http://wiesen.github.io/">Wiesen</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/topics/"><i class='fa fa-folder fa-fw'></i>Topics</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/about/"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/contact/"><i class='fa fa-phone fa-fw'></i>Contact</a>
+      
+        </li>
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://facebook.com/100010837531785" target="_blank"><i class="fa fa-facebook-square fa-fw"></i>Facebook</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/Wiesen" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+
+<div class="header">
+  <h1>Leveldb: Storage MemTable</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+    <i class="fa fa-calendar fa-fw"></i>
+    <time>20 Dec 2016, 21:31</time>
+  </div>
+
+  
+
+  
+  
+  
+  <div>
+    <i class="fa fa-folder fa-fw"></i>
+    
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/database">Database</a>&nbsp;&#47;
+    
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/leveldb">Leveldb</a>
+    
+  </div>
+  
+  
+
+  
+
+</div>
+
+  
+
+<div style="text-align: center">
+<img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb-architecture.png" width="500"/>
+</div>
+
+<h2 id="memtable-db-skiplist-h-db-memtable-h-memtable-cc">Memtable (<code>db/skiplist.h db/memtable.h&amp;memtable.cc</code>)</h2>
+
+<ol>
+<li><p>Introduction</p>
+
+<p>MemTable 是 leveldb 的 kv 数据在内存中的存储结构。当 Memtable 写入的数据占用内存到达指定大小 (Options.write_buffer_size)，则自动转换为 Immutable Memtable，同时生成新的 Memtable 供写操作写入新数据。后台的 compact 进程会负责将 immutable memtable dump to disk 生成 sstable。</p>
+
+<p>Memtable 类只是一个接口类，其底层实现依赖于两大核心组件 Arena 和 SkipList，Arena 内存分配器统一管理内存，SkipList 用于实际 KV 存储。</p>
+
+<p>根据上一篇 blog 中 LSM tree 的性质，table 应当保持有序性。而对一个排序结构执行插入操作开销很大（随机写），通常性能瓶颈集中在这里。一些数据结构如链表, AVL 树, B 树, skiplist 等都加速了随机写。leveldb 的 memtable 实现没有使用复杂的 B 树，采用更轻量级的 <a href="https://en.wikipedia.org/wiki/Skip_list">skiplist</a>。</p>
+
+<p>skiplist 是一种可以代替平衡树的数据结构。其从概率上保证数据平衡，结构和实现比平衡树简单。概率上时间复杂度近似 O(logN)，与平衡树相同，但空间上比较节省，一个节点平均只需要 1.333 个指针。</p></li>
+
+<li><p>Interface</p>
+
+<ol>
+<li><p>成员变量</p>
+
+<pre><code>typedef SkipList&lt;const char*, KeyComparator&gt; Table;
+KeyComparator comparator_;
+int refs_;    // 引用计数
+Arena arena_; // 内存池
+Table table_; // Table 就是 SkipList&lt;const char*, KeyComparator&gt;
+</code></pre></li>
+
+<li><p>共有函数</p>
+
+<pre><code>explicit MemTable(const InternalKeyComparator&amp; comparator);
+void Ref();
+void Unref();
+size_t ApproximateMemoryUsage();
+Iterator* NewIterator();
+void Add(SequenceNumber seq, ValueType type, const Slice&amp; key, const Slice&amp; value);
+bool Get(const LookupKey&amp; key, std::string* value, Status* s);
+</code></pre></li>
+
+<li><p>私有函数</p>
+
+<pre><code>~MemTable();  // Private since only Unref() should be used to delete it
+// No copying allowed
+MemTable(const MemTable&amp;);
+void operator=(const MemTable&amp;);
+</code></pre></li>
+</ol></li>
+
+<li><p>Analysis</p>
+
+<p>MemTable 的对象构造必须显式调用，重点在于初始 Arena 和 SkipList 两大核心组件，且提供引用计数初始为 0，使用时必须先 Ref()，实际对象销毁在 Unref() 引用计数为 0 时。</p>
+
+<p>此外，LevelDB 中禁止类被复制的方法都是声明拷贝构造函数和赋值操作符为 private，并且只提供声明，而不提供定义。（析构函数同理）（C++11 中可以使用 = delete)</p>
+
+<p>memtable 对 key 的查找和遍历是 MemTableIterator，而 MemTableIterator 实际上是 SkipList iterator wrapper。NewIterator 即是返回一个 MemTableIterator，用于有序遍历 memtable 的存储数据。</p>
+
+<p>写入 <code>void Add(SequenceNumber seq, ValueType type, const Slice&amp; key, const Slice&amp; value)</code>:</p>
+
+<ol>
+<li>将传入的参数封装为 <code>Internalkey</code>，然后与 <code>value</code> 一起编码成上述 entry</li>
+<li><code>SkipList::Insert()</code></li>
+</ol>
+
+<p>读取 <code>bool Get(const LookupKey&amp; key, std::string* value, Status* s)</code>:</p>
+
+<ol>
+<li>从传入的 <code>LookupKey</code> 中获取 <code>memtable_key</code></li>
+<li><code>MemTableIterator::Seek()</code> 返回 <code>MemTableIterator</code></li>
+<li>seek 失败，返回 data not exist。seek 成功，则判断数据的 ValueType：a) <code>kTypeValue</code> 则返回对应的 <code>value</code> 数据; b) <code>kTypeDeletion</code> 则返回 data not exist<br /></li>
+</ol>
+
+<p>没有 Delete，前面说过，memtable 的 delete 是 lazy 的，实际上是 add 一条 <code>ValueType</code> 为 <code>kTypeDeletion</code> 的记录。</p></li>
+</ol>
+
+<h2 id="reference">Reference</h2>
+
+<p><a href="http://blog.csdn.net/sparkliang/article/details/8567602">Leveldb 源码分析 &ndash;1</a></p>
+
+<p><a href="http://mingxinglai.com/cn/2013/01/leveldb-memtable/">LevelDB : MemTable</a></p>
+
+<p><a href="http://luodw.cc/2015/10/16/leveldb-05/">leveldb skiplist 实现分析</a></p>
+
+<p><a href="http://www.pandademo.com/2016/03/memtable-and-skiplist-leveldb-source-dissect-3/">MemTable 与 SkipList-leveldb 源码剖析 (3)</a></p>
+
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="http://wiesen.github.io/post/Leveldb-Basic-Concept/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="http://wiesen.github.io/post/Leveldb-Basic-Concept/">Leveldb: Basic Settings</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Wiesen';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="http://wiesen.github.io/js/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-73790691-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

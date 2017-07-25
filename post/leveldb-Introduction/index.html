@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.18" />
+
+  <title>Leveldb: Introduction &middot; Wiesen&#39;s Blog</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="http://wiesen.github.io/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/monokai-sublime.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="http://wiesen.github.io/img/favicon.ico" type="image/x-icon" />
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+  <a class="pure-menu-heading brand" href="http://wiesen.github.io/">Wiesen</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/topics/"><i class='fa fa-folder fa-fw'></i>Topics</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/about/"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/contact/"><i class='fa fa-phone fa-fw'></i>Contact</a>
+      
+        </li>
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://facebook.com/100010837531785" target="_blank"><i class="fa fa-facebook-square fa-fw"></i>Facebook</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/Wiesen" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+
+<div class="header">
+  <h1>Leveldb: Introduction</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+    <i class="fa fa-calendar fa-fw"></i>
+    <time>28 Nov 2016, 21:31</time>
+  </div>
+
+  
+
+  
+  
+  
+  <div>
+    <i class="fa fa-folder fa-fw"></i>
+    
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/database">Database</a>&nbsp;&#47;
+    
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/leveldb">Leveldb</a>
+    
+  </div>
+  
+  
+
+  
+
+</div>
+
+  
+
+<p>看了不少 blog 分析 leveldb，但很少看到有人从设计原因和策略上进行总结。所以这个系列对 leveldb 的实现做一点设计分析，争取将内部实现逻辑串联起来，至于源码注释之类的网上一扒拉就有很多啦。</p>
+
+<h2 id="introduction">Introduction</h2>
+
+<p>Leveldb 库提供持久层 kv 存储，其中 keys 和values 可以是任意字节数组。目前有 C++，golang 的实现。</p>
+
+<p>作者 Jeff Dean, Sanjay Ghemawat 同时也是设计实现 BigTable 的作者。在 BigTable 中有两个关键部分：master server 和 tablet server。</p>
+
+<ul>
+<li>master server 负责存储 meta-data，并且调度管理 tablet server；</li>
+<li>tablet server 负责存储具体数据，并且响应读写操作。</li>
+</ul>
+
+<p>Leveldb 可视为 BigTable 中 tablet server 的简化实现。</p>
+
+<h2 id="features-limitations-performance">Features, Limitations, Performance</h2>
+
+<p>详见 <a href="https://github.com/google/leveldb">leveldb homepage</a></p>
+
+<h2 id="how-to-use">How to use</h2>
+
+<p>详见 <a href="https://github.com/google/leveldb/blob/master/doc/index.html">leveldb 使用文档</a></p>
+
+<h2 id="background">Background</h2>
+
+<p>冯诺依曼体系结构的计算机系统主要为两点：<strong>存储 + 计算</strong>。数据库即为存储方面，依赖于存储硬件特性。</p>
+
+<p>当前磁盘物理结构特性导致 (磁头寻道，旋转延迟)：<strong>随机读写慢，连续读写快</strong>，相差三个数量级。内存和 SSD 同样表现，只不过原因是：连续读写可预判，因此会被优化 (相差量级也没磁盘那么大)。</p>
+
+<p>上述说明：基于目前这样的硬件特性，我们设计存储系统时要<strong>尽量避免随机读写，设计为顺序读写</strong>。</p>
+
+<p>然而，顺序读和顺序写是相互矛盾的：</p>
+
+<ul>
+<li>为了优化读效率，最好是将以有序方式组织数据从而写入相邻的块，以维护顺序读，而这增加了随机写；</li>
+<li>为了优化写效率，最好是所有的写都是增量写，也就是顺序写，而这增加了随机读。</li>
+</ul>
+
+<p>题外话：常见的优化读操作性能的设计有：二分、hash、B+ 树等。这些方法使用各种查找结构来组织数据，有效提升读操作性能(最少提供了O(logN))，但是增加了随机写操作，大大降低了写操作性能。</p>
+
+<p>因此，如果一个业务<strong>对写操作的吞吐量十分敏感，或者写操作数量远远大于读操作</strong>，那么应该采取的措施是：<strong>优化写操作，也就是尽量将写操作设计为增量写</strong>，从而尽可能地减少寻道，以达到磁盘理论写入速度最大值。</p>
+
+<p>这个策略常用于日志或者堆文件这种业务场景中，因为它们是完全顺序的（包括读写），所以可以提供很好的写操作性能。</p>
+
+<h2 id="leveldb-core-idea">Leveldb Core Idea</h2>
+
+<p>以 <strong>LSM(Log Structured Merge) Tree</strong>组织数据从而将逻辑场景中的写请求转换为顺序写，辅以 <strong>Bloom Filter</strong> 和 <strong>Shard LRU cache</strong> 等策略优化随机读操作从而保证读效率。</p>
+
+<ol>
+<li><p><a href="https://en.wikipedia.org/wiki/Log-structured_merge-tree"><strong>LSM tree</strong></a></p>
+
+<p>关于论文的部分分析详见<a href="https://blog.acolyer.org/2014/11/26/the-log-structured-merge-tree-lsm-tree/">链接</a></p>
+
+<div style="text-align: center">
+<img src="http://7vij5d.com1.z0.glb.clouddn.com/memtable.png" width="500"/> <img src="http://7vij5d.com1.z0.glb.clouddn.com/compaction.png" width="500"/>
+</div>
+
+<p>LSM tree 针对<strong>写入速度瓶颈问题</strong>而提出的方法，其基本思想是：<strong>将随机写转换为顺序写，交换读和写的随机 IO</strong>。主要组成结构为：MemTable（内存中）+ SSTable (Sorted String Table)</p>
+
+<p>首先数据更新增量写入 MemTable，其后保存为有序文件 SSTable 到磁盘中（read only），每个文件保存一段时间内的数据更新。为了均衡读写效率，SSTable 文件是一种分层次（level）管理。</p>
+
+<p>LSM Tree 的主要措施有:</p>
+
+<ul>
+<li>对更新进行批量 &amp; 延时处理 (超过大小阈值后将内存中的数据 dump 到磁盘中)：减少寻道，提高写操作性能；</li>
+<li>周期性地利用归并排序对磁盘文件执行合并操作 (compaction)：移除已删除和冗余数据，减少文件个数，保证读操作性能；</li>
+</ul></li>
+
+<li><p><a href="https://en.wikipedia.org/wiki/Bloom_filter"><strong>Bloom Filter</strong></a></p>
+
+<div style="text-align: center">
+<img src="http://7vij5d.com1.z0.glb.clouddn.com/bloomfilter.png" width="550"/>
+</div>
+    
+
+<p>由于 LSM Tree 会产生大量文件，因此 LevelDb 利用 bloomfilter 来避免大量的读操作。</p>
+
+<p>bloomfilter 以概率性算法高效检索一个 key 是否在一个 SSTable (核心为 hash，若判断为不存在则必定不存在，若判断为存在则可能不存在)。</p></li>
+
+<li><p><a href="https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_Recently_Used_.28LRU.29"><strong>Shard LRU Cache</strong></a></p>
+
+<p>leveldb 中的 cache 分为 Table Cache 和 Block Cache 两种，其中 Table Cache 中缓存的是 sstable 的索引数据，Block Cache 缓存的是 Block 数据（可选打开）。</p>
+
+<p>由于 levelDB 为多线程，每个线程访问 cache 时都会对 cache 加锁。为了保证多线程安全并且减少锁开销，leveldb 定义了一个 SharedLRUCache。</p>
+
+<p>ShardedLRUCache 内部有 16 个 LRUCache，查找 Key 时根据 key 的高四位进行 hash 索引，然后在相应的 LRUCache 中进行查找或更新。当 LRUCache 使用率大于总容量后, 根据 LRU 淘汰 key.</p></li>
+</ol>
+
+<h2 id="overall-architecture">Overall Architecture</h2>
+
+<div style="text-align: center">
+<img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb-architecture.png" width="500"/>
+</div>
+
+<p>Leveldb 存储主要分为 SSTable 和 MemTable（即 LSM Tree），前者为不可变且存储于持久设备上，后者位于内存上并且可变。其中有两个 MemTable，一个为当前写入 MemTable，另一个为等待持久化的 Immutable MemTable。此外还有一些辅助文件，后面详述。</p>
+
+<p><strong>Write Operation</strong>：当用户需要插入一条 kv 到 Leveldb 中时，首先会被存储到 log 中 <strong>(Write Ahead Log, WAL, 保证数据持久性)</strong>；然后插入到 MemTable 中；当 MemTable 达到一定大小后会转化为 read-only Immutable MemTable，并且创建一个新的 MemTable；同时开启一个新的后台线程将 Immutable MemTable 的内容 dump 到磁盘中，创建一个新的 SSTable；</p>
+
+<p><strong>Deletion Operation</strong>：在 Leveldb 中视为特殊的 Write operation，写入一个 deletion marker。</p>
+
+<p><strong>Read Operation</strong>：当 leveldb 收到一个 Get 请求时，首先会在 MemTable 进行查找；然后在 Immutable MemTable 查找；最后在 SSTable 中查找（从 level 0 到 higher level），直到匹配到一个 kv item 或者为 NULL。</p>
+
+<h2 id="file-layout">File Layout</h2>
+
+<p>详见 <a href="https://github.com/google/leveldb/blob/master/doc/impl.html">leveldb 实现文档</a></p>
+
+<h2 id="source-code-structure">Source Code Structure</h2>
+
+<pre><code>leveldb-1.4.0  
+|
++--- port           &lt;=== 提供各个平台的基本接口
+|
++--- util           &lt;=== 提供一些通用工具类
+|
++--- helpers
+|      |
+|      +--- memenv  &lt;=== Env 的一个具体实现(Env 是 leveldb 封装的运行环境)
+|
++--- table          &lt;=== sstable 相关的数据格式定义和操作实现
+|
++--- db             &lt;=== 主要逻辑的实现
+|
++--- doc
+|     |
+|     +--- table_format.txt   &lt;=== 磁盘文件数据结构说明
+|     |
+|     +--- log_format.txt     &lt;=== 日志文件（用于宕机恢复未刷盘的数据）数据结构说明
+|     |
+|     +--- impl.html          &lt;=== 一些实现
+|     |
+|     +--- index.html         &lt;=== 使用说明
+|     |
+|     +--- bench.html         &lt;=== 测试数据
+|
++--- include
+     |
+     +--- leveldb           &lt;=== 所有头文件
+</code></pre>
+
+<hr />
+
+<p>Reference：</p>
+
+<blockquote>
+<p><a href="http://zouzls.github.io/2016/11/23/LevelDB%E4%B9%8BLSM-Tree/">LevelDB 之 LSM-Tree</a></p>
+
+<p><a href="http://brg-liuwei.github.io/tech/2014/10/15/leveldb-0.html">和我一起学习 leveldb</a></p>
+
+<p><a href="http://www.open-open.com/lib/view/open1424916275249.html">Log Structured Merge Trees(LSM) 原理</a></p>
+</blockquote>
+
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="http://wiesen.github.io/post/IO-Event-Handling-Design-Patterns/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="http://wiesen.github.io/post/IO-Event-Handling-Design-Patterns/">I/O Event Handling Design Patterns</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="http://wiesen.github.io/post/Leveldb-Basic-Concept/">Leveldb: Basic Settings</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="http://wiesen.github.io/post/Leveldb-Basic-Concept/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Wiesen';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="http://wiesen.github.io/js/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-73790691-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

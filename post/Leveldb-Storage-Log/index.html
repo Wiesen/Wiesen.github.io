@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.18" />
+
+  <title>Leveldb: Log &middot; Wiesen&#39;s Blog</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="http://wiesen.github.io/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/monokai-sublime.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="http://wiesen.github.io/img/favicon.ico" type="image/x-icon" />
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+  <a class="pure-menu-heading brand" href="http://wiesen.github.io/">Wiesen</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/topics/"><i class='fa fa-folder fa-fw'></i>Topics</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/about/"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="http://wiesen.github.io/contact/"><i class='fa fa-phone fa-fw'></i>Contact</a>
+      
+        </li>
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://facebook.com/100010837531785" target="_blank"><i class="fa fa-facebook-square fa-fw"></i>Facebook</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/Wiesen" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+
+<div class="header">
+  <h1>Leveldb: Log</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+    <i class="fa fa-calendar fa-fw"></i>
+    <time>28 Jan 2017, 21:31</time>
+  </div>
+
+  
+
+  
+  
+  
+  <div>
+    <i class="fa fa-folder fa-fw"></i>
+    
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/database">Database</a>&nbsp;&#47;
+    
+      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/leveldb">Leveldb</a>
+    
+  </div>
+  
+  
+
+  
+
+</div>
+
+  
+
+<p>Log：(<code>db/log_format.h</code>,<code>db/log_writer.h&amp;.cc</code>,<code>db/log_reader.h&amp;.cc</code>)</p>
+
+<ol>
+<li><p>Introduction</p>
+
+<p>why log：log 文件在 LevelDb 中的主要作用是系统故障恢复时进行数据恢复。利用 WAL，即使系统发生故障，Memtable 中的数据没有来得及 Dump 到磁盘的 SSTable 文件，LevelDB 也可以根据 log 文件恢复 Memtable 中的数据。</p>
+
+<p>block of log：log 文件中的数据也是以 block 为单位组织（32k）。写日志时，一致性考虑，并没有按 block 单位写，每次更新均对 log 文件进行 IO，根据 WriteOption::sync 决定是否做强制 sync，读取时以 block 为单位做 IO 以及校验。</p>
+
+<p>log 的写入是顺序写，读取只会在启动时发生，不会是性能的瓶颈（每次写都 sync 会有影响），log 中的数据也就没有进行压缩处理。</p></li>
+
+<li><p>Format</p>
+
+<p>block of log 的整体结构，以及 record 的组成：</p>
+
+<table>
+<tbody>
+<tr><td>record0</td></tr>
+<tr><td>record1</td></tr>
+<tr><td>record2</td></tr>
+<tr><td>...</td></tr>
+</tbody>
+</table>
+
+<table>
+<tbody>
+<tr><td>checksum (uint32)</td><td>length (uint16)</td><td>type (uint8)</td><td>data (length)</td></tr>
+</tbody>
+</table>
+   
+
+<ol>
+<li>record： 每次更新写入作为一个 record
+
+<ul>
+<li>checksum 记录的是 type 和 data 的 crc 校验;   每个record都带上了32bit的checksum。对于每条记录多4字节还是很大开销的，这反映了leveldb的定位：针对fault-tolerant的分布式系统设计。</li>
+<li>length 是 record 内保存的 data 长度（little-endian）。</li>
+<li>为了避免 block 内部碎片的产生， 一份 record 可能会跨 block，所以根据 record 内保存数据占更新写入数据的完整与否， 当前分为 4 种 type： FULL， FIRST， MIDDLE， LAST, LAST，依次表示 record 内保存的是完整数据的全部，开始，中间或者最后部分。</li>
+<li>data 即是保存的数据。</li>
+</ul></li>
+<li>trailer： 如果 block 最后剩余的部分小于 record 的头长度(checksum/length/type 共 7bytes),则剩余的部分作为 block 的 trailer，填 0 不使用，record 写入下一个 block。</li>
+</ol>
+
+<p>log 文件格式：</p>
+
+<table>
+<tbody>
+<tr><td>init_data</td></tr>
+<tr><td>block1</td></tr>
+<tr><td>block2</td></tr>
+<tr><td>blockN</td></tr>
+</tbody>
+</table>
+
+<ol>
+<li>init_data: log 文件开头可以添加一些信息，读取写入的时候，跳过这些数据。</li>
+<li>block:实际的数据，binlog 以及 MANIFEST 文件都使用了这种 log 的格式。</li>
+</ol></li>
+
+<li><p>Analysis</p>
+
+<ol>
+<li><p>写入 （<code>Writer::AddRecord() log_writer.cc</code>）</p>
+
+<p>对 log 的每次写入作为 record 添加：</p>
+
+<ol>
+<li>如果当前 block 剩余的 size 小于 record 头长度，填充 trailer，开始下一个 block。</li>
+<li>根据当前 block 剩余的 size 和写入 size，划分出满足写入的最大 record，确定 record type。</li>
+<li>写入 record（Writer::EmitPhysicalRecord()）</li>
+<li>循环 a-c,直至写入处理完成。</li>
+<li>根据 option 指定的 sync 决定是否做 log 文件的强制 sync。
+<br /></li>
+</ol></li>
+
+<li><p>读取（<code>Reader::ReadRecord() db/log_reader.cc</code>）</p>
+
+<p>log 的读取仅发生在 db 启动的时候，每次读取出当时写入的一次完整更新：</p>
+
+<ol>
+<li>第一次读取， 根据指定的 <code>initial_offset</code>_跳过 log 文件开始的 init_data(<code>Reader::SkipToInitialBlock()</code>)，如果从跳过的 offset 开始，当前 block 剩余的 size 小于 record 的头长度（是个 trailer），则直接跳过这个 block。当前实现中指定的initial_offset_为 0。</li>
+<li>从 log 文件中读一个 record（<code>Reader::ReadPhysicalRecord()</code>).</li>
+<li>根据读到 record 的 type 做进一步处理</li>
+<li>循环 a-c 直至读取出当时写入的一个完整更新。
+<br /></li>
+</ol></li>
+</ol></li>
+</ol>
+
+<h2 id="reference">Reference</h2>
+
+<ol>
+<li><a href="http://luodw.cc/2015/10/18/leveldb-08/">leveldb源码分析之读写log文件</a></li>
+<li><a href="http://mingxinglai.com/cn/2013/01/leveldb-log-and-env/">LevelDB源码剖析之Env与log::Writer</a></li>
+<li>leveldb实现解析 by 淘宝-核心系统研发-存储 那岩</li>
+</ol>
+
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="http://wiesen.github.io/post/Leveldb-Cache/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="http://wiesen.github.io/post/Leveldb-Cache/">Leveldb: Block Cache</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Wiesen';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="http://wiesen.github.io/js/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-73790691-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+
