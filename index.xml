@@ -285,7 +285,7 @@ class HandleTable {
 &lt;li&gt;当达到阈值时将 dump to disk，完成后由析构函数完成所有内存的一次性释放，由于业务的特殊性因此无需提供内存释放的接口&lt;/li&gt;
 &lt;/ol&gt;
 
-&lt;p&gt;&lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/arena.png&#34; alt=&#34;arena&#34; /&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;p&gt;![arena]()&lt;a href=&#34;http://7vij5d.com1.z0.glb.clouddn.com/arena.png)&#34;&gt;http://7vij5d.com1.z0.glb.clouddn.com/arena.png)&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
 
 &lt;li&gt;&lt;p&gt;Declaration&lt;/p&gt;
 
