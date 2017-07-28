@@ -23,11 +23,16 @@
 &lt;ol&gt;
 &lt;li&gt;&lt;p&gt;Introduction&lt;/p&gt;
 
-&lt;p&gt;why log：log 文件在 LevelDb 中的主要作用是系统故障恢复时进行数据恢复。利用 WAL，即使系统发生故障，Memtable 中的数据没有来得及 Dump 到磁盘的 SSTable 文件，LevelDB 也可以根据 log 文件恢复 Memtable 中的数据。&lt;/p&gt;
+&lt;p&gt;日志（logging）分两种：&lt;/p&gt;
 
-&lt;p&gt;block of log：log 文件中的数据也是以 block 为单位组织（32k）。写日志时，一致性考虑，并没有按 block 单位写，每次更新均对 log 文件进行 IO，根据 WriteOption::sync 决定是否做强制 sync，读取时以 block 为单位做 IO 以及校验。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;诊断日志（diagnostic log）：即log4j、glog、log4cxx等常用日志库提供的日志功能&lt;/li&gt;
+&lt;li&gt;交易日志（transaction log）：即数据库的 write-ahead log、文件系统的journaling等，用于记录状态变更，通过 replay log 可以逐步恢复每一次修改之后的状态。&lt;/li&gt;
+&lt;/ol&gt;
 
-&lt;p&gt;log 的写入是顺序写，读取只会在启动时发生，不会是性能的瓶颈（每次写都 sync 会有影响），log 中的数据也就没有进行压缩处理。&lt;/p&gt;&lt;/li&gt;
+&lt;p&gt;LevelDb 中的 log 是后者，主要作用是系统故障时进行数据恢复。利用 WAL，当故障时内存 Memtable 中的数据没有来得及 Dump 到磁盘的 SSTable 文件，LevelDB 可根据 log 文件恢复内存数据。&lt;/p&gt;
+
+&lt;p&gt;log 文件中的数据也是以 block 为单位组织（32k）。写日志时，一致性考虑，并没有按 block 单位写，每次更新均对 log 文件进行 IO，根据 WriteOption::sync 决定是否做强制 sync。读取时以 block 为单位做 IO 以及校验。log 的写入是顺序写，读取只会在启动时发生，不会是性能的瓶颈。&lt;/p&gt;&lt;/li&gt;
 
 &lt;li&gt;&lt;p&gt;Format&lt;/p&gt;
 
@@ -88,8 +93,8 @@
 &lt;li&gt;如果当前 block 剩余的 size 小于 record 头长度，填充 trailer，开始下一个 block。&lt;/li&gt;
 &lt;li&gt;根据当前 block 剩余的 size 和写入 size，划分出满足写入的最大 record，确定 record type。&lt;/li&gt;
 &lt;li&gt;写入 record（Writer::EmitPhysicalRecord()）&lt;/li&gt;
-&lt;li&gt;循环 a-c,直至写入处理完成。&lt;/li&gt;
-&lt;li&gt;根据 option 指定的 sync 决定是否做 log 文件的强制 sync。
+&lt;li&gt;循环1-3,直至写入处理完成&lt;/li&gt;
+&lt;li&gt;根据 option 指定的 sync 决定是否做 log 文件的强制 sync
 &lt;br /&gt;&lt;/li&gt;
 &lt;/ol&gt;&lt;/li&gt;
 
@@ -99,9 +104,9 @@
 
 &lt;ol&gt;
 &lt;li&gt;第一次读取， 根据指定的 &lt;code&gt;initial_offset&lt;/code&gt;_跳过 log 文件开始的 init_data(&lt;code&gt;Reader::SkipToInitialBlock()&lt;/code&gt;)，如果从跳过的 offset 开始，当前 block 剩余的 size 小于 record 的头长度（是个 trailer），则直接跳过这个 block。当前实现中指定的initial_offset_为 0。&lt;/li&gt;
-&lt;li&gt;从 log 文件中读一个 record（&lt;code&gt;Reader::ReadPhysicalRecord()&lt;/code&gt;).&lt;/li&gt;
+&lt;li&gt;从 log 文件中读一个 record（&lt;code&gt;Reader::ReadPhysicalRecord()&lt;/code&gt;)&lt;/li&gt;
 &lt;li&gt;根据读到 record 的 type 做进一步处理&lt;/li&gt;
-&lt;li&gt;循环 a-c 直至读取出当时写入的一个完整更新。
+&lt;li&gt;循环 1-3 直至读取出当时写入的一个完整更新。
 &lt;br /&gt;&lt;/li&gt;
 &lt;/ol&gt;&lt;/li&gt;
 &lt;/ol&gt;&lt;/li&gt;
