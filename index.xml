@@ -34,53 +34,7 @@
 
 &lt;p&gt;log 文件中的数据也是以 block 为单位组织（32k）。写日志时，一致性考虑，并没有按 block 单位写，每次更新均对 log 文件进行 IO，根据 WriteOption::sync 决定是否做强制 sync。读取时以 block 为单位做 IO 以及校验。log 的写入是顺序写，读取只会在启动时发生，不会是性能的瓶颈。&lt;/p&gt;&lt;/li&gt;
 
-&lt;li&gt;&lt;p&gt;Format&lt;/p&gt;
-
-&lt;p&gt;block of log 的整体结构，以及 record 的组成：&lt;/p&gt;
-
-&lt;table&gt;
-&lt;tbody&gt;
-&lt;tr&gt;&lt;td&gt;record0&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;td&gt;record1&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;td&gt;record2&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;td&gt;...&lt;/td&gt;&lt;/tr&gt;
-&lt;/tbody&gt;
-&lt;/table&gt;
-
-&lt;table&gt;
-&lt;tbody&gt;
-&lt;tr&gt;&lt;td&gt;checksum (uint32)&lt;/td&gt;&lt;td&gt;length (uint16)&lt;/td&gt;&lt;td&gt;type (uint8)&lt;/td&gt;&lt;td&gt;data (length)&lt;/td&gt;&lt;/tr&gt;
-&lt;/tbody&gt;
-&lt;/table&gt;
-   
-
-&lt;ol&gt;
-&lt;li&gt;record： 每次更新写入作为一个 record
-
-&lt;ul&gt;
-&lt;li&gt;checksum 记录的是 type 和 data 的 crc 校验;   每个record都带上了32bit的checksum。对于每条记录多4字节还是很大开销的，这反映了leveldb的定位：针对fault-tolerant的分布式系统设计。&lt;/li&gt;
-&lt;li&gt;length 是 record 内保存的 data 长度（little-endian）。&lt;/li&gt;
-&lt;li&gt;为了避免 block 内部碎片的产生， 一份 record 可能会跨 block，所以根据 record 内保存数据占更新写入数据的完整与否， 当前分为 4 种 type： FULL， FIRST， MIDDLE， LAST, LAST，依次表示 record 内保存的是完整数据的全部，开始，中间或者最后部分。&lt;/li&gt;
-&lt;li&gt;data 即是保存的数据。&lt;/li&gt;
-&lt;/ul&gt;&lt;/li&gt;
-&lt;li&gt;trailer： 如果 block 最后剩余的部分小于 record 的头长度(checksum/length/type 共 7bytes),则剩余的部分作为 block 的 trailer，填 0 不使用，record 写入下一个 block。&lt;/li&gt;
-&lt;/ol&gt;
-
-&lt;p&gt;log 文件格式：&lt;/p&gt;
-
-&lt;table&gt;
-&lt;tbody&gt;
-&lt;tr&gt;&lt;td&gt;init_data&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;td&gt;block1&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;td&gt;block2&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;td&gt;blockN&lt;/td&gt;&lt;/tr&gt;
-&lt;/tbody&gt;
-&lt;/table&gt;
-
-&lt;ol&gt;
-&lt;li&gt;init_data: log 文件开头可以添加一些信息，读取写入的时候，跳过这些数据。&lt;/li&gt;
-&lt;li&gt;block:实际的数据，binlog 以及 MANIFEST 文件都使用了这种 log 的格式。&lt;/li&gt;
-&lt;/ol&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;a href=&#34;http://www.cnblogs.com/cobbliu/p/6243550.html&#34;&gt;Format&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
 
 &lt;li&gt;&lt;p&gt;Analysis&lt;/p&gt;
 
@@ -455,6 +409,8 @@ Arena::~Arena() {
 
 &lt;p&gt;Leveldb 存储主要分为 SSTable（磁盘） 和 MemTable（内存，包括 MemTable 和 Immutable MemTable），此外还有一些辅助文件:Manifest, Log, Current。&lt;/p&gt;
 
+&lt;p&gt;本篇主要解答：Leveldb一条记录在内存中的形式是什么，记录以怎样的方式被组织？&lt;/p&gt;
+
 &lt;h2 id=&#34;memtable-db-skiplist-h-db-memtable-h-memtable-cc&#34;&gt;Memtable (&lt;code&gt;db/skiplist.h&lt;/code&gt;,&lt;code&gt;db/memtable.h &amp;amp; memtable.cc&lt;/code&gt;)&lt;/h2&gt;
 
 &lt;div style=&#34;text-align: center&#34;&gt;
@@ -827,7 +783,7 @@ struct ParsedInternalKey {
 
 &lt;h2 id=&#34;leveldb-core-idea&#34;&gt;Leveldb Core Idea&lt;/h2&gt;
 
-&lt;p&gt;以 &lt;strong&gt;LSM(Log Structured Merge) Tree&lt;/strong&gt;组织数据从而将逻辑场景中的写请求转换为顺序写，辅以 &lt;strong&gt;Bloom Filter&lt;/strong&gt; 和 &lt;strong&gt;Shard LRU cache&lt;/strong&gt; 等策略优化随机读操作从而保证读效率。&lt;/p&gt;
+&lt;p&gt;以 &lt;strong&gt;LSM(Log Structured Merge) Tree&lt;/strong&gt;组织数据从而将逻辑场景中的写请求转换为顺序写，利用 &lt;strong&gt;write batch&lt;/strong&gt; 加速写操作，辅以 &lt;strong&gt;Bloom Filter&lt;/strong&gt; 和 &lt;strong&gt;Shard LRU cache&lt;/strong&gt; 等策略优化随机读操作从而保证读效率。&lt;/p&gt;
 
 &lt;ol&gt;
 &lt;li&gt;&lt;p&gt;&lt;a href=&#34;https://en.wikipedia.org/wiki/Log-structured_merge-tree&#34;&gt;&lt;strong&gt;LSM tree&lt;/strong&gt;&lt;/a&gt;&lt;/p&gt;
@@ -846,8 +802,20 @@ struct ParsedInternalKey {
 
 &lt;ul&gt;
 &lt;li&gt;对更新进行批量 &amp;amp; 延时处理 (超过大小阈值后将内存中的数据 dump 到磁盘中)：减少寻道，提高写操作性能；&lt;/li&gt;
-&lt;li&gt;周期性地利用归并排序对磁盘文件执行合并操作 (compaction)：移除已删除和冗余数据，减少文件个数，保证读操作性能；&lt;/li&gt;
+&lt;li&gt;周期性地利用归并排序对磁盘文件执行合并操作 (compaction)：移除已删除和冗余数据，减少文件个数，保证读操作性能。&lt;/li&gt;
 &lt;/ul&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;leveldb的工程优化&#34;&gt;Leveldb的工程优化&lt;/h2&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;write batch&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;Leveldb 采用 write batc h来优化并发写。&lt;/p&gt;
+
+&lt;p&gt;对每一个写操作，先通过传入的键值对构造一个 WriteBatch 对象，里面其实就是一个字符串。多个并发写的 write batch 最后会被合并成一个，再写入 log 和 memtable。&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&#34;http://www.cnblogs.com/cobbliu/p/6193164.html&#34;&gt;leveldb并发写处理&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
 
 &lt;li&gt;&lt;p&gt;&lt;a href=&#34;https://en.wikipedia.org/wiki/Bloom_filter&#34;&gt;&lt;strong&gt;Bloom Filter&lt;/strong&gt;&lt;/a&gt;&lt;/p&gt;
 
@@ -862,7 +830,9 @@ struct ParsedInternalKey {
 
 &lt;li&gt;&lt;p&gt;&lt;a href=&#34;https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_Recently_Used_.28LRU.29&#34;&gt;&lt;strong&gt;Shard LRU Cache&lt;/strong&gt;&lt;/a&gt;&lt;/p&gt;
 
-&lt;p&gt;leveldb 中的 cache 分为 Table Cache 和 Block Cache 两种，其中 Table Cache 中缓存的是 sstable 的索引数据，Block Cache 缓存的是 Block 数据（可选打开）。&lt;/p&gt;
+&lt;p&gt;Leveldb 是基于磁盘存储，cache优化是非常自然的想法，主要作用还是在加速读操作。&lt;/p&gt;
+
+&lt;p&gt;leveldb 中的 cache 分为 Table Cache 和 Block Cache 两种，其中 Table Cache 中缓存的是 sstable 的索引数据，Block Cache 缓存的是 sstable 的 Block 数据（可选打开）。&lt;/p&gt;
 
 &lt;p&gt;由于 levelDB 为多线程，每个线程访问 cache 时都会对 cache 加锁。为了保证多线程安全并且减少锁开销，leveldb 定义了一个 SharedLRUCache。&lt;/p&gt;
 
@@ -875,7 +845,7 @@ struct ParsedInternalKey {
 &lt;img src=&#34;http://7vij5d.com1.z0.glb.clouddn.com/leveldb-architecture.png&#34; width=&#34;500&#34;/&gt;
 &lt;/div&gt;
 
-&lt;p&gt;Leveldb 存储主要分为 SSTable 和 MemTable（即 LSM Tree），前者为不可变且存储于持久设备上，后者位于内存上并且可变。其中有两个 MemTable，一个为当前写入 MemTable，另一个为等待持久化的 Immutable MemTable。此外还有一些辅助文件，后面详述。&lt;/p&gt;
+&lt;p&gt;Leveldb 存储主要分为 SSTable 和 MemTable。前者为不可变且存储于持久设备上，后者位于内存上并且可变。其中有两个 MemTable，一个为当前写入 MemTable，另一个为等待持久化的 Immutable MemTable。此外还有一些辅助文件，后面详述。&lt;/p&gt;
 
 &lt;p&gt;&lt;strong&gt;Write Operation&lt;/strong&gt;：当用户需要插入一条 kv 到 Leveldb 中时，首先会被存储到 log 中 &lt;strong&gt;(Write Ahead Log, WAL, 保证数据持久性)&lt;/strong&gt;；然后插入到 MemTable 中；当 MemTable 达到一定大小后会转化为 read-only Immutable MemTable，并且创建一个新的 MemTable；同时开启一个新的后台线程将 Immutable MemTable 的内容 dump 到磁盘中，创建一个新的 SSTable；&lt;/p&gt;
 

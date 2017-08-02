@@ -221,6 +221,8 @@
 
 <p>Leveldb 存储主要分为 SSTable（磁盘） 和 MemTable（内存，包括 MemTable 和 Immutable MemTable），此外还有一些辅助文件:Manifest, Log, Current。</p>
 
+<p>本篇主要解答：Leveldb一条记录在内存中的形式是什么，记录以怎样的方式被组织？</p>
+
 <h2 id="memtable-db-skiplist-h-db-memtable-h-memtable-cc">Memtable (<code>db/skiplist.h</code>,<code>db/memtable.h &amp; memtable.cc</code>)</h2>
 
 <div style="text-align: center">

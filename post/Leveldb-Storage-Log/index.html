@@ -235,53 +235,7 @@
 
 <p>log 文件中的数据也是以 block 为单位组织（32k）。写日志时，一致性考虑，并没有按 block 单位写，每次更新均对 log 文件进行 IO，根据 WriteOption::sync 决定是否做强制 sync。读取时以 block 为单位做 IO 以及校验。log 的写入是顺序写，读取只会在启动时发生，不会是性能的瓶颈。</p></li>
 
-<li><p>Format</p>
-
-<p>block of log 的整体结构，以及 record 的组成：</p>
-
-<table>
-<tbody>
-<tr><td>record0</td></tr>
-<tr><td>record1</td></tr>
-<tr><td>record2</td></tr>
-<tr><td>...</td></tr>
-</tbody>
-</table>
-
-<table>
-<tbody>
-<tr><td>checksum (uint32)</td><td>length (uint16)</td><td>type (uint8)</td><td>data (length)</td></tr>
-</tbody>
-</table>
-   
-
-<ol>
-<li>record： 每次更新写入作为一个 record
-
-<ul>
-<li>checksum 记录的是 type 和 data 的 crc 校验;   每个record都带上了32bit的checksum。对于每条记录多4字节还是很大开销的，这反映了leveldb的定位：针对fault-tolerant的分布式系统设计。</li>
-<li>length 是 record 内保存的 data 长度（little-endian）。</li>
-<li>为了避免 block 内部碎片的产生， 一份 record 可能会跨 block，所以根据 record 内保存数据占更新写入数据的完整与否， 当前分为 4 种 type： FULL， FIRST， MIDDLE， LAST, LAST，依次表示 record 内保存的是完整数据的全部，开始，中间或者最后部分。</li>
-<li>data 即是保存的数据。</li>
-</ul></li>
-<li>trailer： 如果 block 最后剩余的部分小于 record 的头长度(checksum/length/type 共 7bytes),则剩余的部分作为 block 的 trailer，填 0 不使用，record 写入下一个 block。</li>
-</ol>
-
-<p>log 文件格式：</p>
-
-<table>
-<tbody>
-<tr><td>init_data</td></tr>
-<tr><td>block1</td></tr>
-<tr><td>block2</td></tr>
-<tr><td>blockN</td></tr>
-</tbody>
-</table>
-
-<ol>
-<li>init_data: log 文件开头可以添加一些信息，读取写入的时候，跳过这些数据。</li>
-<li>block:实际的数据，binlog 以及 MANIFEST 文件都使用了这种 log 的格式。</li>
-</ol></li>
+<li><p><a href="http://www.cnblogs.com/cobbliu/p/6243550.html">Format</a></p></li>
 
 <li><p>Analysis</p>
 

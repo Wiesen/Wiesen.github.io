@@ -265,7 +265,7 @@
 
 <h2 id="leveldb-core-idea">Leveldb Core Idea</h2>
 
-<p>以 <strong>LSM(Log Structured Merge) Tree</strong>组织数据从而将逻辑场景中的写请求转换为顺序写，辅以 <strong>Bloom Filter</strong> 和 <strong>Shard LRU cache</strong> 等策略优化随机读操作从而保证读效率。</p>
+<p>以 <strong>LSM(Log Structured Merge) Tree</strong>组织数据从而将逻辑场景中的写请求转换为顺序写，利用 <strong>write batch</strong> 加速写操作，辅以 <strong>Bloom Filter</strong> 和 <strong>Shard LRU cache</strong> 等策略优化随机读操作从而保证读效率。</p>
 
 <ol>
 <li><p><a href="https://en.wikipedia.org/wiki/Log-structured_merge-tree"><strong>LSM tree</strong></a></p>
@@ -284,8 +284,20 @@
 
 <ul>
 <li>对更新进行批量 &amp; 延时处理 (超过大小阈值后将内存中的数据 dump 到磁盘中)：减少寻道，提高写操作性能；</li>
-<li>周期性地利用归并排序对磁盘文件执行合并操作 (compaction)：移除已删除和冗余数据，减少文件个数，保证读操作性能；</li>
+<li>周期性地利用归并排序对磁盘文件执行合并操作 (compaction)：移除已删除和冗余数据，减少文件个数，保证读操作性能。</li>
 </ul></li>
+</ol>
+
+<h2 id="leveldb的工程优化">Leveldb的工程优化</h2>
+
+<ol>
+<li><p><strong>write batch</strong></p>
+
+<p>Leveldb 采用 write batc h来优化并发写。</p>
+
+<p>对每一个写操作，先通过传入的键值对构造一个 WriteBatch 对象，里面其实就是一个字符串。多个并发写的 write batch 最后会被合并成一个，再写入 log 和 memtable。</p>
+
+<p><a href="http://www.cnblogs.com/cobbliu/p/6193164.html">leveldb并发写处理</a></p></li>
 
 <li><p><a href="https://en.wikipedia.org/wiki/Bloom_filter"><strong>Bloom Filter</strong></a></p>
 
@@ -300,7 +312,9 @@
 
 <li><p><a href="https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_Recently_Used_.28LRU.29"><strong>Shard LRU Cache</strong></a></p>
 
-<p>leveldb 中的 cache 分为 Table Cache 和 Block Cache 两种，其中 Table Cache 中缓存的是 sstable 的索引数据，Block Cache 缓存的是 Block 数据（可选打开）。</p>
+<p>Leveldb 是基于磁盘存储，cache优化是非常自然的想法，主要作用还是在加速读操作。</p>
+
+<p>leveldb 中的 cache 分为 Table Cache 和 Block Cache 两种，其中 Table Cache 中缓存的是 sstable 的索引数据，Block Cache 缓存的是 sstable 的 Block 数据（可选打开）。</p>
 
 <p>由于 levelDB 为多线程，每个线程访问 cache 时都会对 cache 加锁。为了保证多线程安全并且减少锁开销，leveldb 定义了一个 SharedLRUCache。</p>
 
@@ -313,7 +327,7 @@
 <img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb-architecture.png" width="500"/>
 </div>
 
-<p>Leveldb 存储主要分为 SSTable 和 MemTable（即 LSM Tree），前者为不可变且存储于持久设备上，后者位于内存上并且可变。其中有两个 MemTable，一个为当前写入 MemTable，另一个为等待持久化的 Immutable MemTable。此外还有一些辅助文件，后面详述。</p>
+<p>Leveldb 存储主要分为 SSTable 和 MemTable。前者为不可变且存储于持久设备上，后者位于内存上并且可变。其中有两个 MemTable，一个为当前写入 MemTable，另一个为等待持久化的 Immutable MemTable。此外还有一些辅助文件，后面详述。</p>
 
 <p><strong>Write Operation</strong>：当用户需要插入一条 kv 到 Leveldb 中时，首先会被存储到 log 中 <strong>(Write Ahead Log, WAL, 保证数据持久性)</strong>；然后插入到 MemTable 中；当 MemTable 达到一定大小后会转化为 read-only Immutable MemTable，并且创建一个新的 MemTable；同时开启一个新的后台线程将 Immutable MemTable 的内容 dump 到磁盘中，创建一个新的 SSTable；</p>
 
