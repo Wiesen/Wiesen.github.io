@@ -1,35 +1,36 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>Minimal</title>
-    <link>http://example.com/</link>
-    <description>Recent content on Minimal</description>
+    <title>Wiesen&#39;s Blog</title>
+    <link>https://wiesen.github.io/</link>
+    <description>Recent content on Wiesen&#39;s Blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <lastBuildDate>Sat, 28 Jan 2017 21:31:20 +0800</lastBuildDate>
     
-	<atom:link href="http://example.com/index.xml" rel="self" type="application/rss+xml" />
+	<atom:link href="https://wiesen.github.io/index.xml" rel="self" type="application/rss+xml" />
     
     
     <item>
       <title>Leveldb: Log</title>
-      <link>http://example.com/post/leveldb-storage-log/</link>
+      <link>https://wiesen.github.io/post/leveldb-storage-log/</link>
       <pubDate>Sat, 28 Jan 2017 21:31:20 +0800</pubDate>
       
-      <guid>http://example.com/post/leveldb-storage-log/</guid>
+      <guid>https://wiesen.github.io/post/leveldb-storage-log/</guid>
       <description>Leveldb 存储主要分为 SSTable（磁盘） 和 MemTable（内存，包括 MemTable 和 Immutable MemTable），此外还有一些辅助文件:Manifest, Log, Current。
 本篇 blog 主要分析 Log：log 在 Leveldb 中的作用，一条log 在内存中的形式是什么，以怎样的方式被组织。
-Log：(db/log_format.h&amp;amp;cc,db/log_writer.h&amp;amp;.cc,db/log_reader.h&amp;amp;.cc)  Introduction  日志（logging）分两种：
- 诊断日志（diagnostic log）：即log4j、glog、log4cxx等常用日志库提供的日志功能 交易日志（transaction log）：即数据库的 write-ahead log、文件系统的journaling等，用于记录状态变更，通过 replay log 可以逐步恢复每一次修改之后的状态。  LevelDb 中的 log 是后者，主要作用是系统故障时进行数据恢复。利用 WAL（write-ahead log），当故障时 Memtable 中的数据没来得及 Dump 成 SSTable 文件，LevelDB 可根据 log 文件恢复内存数据，保持数据（data和metadata）的持久性。
- Format  log record 以 block 为单位组织（32k）。写日志时，一致性考虑，并没有以 block 为单位写，而是每次更新均对 log 文件进行 IO，根据 WriteOption::sync 决定是否做强制 sync。读取时以 block 为单位做 IO 以及校验。log 的写入是顺序写，读取只会在启动时发生，不会是性能的瓶颈。</description>
+Log (db/log_format.h&amp;amp;cc,db/log_writer.h&amp;amp;.cc,db/log_reader.h&amp;amp;.cc) Introduction 日志（logging）分两种：
+ 诊断日志（diagnostic log）：即log4j、glog、log4cxx等常用日志库提供的日志功能 交易日志（transaction log）：即数据库的 write-ahead log、文件系统的journaling等，用于记录状态变更，通过 replay log 可以逐步恢复每一次修改之后的状态。  LevelDb 中的 log 是后者，主要作用是系统故障时进行数据恢复。**利用 WAL（write-ahead log），当故障时 Memtable 中的数据没来得及 Dump 成 SSTable 文件，LevelDB 可根据 log 文件恢复内存数据，保持数据（data和metadata）的持久性。
+Format log record 以 block 为单位组织（32k）。写日志时，一致性考虑，并没有以 block 为单位写，而是每次更新均对 log 文件进行 IO，根据 WriteOption::sync 决定是否做强制 sync。读取时以 block 为单位做 IO 以及校验。log 的写入是顺序写，读取只会在启动时发生，不会是性能的瓶颈。
+Log entry header 包含三个字段，checksum 是对“类型”和“数据”字段的校验码，为了避免处理不完整或者是被破坏的数据，当 leveldb 读取记录数据时候会对数据进行校验，如果 checksum 相同则说明数据完整无破坏，可以继续后续流程。length 表示 payload 长度，type 字段则指出了每条 log record 和 log block 之间的结构关系，主要有五种类型：ZERO/FULL/FIRST/MIDDLE/LAST，具体结构关系如上图所示。</description>
     </item>
     
     <item>
       <title>Leveldb: Block Cache</title>
-      <link>http://example.com/post/leveldb-cache/</link>
+      <link>https://wiesen.github.io/post/leveldb-cache/</link>
       <pubDate>Wed, 25 Jan 2017 21:31:20 +0800</pubDate>
       
-      <guid>http://example.com/post/leveldb-cache/</guid>
+      <guid>https://wiesen.github.io/post/leveldb-cache/</guid>
       <description>Block Cache (util/cache.cc)：
  Introduction
 Cache 的目的：减少磁盘IO，加快 CURD 速度。
@@ -40,25 +41,23 @@ leveldb 中支持用户自己实现 block cache 逻辑，作为 option 传入。
     
     <item>
       <title>Leveldb: Storage MemTable</title>
-      <link>http://example.com/post/leveldb-storage-memtable/</link>
+      <link>https://wiesen.github.io/post/leveldb-storage-memtable/</link>
       <pubDate>Tue, 20 Dec 2016 21:31:20 +0800</pubDate>
       
-      <guid>http://example.com/post/leveldb-storage-memtable/</guid>
+      <guid>https://wiesen.github.io/post/leveldb-storage-memtable/</guid>
       <description>Leveldb 存储主要分为 SSTable（磁盘） 和 MemTable（内存，包括 MemTable 和 Immutable MemTable），此外还有一些辅助文件:Manifest, Log, Current。
 本篇 blog 主要分析 Memtable：Leveldb一条记录在内存中的形式是什么，记录以怎样的方式被组织。
-Memtable (db/skiplist.h,db/memtable.h &amp;amp; memtable.cc)   Introduction
-MemTable 是 leveldb 的 kv 数据在内存中的存储结构。当 Memtable 写入的数据占用内存到达指定大小 (Options.write_buffer_size)，则自动转换为 Immutable Memtable（只读），同时生成新的 Memtable 供写操作写入新数据。后台的 compact 进程会负责将 immutable memtable dump to disk 生成 sstable。
+Memtable (db/skiplist.h,db/memtable.h &amp;amp; memtable.cc)  Introduction MemTable 是 leveldb 的 kv 数据在内存中的存储结构。当 Memtable 写入的数据占用内存到达指定大小 (Options.write_buffer_size)，则自动转换为 Immutable Memtable（只读），同时生成新的 Memtable 供写操作写入新数据。后台的 compact 进程会负责将 immutable memtable dump to disk 生成 sstable。
 通过 Memtable 和 Immutable Memtable，Leveldb 可在持久化到磁盘上的同时保持对外服务可用。这种特性是由 Leveldb 的适用场景催生的：Append 写。
- Structure &amp;amp; Operation
-memtable key 的组成参照 Leveldb: Basic Settings。memtable 存储同一 key 的多个版本的数据。KeyComparator 首先按照递增顺序比较 user key，然后安装递减顺序比较sequence number，这两个足以唯一确定一条 entry。</description>
+Structure &amp;amp; Operation memtable key 的组成参照 Leveldb: Basic Settings。memtable 存储同一 key 的多个版本的数据。KeyComparator 首先按照递增顺序比较 user key，然后安装递减顺序比较sequence number，这两个足以唯一确定一条 entry。</description>
     </item>
     
     <item>
       <title>Leveldb: Basic Settings</title>
-      <link>http://example.com/post/leveldb-basic-concept/</link>
+      <link>https://wiesen.github.io/post/leveldb-basic-concept/</link>
       <pubDate>Mon, 19 Dec 2016 21:31:20 +0800</pubDate>
       
-      <guid>http://example.com/post/leveldb-basic-concept/</guid>
+      <guid>https://wiesen.github.io/post/leveldb-basic-concept/</guid>
       <description>（待完善……）
  Slice(include/leveldb/slice.h)
 为操作数据的方便，将数据和长度包装成 Slice 使用，直接操控指针以避免不必要的数据拷贝
@@ -76,10 +75,10 @@ enum ValueType { kTypeDeletion = 0x0, kTypeValue = 0x1 };  SequenceNumber(db/dbf
     
     <item>
       <title>Leveldb: Introduction</title>
-      <link>http://example.com/post/leveldb-introduction/</link>
+      <link>https://wiesen.github.io/post/leveldb-introduction/</link>
       <pubDate>Mon, 28 Nov 2016 21:31:20 +0800</pubDate>
       
-      <guid>http://example.com/post/leveldb-introduction/</guid>
+      <guid>https://wiesen.github.io/post/leveldb-introduction/</guid>
       <description>看了不少 blog 分析 leveldb，但很少看到有人从设计原因和策略上进行总结。所以这个系列对 leveldb 的实现做一点设计分析，争取将内部实现逻辑串联起来，至于源码注释之类的网上一扒拉就有很多啦。
 Introduction Leveldb 库提供持久层 kv 存储，其中 keys 和values 可以是任意字节数组。目前有 C++，golang 的实现。
 作者 Jeff Dean, Sanjay Ghemawat 同时也是设计实现 BigTable 的作者。在 BigTable 中有两个关键部分：master server 和 tablet server。
@@ -92,10 +91,10 @@ Background 冯诺依曼体系结构的计算机系统主要为两点：存储 + 
     
     <item>
       <title>I/O Event Handling Design Patterns</title>
-      <link>http://example.com/post/io-event-handling-design-patterns/</link>
+      <link>https://wiesen.github.io/post/io-event-handling-design-patterns/</link>
       <pubDate>Thu, 24 Nov 2016 21:31:20 +0800</pubDate>
       
-      <guid>http://example.com/post/io-event-handling-design-patterns/</guid>
+      <guid>https://wiesen.github.io/post/io-event-handling-design-patterns/</guid>
       <description>Introduction System I/O can be blocking, or non-blocking synchronous, or non-blocking asynchronous:
  Blocking I/O means that the calling system does not return control to the caller until the operation is finished a non-blocking synchronous call returns control to the caller immediately  I/O multiplexing mechanisms rely on an event demultiplexor: dispatches I/O events from a limited number of sources to the appropriate read/write event handlers.
 There are two non-blocking I/O multiplexing mechanisms: reactor &amp;amp;&amp;amp; proactor.</description>
@@ -103,10 +102,10 @@ There are two non-blocking I/O multiplexing mechanisms: reactor &amp;amp;&amp;am
     
     <item>
       <title>TCP粘包问题：分包</title>
-      <link>http://example.com/post/tcp%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/</link>
+      <link>https://wiesen.github.io/post/tcp%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/</link>
       <pubDate>Wed, 26 Oct 2016 10:32:46 +0800</pubDate>
       
-      <guid>http://example.com/post/tcp%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/</guid>
+      <guid>https://wiesen.github.io/post/tcp%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/</guid>
       <description>Update 2017-01-17 From Muduo：
 TCP 是“字节流”协议，其本身没有“消息包”的概念，因此“粘包问题”是个伪命题。但对利用 TCP 进行通信的应用层程序来说，分包是其基本需求。
 分包指的是在发送一个消息（message）或者一帧（frame）数据时，通过一定的处理，令接收方能从字节流中识别并截取（还原）出一个个消息包。
@@ -124,10 +123,10 @@ TCP 是“字节流”协议，其本身没有“消息包”的概念，因此�
     
     <item>
       <title>Solution to Raspberry Pi ROS rivz Core Dumped</title>
-      <link>http://example.com/post/solution-to-raspberry-pi-ros-rivz-segmentation-fault/</link>
+      <link>https://wiesen.github.io/post/solution-to-raspberry-pi-ros-rivz-segmentation-fault/</link>
       <pubDate>Sun, 18 Sep 2016 17:32:46 +0800</pubDate>
       
-      <guid>http://example.com/post/solution-to-raspberry-pi-ros-rivz-segmentation-fault/</guid>
+      <guid>https://wiesen.github.io/post/solution-to-raspberry-pi-ros-rivz-segmentation-fault/</guid>
       <description>Recently I installed ROS on Raspberry Pi2 (both Jessie and Ubuntu 14.04) in order to implement SLAM algorithm on it. However when runs the rviz (rosrun rviz rviz) I get core dumped message.
 After searching I found the solution here. What I do is upgrade libpcre3 to 3_8.35 (upgrade collada-dom to 2.4.4 does not help). Here is the download link.
 I confirm that rviz now works properly on my Raspberry Pi2 running the official ubuntu 14.</description>
@@ -135,10 +134,10 @@ I confirm that rviz now works properly on my Raspberry Pi2 running the official 
     
     <item>
       <title>MIT 6.824: Lab 4 Sharded KeyValue Service Implementation</title>
-      <link>http://example.com/post/mit-6.824-lab4-sharded-keyvalue-service/</link>
+      <link>https://wiesen.github.io/post/mit-6.824-lab4-sharded-keyvalue-service/</link>
       <pubDate>Fri, 09 Sep 2016 17:32:46 +0800</pubDate>
       
-      <guid>http://example.com/post/mit-6.824-lab4-sharded-keyvalue-service/</guid>
+      <guid>https://wiesen.github.io/post/mit-6.824-lab4-sharded-keyvalue-service/</guid>
       <description>lab4 是基于 lab2 和 lab3 实现的 Raft Consensus Algorithm 之上实现 Sharded KeyValue Service。主要分为两部分：
  Part A：The Shard Master Part B: Sharded Key/Value Server  除了最后一个 challenge test case TestDelete() 以外，目前代码其余都可以 pass。但偶尔会 fail 在 unreliable test case，目前的定位是 raft 的实现还有点 bug。
 Code Link:
@@ -147,10 +146,10 @@ Code Link:
     
     <item>
       <title>Robotics: Estimation and learning</title>
-      <link>http://example.com/post/robotics-estimation-and-learning/</link>
+      <link>https://wiesen.github.io/post/robotics-estimation-and-learning/</link>
       <pubDate>Tue, 16 Aug 2016 17:32:46 +0800</pubDate>
       
-      <guid>http://example.com/post/robotics-estimation-and-learning/</guid>
+      <guid>https://wiesen.github.io/post/robotics-estimation-and-learning/</guid>
       <description>Course Link: One of the course of Robotics in Coursera from the University of Pennsylvania. It is helpful to learn the classical algorithm of robotics.
 Here are some course notes in Chinese collected from Zhihu. These notes introduce algorithm in a little more detial than course.
 However, the code in these notes has bug and even can not run normally, which are no worthy of learning. The code in my GitHub pass all homeworks.</description>
@@ -158,10 +157,10 @@ However, the code in these notes has bug and even can not run normally, which ar
     
     <item>
       <title>MIT 6.824: lab3 Fault-Tolerant Key/Value Service Implementation</title>
-      <link>http://example.com/post/mit-6.824-lab3-fault-tolerant-kvservice-implementation/</link>
+      <link>https://wiesen.github.io/post/mit-6.824-lab3-fault-tolerant-kvservice-implementation/</link>
       <pubDate>Sat, 06 Aug 2016 17:32:46 +0800</pubDate>
       
-      <guid>http://example.com/post/mit-6.824-lab3-fault-tolerant-kvservice-implementation/</guid>
+      <guid>https://wiesen.github.io/post/mit-6.824-lab3-fault-tolerant-kvservice-implementation/</guid>
       <description>lab3 是基于 lab2 实现的 Raft Consensus Algorithm 之上实现 KV Service。主要分为两部分：
  Part A：Key/value service without log compaction，即实现基本的分布式存储服务。 Part B: Key/value service with log compaction，即在 Part A 基础上实现 log compaction。  代码分别可以 pass 各个 test case，但所有一起跑时有时会卡在 TestPersistPartition() 这里，初步猜测是 raft 的实现还有点 bug。
 Code Link
@@ -172,10 +171,10 @@ key/value database 的 client API 必须满足以下要求：
     
     <item>
       <title>MIT 6.824: lab2 Raft Consensus Algorithm Implementation</title>
-      <link>http://example.com/post/mit-6.824-lab2-raft-consensus-algorithm-implementation/</link>
+      <link>https://wiesen.github.io/post/mit-6.824-lab2-raft-consensus-algorithm-implementation/</link>
       <pubDate>Fri, 10 Jun 2016 21:32:46 +0800</pubDate>
       
-      <guid>http://example.com/post/mit-6.824-lab2-raft-consensus-algorithm-implementation/</guid>
+      <guid>https://wiesen.github.io/post/mit-6.824-lab2-raft-consensus-algorithm-implementation/</guid>
       <description>Raft 将一致性问题分为了三个相对独立的子问题，分别是：
  Leader election：当前 leader 崩溃时，集群中必须选举出一个新的 leader； Log replication：leader 必须接受来自 clients 的 log entries，并且将其 replicate 到集群机器中，强制其余 logs 与其保持一致； Safety：Raft 中最关键的 safety property 是 State Machine Safety Property，亦即是，当任一机器 apply 了某一特定 log entry 到其 state machine 中，则其余服务器都不可能 apply 了一个 index 相同但 command 不同的 log。  差不多依据上述划分，6.824 中 Raft 的实现指导逻辑还是挺清晰的，其中 safety property 由 Leader election 和 Log replication 共同承担，并且将 Persistence 作为最后一部分。实现过程主要分为：
  Leader Election and Heartbeats：首先令 Raft 能够在不存在故障的情景下选举出一个 leader，并且稳定保持状态； Log Replication：其次令 Raft 能够保持一个 consistent 并且 replicated 的 log； Persistence：最后令 Raft 能够持久化保存 persistent state，这样在重启后可以进行恢复。  其中，本文主要参考 Raft paper，其中的 figure 2 作用很大。本文实现大量依赖 channel 实现消息传递和线程同步。</description>
@@ -183,10 +182,10 @@ key/value database 的 client API 必须满足以下要求：
     
     <item>
       <title>微软2016校招在线笔试题解</title>
-      <link>http://example.com/post/%E5%BE%AE%E8%BD%AF2016%E6%A0%A1%E6%8B%9B%E5%9C%A8%E7%BA%BF%E7%AC%94%E8%AF%95%E9%A2%98%E8%A7%A3/</link>
+      <link>https://wiesen.github.io/post/%E5%BE%AE%E8%BD%AF2016%E6%A0%A1%E6%8B%9B%E5%9C%A8%E7%BA%BF%E7%AC%94%E8%AF%95%E9%A2%98%E8%A7%A3/</link>
       <pubDate>Fri, 15 Apr 2016 21:31:33 +0800</pubDate>
       
-      <guid>http://example.com/post/%E5%BE%AE%E8%BD%AF2016%E6%A0%A1%E6%8B%9B%E5%9C%A8%E7%BA%BF%E7%AC%94%E8%AF%95%E9%A2%98%E8%A7%A3/</guid>
+      <guid>https://wiesen.github.io/post/%E5%BE%AE%E8%BD%AF2016%E6%A0%A1%E6%8B%9B%E5%9C%A8%E7%BA%BF%E7%AC%94%E8%AF%95%E9%A2%98%E8%A7%A3/</guid>
       <description>微软2016校招在线笔试题解 题目地址：mstest2016april1
 感受：一定要理解好题意，注意细节。另外微软特别喜欢考察反向思维。
 A. Font Size 选择一个最大字号刚好可以令页数不超过给定阈值P。
@@ -207,10 +206,10 @@ DP[i][j][right] = min{DP[i][j-1][right], DP[i-1][j][down] + (i + 1 &amp;lt; n &a
     
     <item>
       <title>Flat Datacenter Storage Paper Review</title>
-      <link>http://example.com/post/flat-datacenter-storage-paper-review/</link>
+      <link>https://wiesen.github.io/post/flat-datacenter-storage-paper-review/</link>
       <pubDate>Wed, 30 Mar 2016 21:33:37 +0800</pubDate>
       
-      <guid>http://example.com/post/flat-datacenter-storage-paper-review/</guid>
+      <guid>https://wiesen.github.io/post/flat-datacenter-storage-paper-review/</guid>
       <description>A review for paper Nightingale E B, Elson J, Fan J, et al. Flat datacenter storage[C]//Presented as part of the 10th USENIX Symposium on Operating Systems Design and Implementation (OSDI 12). 2012: 1-15.
 Introduction What is FDS?
  Flat Datacenter Storage (FDS) is a high-performance, fault-tolerant, large-scale, locality-oblivious blob store. Using a novel combination of full bisection bandwidth networks, data and metadata striping, and** flow control**, FDS multiplexes an application’s large-scale I/O across the available throughput and latency budget of every disk in a cluster.</description>
@@ -218,10 +217,10 @@ Introduction What is FDS?
     
     <item>
       <title>Chain Replication Paper Review</title>
-      <link>http://example.com/post/chain-replication-paper-review/</link>
+      <link>https://wiesen.github.io/post/chain-replication-paper-review/</link>
       <pubDate>Sat, 19 Mar 2016 21:33:09 +0800</pubDate>
       
-      <guid>http://example.com/post/chain-replication-paper-review/</guid>
+      <guid>https://wiesen.github.io/post/chain-replication-paper-review/</guid>
       <description>本文是读完 Van Renesse R, Schneider F B. Chain Replication for Supporting High Throughput and Availability[C]//OSDI. 2004. 的总结。
 Summary Chain replication is a new approach to coordinating clusters of fail-stop storage servers.
 Chain replication 采用 ROWAA (read one, write all available) 方法, 具有良好的 Scalability.
@@ -232,10 +231,10 @@ The storage service 为每个 request 生成 reply 发送会 client 告知其已
     
     <item>
       <title>快速排序笔记</title>
-      <link>http://example.com/post/%E5%BF%AB%E9%80%9F%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/</link>
+      <link>https://wiesen.github.io/post/%E5%BF%AB%E9%80%9F%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/</link>
       <pubDate>Tue, 15 Mar 2016 21:31:20 +0800</pubDate>
       
-      <guid>http://example.com/post/%E5%BF%AB%E9%80%9F%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/</guid>
+      <guid>https://wiesen.github.io/post/%E5%BF%AB%E9%80%9F%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/</guid>
       <description>快排最引人注目的特点是原地排序（只需要一个很小的辅助栈），且将长度为 N 的数组排序所需的时间和 NlgN 成正比。 而快排的主要缺点是非常脆弱，在实现时必须非常小心才能避免性能低下。
 同前述一致：以 C++ 实现,仅针对 vector 进行操作, 并且遵循 C++ 左闭右开的区间标准: [a,b)。
 基本算法 快排也是一种分治的排序算法，快排与归并排序是互补的：
@@ -247,10 +246,10 @@ int Partition(std::vector&amp;lt;T&amp;gt; &amp;amp;vec, int low, int high) { in
     
     <item>
       <title>归并排序笔记</title>
-      <link>http://example.com/post/%E5%BD%92%E5%B9%B6%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/</link>
+      <link>https://wiesen.github.io/post/%E5%BD%92%E5%B9%B6%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/</link>
       <pubDate>Thu, 10 Mar 2016 21:24:46 +0800</pubDate>
       
-      <guid>http://example.com/post/%E5%BD%92%E5%B9%B6%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/</guid>
+      <guid>https://wiesen.github.io/post/%E5%BD%92%E5%B9%B6%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/</guid>
       <description>归并排序是一种渐近最优的基于比较排序的算法, 意即: 其在最坏情况下的比较次数和任意基于比较的排序算法所需的最少比较次数都是~NlgN。其主要的优点是可以保证将任意长度为 N 的数组排序的时间复杂度为 O(NlgN); 其主要缺点是空间复杂度为 O(N)。
 这里均以 C++ 实现, 为了避免陷入到语言细节里所以仅针对 vector 进行操作, 并且遵循 C++ 左闭右开的区间标准: [a,b)。值得注意的是区间表示一致性这个细节对针对数组和搜索(如二分查找)的算法有着举足轻重的影响。
 至于倾向于 [a,b) 左闭右开区间表示的原因可参考链接。简单来说主要原因有二: 一是 end-begin 即可得到区间大小; 二是当区间退化为 0 时包含左界更加&amp;rdquo;natural&amp;rdquo;。

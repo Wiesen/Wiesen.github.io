@@ -40,7 +40,7 @@
 
     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
 
-     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/go.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/haskell.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/kotlin.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c&#43;&#43;.min.js"></script> 
+     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/go.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/java.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/python.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c&#43;&#43;.min.js"></script> 
 
     <script>hljs.initHighlightingOnLoad();</script>
 
@@ -105,15 +105,9 @@
                     
                         <ul class="nav navbar-nav navbar-right">
                             
-                                <li class="navbar-icon"><a href="mailto:me@example.com"><i class="fa fa-envelope-o"></i></a></li>
+                                <li class="navbar-icon"><a href="mailto:yangwj92@gmail.com"><i class="fa fa-envelope-o"></i></a></li>
                             
-                                <li class="navbar-icon"><a href="https://github.com/username/"><i class="fa fa-github"></i></a></li>
-                            
-                                <li class="navbar-icon"><a href="https://twitter.com/username/"><i class="fa fa-twitter"></i></a></li>
-                            
-                                <li class="navbar-icon"><a href="https://www.linkedin.com/in/username/"><i class="fa fa-linkedin"></i></a></li>
-                            
-                                <li class="navbar-icon"><a href="https://www.stackoverflow.com/username/"><i class="fa fa-stack-overflow"></i></a></li>
+                                <li class="navbar-icon"><a href="https://github.com/Wiesen/"><i class="fa fa-github"></i></a></li>
                             
                         </ul>
                     
@@ -138,7 +132,7 @@
 
     <h4><a href="/post/leveldb-storage-memtable/">Leveldb: Storage MemTable</a></h4>
     <h5>December 20, 2016</h5>
-    
+     <kbd class="item-tag">Database</kbd>  <kbd class="item-tag">Leveldb</kbd> 
 
 </div>
 
@@ -155,14 +149,13 @@
 <img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb-architecture.png" width="500"/>
 </div>
 
-<ol>
-<li><p>Introduction</p>
+<h3 id="introduction">Introduction</h3>
 
 <p>MemTable 是 leveldb 的 kv 数据在内存中的存储结构。当 Memtable 写入的数据占用内存到达指定大小 (Options.write_buffer_size)，则自动转换为 Immutable Memtable（只读），同时生成新的 Memtable 供写操作写入新数据。后台的 compact 进程会负责将 immutable memtable dump to disk 生成 sstable。</p>
 
-<p>通过 Memtable 和 Immutable Memtable，Leveldb 可在持久化到磁盘上的同时保持对外服务可用。这种特性是由 Leveldb 的适用场景催生的：Append 写。</p></li>
+<p>通过 Memtable 和 Immutable Memtable，Leveldb 可在持久化到磁盘上的同时保持对外服务可用。这种特性是由 Leveldb 的适用场景催生的：Append 写。</p>
 
-<li><p>Structure &amp; Operation</p>
+<h3 id="structure-operation">Structure &amp; Operation</h3>
 
 <p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_memtable_key.png" alt="leveldb memtable key" /></p>
 
@@ -170,9 +163,9 @@
 
 <p>MemTable 提供内存中 KV entry 的 Add 和 Get 操作接口。 Memtable 实际上并不存在 Delete 操作，删除某个 Key 的 Value 在 Memtable 内是作为插入一条记录实施的，但是会打上一个 Key 的删除标记，真正的删除操作是 Lazy 的，会在以后的 Compaction 过程中删除这个 KV。</p>
 
-<p>Memtable 类只是一个接口类，其底层实现依赖于两大核心组件 Arena 和 SkipList。其中 Arena 内存分配器统一管理内存，SkipList 用于实际 KV 存储（Memtable 的所有数据操作接口都是对 SkipList 的封装）。</p></li>
+<p>Memtable 类只是一个接口类，其底层实现依赖于两大核心组件 Arena 和 SkipList。其中 Arena 内存分配器统一管理内存，SkipList 用于实际 KV 存储（Memtable 的所有数据操作接口都是对 SkipList 的封装）。</p>
 
-<li><p>Component</p>
+<h3 id="component">Component</h3>
 
 <ol>
 <li><p>Arena： memtable 内存管理</p>
@@ -186,14 +179,16 @@
 
 <li><p>由Arena的析构函数统一释放所有的内存：和 leveldb 特定的应用场景相关的，比如一个memtable使用一个Arena，当memtable被释放时，由Arena统一释放其内存，不需要额外提供内存释放接口。</p></li>
 
-<li><p>Arena 类内存管理方法：</p></li>
+<li><p>Arena 类内存管理方法：</p>
 
+<ol>
 <li><p>采用 vector 来存储每次分配的内存，每一次分配的内存为一个块（block），block默认大小为4096kb；</p></li>
 
 <li><p>当达到阈值时将 dump to disk，完成后由析构函数完成所有内存的一次性释放，由于业务的特殊性因此无需提供内存释放的接口</p></li>
 </ol>
 
 <p><img src="http://7vij5d.com1.z0.glb.clouddn.com/arena.png" alt="arena" />)</p></li>
+</ol></li>
 
 <li><p>SkipList：memtable 的实际数据结构</p>
 
@@ -201,19 +196,22 @@
 <li>根据上一篇 blog 中 LSM tree 的性质，table 应当保持有序性。而对一个排序结构执行插入操作开销很大（随机写），通常性能瓶颈集中在这里。一些数据结构如链表, AVL 树, B 树, skiplist 等都加速了随机写。leveldb 的 memtable 实现没有使用复杂的 B 树，采用更轻量级的 <a href="https://en.wikipedia.org/wiki/Skip_list">skiplist</a>。</li>
 <li>skiplist 是一种可以代替平衡树的数据结构：skiplist 从概率上保证数据平衡（依赖于系统设计时的随机假设），结构和实现比平衡树简单。概率上时间复杂度近似 O(logN)，与平衡树相同，但空间上比较节省，一个节点平均只需要 1.333 个指针。</li>
 <li>skiplist 拥有比平衡树更好的并发性能：平衡树在更新时可能会触发 rebalancing，改操作牵涉到大量节点，争锁的代价相对较高。而 skiplist 的操作需要更新的部分比较少，加锁的粒度和数量都更少，所以不同线程争锁的代价相对较低</li>
-<li>Leveldb 中，Skiplist 中的操作不需要任何锁或者 node 的引用计数，利用内存屏障来进行线程同步，原因主要为以下两个：</li>
+<li>Leveldb 中，Skiplist 中的操作不需要任何锁或者 node 的引用计数，利用内存屏障来进行线程同步，原因主要为以下两个：
+
+<ol>
 <li>Skiplist 中 node 内保存的是 InternalKey 与对应 value 组成的数据，SequenceNumber 的全局唯一保证了不会有相同的 node 出现，因此保证了不会有node更新的情况.</li>
 <li>delete 操作等同于 put 操作，因此不会需要引用计数记录 node 的生存周期。</li>
 </ol></li>
 </ol></li>
+</ol>
 
-<li><p>Declaration</p>
+<h3 id="declaration">Declaration</h3>
 
 <p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_memtable.png" alt="memtable" /></p>
 
-<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_skiplist.png" alt="skiplist" /></p></li>
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_skiplist.png" alt="skiplist" /></p>
 
-<li><p>Coding &amp; Function Analysis</p>
+<h3 id="coding-function-analysis">Coding &amp; Function Analysis</h3>
 
 <p>构造和析构：MemTable 的对象构造必须显式调用，重点在于初始 Arena 和 SkipList 两大核心组件。MemTable class 由 <code>Unref()</code> 完成实际的内存释放操作，因此 Leveldb 中禁用了 copy ctor 和 assignment operator（C++ class基本功，正确管理内存和其他资源）。</p>
 
@@ -237,10 +235,9 @@
 </ol></li>
 
 <li><p>没有删除：前面说过，memtable 的 delete 是 lazy 的，实际上是 add 一条 <code>ValueType</code> 为 <code>kTypeDeletion</code> 的记录。</p></li>
-</ol></li>
 </ol>
 
-<h2 id="reference">Reference</h2>
+<h3 id="reference">Reference</h3>
 
 <ol>
 <li><a href="http://blog.csdn.net/sparkliang/article/details/8567602">Leveldb 源码分析 &ndash;1</a></li>
@@ -253,6 +250,54 @@
 
     
     
+
+    
+
+        <h4 class="page-header">Related</h4>
+
+         <div class="item">
+
+    
+    
+    
+
+    
+    
+
+    <h4><a href="/post/leveldb-storage-log/">Leveldb: Log</a></h4>
+    <h5>January 28, 2017</h5>
+     <kbd class="item-tag">Database</kbd>  <kbd class="item-tag">Leveldb</kbd> 
+
+</div>
+  <div class="item">
+
+    
+    
+    
+
+    
+    
+
+    <h4><a href="/post/leveldb-cache/">Leveldb: Block Cache</a></h4>
+    <h5>January 25, 2017</h5>
+     <kbd class="item-tag">Database</kbd>  <kbd class="item-tag">Leveldb</kbd> 
+
+</div>
+  <div class="item">
+
+    
+    
+    
+
+    
+    
+
+    <h4><a href="/post/leveldb-basic-concept/">Leveldb: Basic Settings</a></h4>
+    <h5>December 19, 2016</h5>
+     <kbd class="item-tag">Database</kbd>  <kbd class="item-tag">Leveldb</kbd> 
+
+</div>
+ 
 
     
 
@@ -273,7 +318,7 @@
             return;
         }
         var d = document, s = d.createElement('script'); s.async = true;
-        s.src = '//' + "username" + '.disqus.com/embed.js';
+        s.src = '//' + "Wiesen" + '.disqus.com/embed.js';
         s.setAttribute('data-timestamp', +new Date());
         (d.head || d.body).appendChild(s);
     })();
