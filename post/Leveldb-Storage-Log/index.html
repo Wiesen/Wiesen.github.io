@@ -40,7 +40,7 @@
 
     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
 
-     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/go.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/haskell.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/kotlin.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c&#43;&#43;.min.js"></script> 
+     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/go.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/java.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/python.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c&#43;&#43;.min.js"></script> 
 
     <script>hljs.initHighlightingOnLoad();</script>
 
@@ -105,15 +105,9 @@
                     
                         <ul class="nav navbar-nav navbar-right">
                             
-                                <li class="navbar-icon"><a href="mailto:me@example.com"><i class="fa fa-envelope-o"></i></a></li>
+                                <li class="navbar-icon"><a href="mailto:yangwj92@gmail.com"><i class="fa fa-envelope-o"></i></a></li>
                             
-                                <li class="navbar-icon"><a href="https://github.com/username/"><i class="fa fa-github"></i></a></li>
-                            
-                                <li class="navbar-icon"><a href="https://twitter.com/username/"><i class="fa fa-twitter"></i></a></li>
-                            
-                                <li class="navbar-icon"><a href="https://www.linkedin.com/in/username/"><i class="fa fa-linkedin"></i></a></li>
-                            
-                                <li class="navbar-icon"><a href="https://www.stackoverflow.com/username/"><i class="fa fa-stack-overflow"></i></a></li>
+                                <li class="navbar-icon"><a href="https://github.com/Wiesen/"><i class="fa fa-github"></i></a></li>
                             
                         </ul>
                     
@@ -138,7 +132,7 @@
 
     <h4><a href="/post/leveldb-storage-log/">Leveldb: Log</a></h4>
     <h5>January 28, 2017</h5>
-    
+     <kbd class="item-tag">Database</kbd>  <kbd class="item-tag">Leveldb</kbd> 
 
 </div>
 
@@ -149,13 +143,11 @@
 
 <p>本篇 blog 主要分析 Log：log 在 Leveldb 中的作用，一条log 在内存中的形式是什么，以怎样的方式被组织。</p>
 
-<h2 id="log-db-log-format-h-cc-db-log-writer-h-cc-db-log-reader-h-cc">Log：(<code>db/log_format.h&amp;cc</code>,<code>db/log_writer.h&amp;.cc</code>,<code>db/log_reader.h&amp;.cc</code>)</h2>
+<h2 id="log-db-log-format-h-cc-db-log-writer-h-cc-db-log-reader-h-cc">Log (<code>db/log_format.h&amp;cc</code>,<code>db/log_writer.h&amp;.cc</code>,<code>db/log_reader.h&amp;.cc</code>)</h2>
 
 <p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_log_commit.png" alt="log commit" /></p>
 
-<ol>
-<li>Introduction</li>
-</ol>
+<h3 id="introduction">Introduction</h3>
 
 <p>日志（logging）分两种：</p>
 
@@ -164,11 +156,9 @@
 <li>交易日志（transaction log）：即<strong>数据库的 write-ahead log</strong>、文件系统的journaling等，用于记录状态变更，通过 replay log 可以逐步恢复每一次修改之后的状态。</li>
 </ol>
 
-<p>LevelDb 中的 log 是后者，主要作用是系统故障时进行数据恢复。<strong>利用 WAL（write-ahead log），当故障时 Memtable 中的数据没来得及 Dump 成 SSTable 文件，LevelDB 可根据 log 文件恢复内存数据，保持数据（data和metadata）的持久性。</strong></p>
+<p>LevelDb 中的 log 是后者，主要作用是系统故障时进行数据恢复。**利用 WAL（write-ahead log），当故障时 Memtable 中的数据没来得及 Dump 成 SSTable 文件，LevelDB 可根据 log 文件恢复内存数据，保持数据（data和metadata）的持久性。</p>
 
-<ol>
-<li><a href="http://www.cnblogs.com/cobbliu/p/6243550.html">Format</a></li>
-</ol>
+<h3 id="format-http-www-cnblogs-com-cobbliu-p-6243550-html"><a href="http://www.cnblogs.com/cobbliu/p/6243550.html">Format</a></h3>
 
 <p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_log.png" alt="log format" /></p>
 
@@ -182,20 +172,16 @@
 
 <p>Leveldb 采用 write batch 来优化并发写。对每一个写操作，先通过传入的键值对构造一个 WriteBatch 对象。多个并发写的 write batch 最后会被合并成一个，再写入 log 和 memtable。</p>
 
-<ol>
-<li>Declaration</li>
-</ol>
+<h3 id="declaration">Declaration</h3>
 
 <p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_log_reader.png" alt="log reader" /></p>
 
 <p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_log_writer.png" alt="log writer" /></p>
 
-<ol>
-<li><p>Analysis</p>
+<h3 id="analysis">Analysis</h3>
 
 <ol>
-<li>写入 （<code>Writer::AddRecord() log_writer.cc</code>）</li>
-</ol>
+<li><p>写入 （<code>Writer::AddRecord() log_writer.cc</code>）</p>
 
 <p>对 log 的每次写入作为 record 添加：</p>
 
@@ -204,11 +190,10 @@
 <li>根据当前 block 剩余的 size 和写入 size，划分出满足写入的最大 record，确定 record type。</li>
 <li>写入 record（Writer::EmitPhysicalRecord()）</li>
 <li>循环1-3,直至写入处理完成</li>
+<li>根据 option 指定的 sync 决定是否做 log 文件的强制 sync</li>
+</ol></li>
 
-<li><p>根据 option 指定的 sync 决定是否做 log 文件的强制 sync</p></li>
-
-<li><p>读取（<code>Reader::ReadRecord() db/log_reader.cc</code>）</p></li>
-</ol>
+<li><p>读取（<code>Reader::ReadRecord() db/log_reader.cc</code>）</p>
 
 <p>log 的读取仅发生在 db 启动的时候，每次读取出当时写入的一次完整更新：</p>
 
@@ -220,7 +205,7 @@
 </ol></li>
 </ol>
 
-<h2 id="reference">Reference</h2>
+<h3 id="reference">Reference</h3>
 
 <ol>
 <li><a href="http://luodw.cc/2015/10/18/leveldb-08/">leveldb源码分析之读写log文件</a></li>
@@ -232,6 +217,54 @@
 
     
     
+
+    
+
+        <h4 class="page-header">Related</h4>
+
+         <div class="item">
+
+    
+    
+    
+
+    
+    
+
+    <h4><a href="/post/leveldb-cache/">Leveldb: Block Cache</a></h4>
+    <h5>January 25, 2017</h5>
+     <kbd class="item-tag">Database</kbd>  <kbd class="item-tag">Leveldb</kbd> 
+
+</div>
+  <div class="item">
+
+    
+    
+    
+
+    
+    
+
+    <h4><a href="/post/leveldb-storage-memtable/">Leveldb: Storage MemTable</a></h4>
+    <h5>December 20, 2016</h5>
+     <kbd class="item-tag">Database</kbd>  <kbd class="item-tag">Leveldb</kbd> 
+
+</div>
+  <div class="item">
+
+    
+    
+    
+
+    
+    
+
+    <h4><a href="/post/leveldb-basic-concept/">Leveldb: Basic Settings</a></h4>
+    <h5>December 19, 2016</h5>
+     <kbd class="item-tag">Database</kbd>  <kbd class="item-tag">Leveldb</kbd> 
+
+</div>
+ 
 
     
 
@@ -252,7 +285,7 @@
             return;
         }
         var d = document, s = d.createElement('script'); s.async = true;
-        s.src = '//' + "username" + '.disqus.com/embed.js';
+        s.src = '//' + "Wiesen" + '.disqus.com/embed.js';
         s.setAttribute('data-timestamp', +new Date());
         (d.head || d.body).appendChild(s);
     })();
