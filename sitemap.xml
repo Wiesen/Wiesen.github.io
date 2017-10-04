@@ -3,157 +3,157 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   
   <url>
-    <loc>http://wiesen.github.io/post/leveldb-storage-log/</loc>
+    <loc>https://wiesen.github.io/post/leveldb-storage-log/</loc>
     <lastmod>2017-01-28T21:31:20+08:00</lastmod>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/post/leveldb-cache/</loc>
+    <loc>https://wiesen.github.io/post/leveldb-cache/</loc>
     <lastmod>2017-01-25T21:31:20+08:00</lastmod>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/post/leveldb-storage-memtable/</loc>
+    <loc>https://wiesen.github.io/post/leveldb-storage-memtable/</loc>
     <lastmod>2016-12-20T21:31:20+08:00</lastmod>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/post/leveldb-basic-concept/</loc>
+    <loc>https://wiesen.github.io/post/leveldb-basic-concept/</loc>
     <lastmod>2016-12-19T21:31:20+08:00</lastmod>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/post/leveldb-introduction/</loc>
+    <loc>https://wiesen.github.io/post/leveldb-introduction/</loc>
     <lastmod>2016-11-28T21:31:20+08:00</lastmod>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/post/io-event-handling-design-patterns/</loc>
+    <loc>https://wiesen.github.io/post/io-event-handling-design-patterns/</loc>
     <lastmod>2016-11-24T21:31:20+08:00</lastmod>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/post/tcp%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/</loc>
+    <loc>https://wiesen.github.io/post/tcp%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/</loc>
     <lastmod>2016-10-26T10:32:46+08:00</lastmod>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/post/solution-to-raspberry-pi-ros-rivz-segmentation-fault/</loc>
+    <loc>https://wiesen.github.io/post/solution-to-raspberry-pi-ros-rivz-segmentation-fault/</loc>
     <lastmod>2016-09-18T17:32:46+08:00</lastmod>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/post/mit-6.824-lab4-sharded-keyvalue-service/</loc>
+    <loc>https://wiesen.github.io/post/mit-6.824-lab4-sharded-keyvalue-service/</loc>
     <lastmod>2016-09-09T17:32:46+08:00</lastmod>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/post/robotics-estimation-and-learning/</loc>
+    <loc>https://wiesen.github.io/post/robotics-estimation-and-learning/</loc>
     <lastmod>2016-08-16T17:32:46+08:00</lastmod>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/post/mit-6.824-lab3-fault-tolerant-kvservice-implementation/</loc>
+    <loc>https://wiesen.github.io/post/mit-6.824-lab3-fault-tolerant-kvservice-implementation/</loc>
     <lastmod>2016-08-06T17:32:46+08:00</lastmod>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/post/mit-6.824-lab2-raft-consensus-algorithm-implementation/</loc>
+    <loc>https://wiesen.github.io/post/mit-6.824-lab2-raft-consensus-algorithm-implementation/</loc>
     <lastmod>2016-06-10T21:32:46+08:00</lastmod>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/post/%E5%BE%AE%E8%BD%AF2016%E6%A0%A1%E6%8B%9B%E5%9C%A8%E7%BA%BF%E7%AC%94%E8%AF%95%E9%A2%98%E8%A7%A3/</loc>
+    <loc>https://wiesen.github.io/post/%E5%BE%AE%E8%BD%AF2016%E6%A0%A1%E6%8B%9B%E5%9C%A8%E7%BA%BF%E7%AC%94%E8%AF%95%E9%A2%98%E8%A7%A3/</loc>
     <lastmod>2016-04-15T21:31:33+08:00</lastmod>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/post/flat-datacenter-storage-paper-review/</loc>
+    <loc>https://wiesen.github.io/post/flat-datacenter-storage-paper-review/</loc>
     <lastmod>2016-03-30T21:33:37+08:00</lastmod>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/post/chain-replication-paper-review/</loc>
+    <loc>https://wiesen.github.io/post/chain-replication-paper-review/</loc>
     <lastmod>2016-03-19T21:33:09+08:00</lastmod>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/post/%E5%BF%AB%E9%80%9F%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/</loc>
+    <loc>https://wiesen.github.io/post/%E5%BF%AB%E9%80%9F%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/</loc>
     <lastmod>2016-03-15T21:31:20+08:00</lastmod>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/post/%E5%BD%92%E5%B9%B6%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/</loc>
+    <loc>https://wiesen.github.io/post/%E5%BD%92%E5%B9%B6%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/</loc>
     <lastmod>2016-03-10T21:24:46+08:00</lastmod>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/tags/algorithm/</loc>
+    <loc>https://wiesen.github.io/tags/algorithm/</loc>
     <lastmod>2016-04-15T21:31:33+08:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/categories/</loc>
+    <loc>https://wiesen.github.io/categories/</loc>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/tags/database/</loc>
+    <loc>https://wiesen.github.io/tags/database/</loc>
     <lastmod>2017-01-28T21:31:20+08:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/tags/distributed-system/</loc>
+    <loc>https://wiesen.github.io/tags/distributed-system/</loc>
     <lastmod>2016-09-09T17:32:46+08:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/tags/high-performance-server/</loc>
+    <loc>https://wiesen.github.io/tags/high-performance-server/</loc>
     <lastmod>2016-11-24T21:31:20+08:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/tags/leveldb/</loc>
+    <loc>https://wiesen.github.io/tags/leveldb/</loc>
     <lastmod>2017-01-28T21:31:20+08:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/tags/mit-6.824/</loc>
+    <loc>https://wiesen.github.io/tags/mit-6.824/</loc>
     <lastmod>2016-09-09T17:32:46+08:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/tags/network/</loc>
+    <loc>https://wiesen.github.io/tags/network/</loc>
     <lastmod>2016-10-26T10:32:46+08:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/post/</loc>
+    <loc>https://wiesen.github.io/post/</loc>
     <lastmod>2017-01-28T21:31:20+08:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/tags/robotics/</loc>
+    <loc>https://wiesen.github.io/tags/robotics/</loc>
     <lastmod>2016-09-18T17:32:46+08:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/tags/</loc>
+    <loc>https://wiesen.github.io/tags/</loc>
     <lastmod>2016-04-15T21:31:33+08:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>http://wiesen.github.io/</loc>
+    <loc>https://wiesen.github.io/</loc>
     <lastmod>2017-01-28T21:31:20+08:00</lastmod>
     <priority>0</priority>
   </url>
