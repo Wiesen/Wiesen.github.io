@@ -1,284 +1,232 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-us">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Posts</title>
+        <style>
 
-<head>
-  <meta http-equiv="content-type" content="text/html; charset=utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="">
-  <meta name="generator" content="Hugo 0.18" />
+    html body {
+        font-family: Raleway, sans-serif;
+        background-color: white;
+    }
 
-  <title>Posts &middot; Wiesen&#39;s Blog</title>
+    :root {
+        --accent: red;
+        --border-width:  5px ;
+    }
 
-  
-  
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
-
-  <!--[if lte IE 8]>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
-  <![endif]-->
-  <!--[if gt IE 8]><!-->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
-  <!--<![endif]-->
-
-  <!--[if lte IE 8]>
-  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu-old-ie.css">
-  <![endif]-->
-  <!--[if gt IE 8]><!-->
-  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu.css">
-  <!--<![endif]-->
-
-  <link rel="stylesheet" href="http://wiesen.github.io/css/blackburn.css">
-
-  
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
-
-  
-  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
-
-  
-  
-  <link rel="alternate" type="application/rss+xml" title="Wiesen&#39;s Blog" href="http://wiesen.github.io/post/index.xml" />
-  
-
-  
-  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/monokai-sublime.min.css">
-  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
-  <script>hljs.initHighlightingOnLoad();</script>
-  
-
-  <link rel="shortcut icon" href="http://wiesen.github.io/img/favicon.ico" type="image/x-icon" />
-
-</head>
+</style>
 
 
-<body>
-<div id="layout">
-
-  
-<a href="#menu" id="menuLink" class="menu-link">
-  
-  <span></span>
-</a>
-<div id="menu">
-
-  
-  <a class="pure-menu-heading brand" href="http://wiesen.github.io/">Wiesen</a>
+<link rel="stylesheet" href="/css/main.css">
 
 
-  <div class="pure-menu">
-    <ul class="pure-menu-list">
-      
-      
-        <li class="pure-menu-item">
-          <a class="pure-menu-link" href="http://wiesen.github.io/"><i class='fa fa-home fa-fw'></i>Home</a>
-      
-        </li>
-      
-      
-        <li class="pure-menu-item">
-          <a class="pure-menu-link" href="http://wiesen.github.io/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
-      
-        </li>
-      
-      
-        <li class="pure-menu-item">
-          <a class="pure-menu-link" href="http://wiesen.github.io/topics/"><i class='fa fa-folder fa-fw'></i>Topics</a>
-      
-        </li>
-      
-      
-        <li class="pure-menu-item">
-          <a class="pure-menu-link" href="http://wiesen.github.io/about/"><i class='fa fa-user fa-fw'></i>About</a>
-      
-        </li>
-      
-      
-        <li class="pure-menu-item">
-          <a class="pure-menu-link" href="http://wiesen.github.io/contact/"><i class='fa fa-phone fa-fw'></i>Contact</a>
-      
-        </li>
-      
-    </ul>
-  </div>
 
-  <div class="pure-menu social">
-  <ul class="pure-menu-list">
 
-    
-    <li class="pure-menu-item">
-      <a class="pure-menu-link" href="http://wiesen.github.io/post/index.xml"><i class="fa fa-rss fa-fw"></i>RSS</a>
-    </li>
-    
 
-    
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
 
-    
 
-    
+ <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/solarized-dark.min.css"> 
 
-    
-    <li class="pure-menu-item">
-      <a class="pure-menu-link" href="https://facebook.com/100010837531785" target="_blank"><i class="fa fa-facebook-square fa-fw"></i>Facebook</a>
-    </li>
-    
 
-    
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
 
-    
 
-    
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+ 
 
-    
 
-    
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
 
-    
+     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/go.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/haskell.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/kotlin.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c&#43;&#43;.min.js"></script> 
 
-    
+    <script>hljs.initHighlightingOnLoad();</script>
+
+
+
+
+
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+
+<script>$(document).on('click', function() { $('.collapse').collapse('hide'); })</script>
+ <meta name="generator" content="Hugo 0.29" />
+        
+        <link href="http://example.com/post/index.xml" rel="alternate" type="application/rss+xml" title="Minimal" />
+        <link href="http://example.com/post/index.xml" rel="feed" type="application/rss+xml" title="Minimal" />
+        
+        
+        <script async src="https://www.googletagmanager.com/gtag/js?id="></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments)};
+          gtag('js', new Date());
+
+          gtag('config', '');
+        </script>
+    </head>
+
+    <body>
+
+        <nav class="navbar navbar-default navbar-fixed-top">
+
+            <div class="container">
+
+                <div class="navbar-header">
+
+                    <a class="navbar-brand visible-xs" href="#">Posts</a>
+
+                    <button class="navbar-toggle" data-target=".navbar-collapse" data-toggle="collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+
+                </div>
+
+                <div class="collapse navbar-collapse">
+
+                    
+                        <ul class="nav navbar-nav">
+                            
+                                <li><a href="/">Home</a></li>
+                            
+                                <li><a href="/post/">Posts</a></li>
+                            
+                                <li><a href="/project/">Projects</a></li>
+                            
+                        </ul>
+                    
+
+                    
+                        <ul class="nav navbar-nav navbar-right">
+                            
+                                <li class="navbar-icon"><a href="mailto:me@example.com"><i class="fa fa-envelope-o"></i></a></li>
+                            
+                                <li class="navbar-icon"><a href="https://github.com/username/"><i class="fa fa-github"></i></a></li>
+                            
+                                <li class="navbar-icon"><a href="https://twitter.com/username/"><i class="fa fa-twitter"></i></a></li>
+                            
+                                <li class="navbar-icon"><a href="https://www.linkedin.com/in/username/"><i class="fa fa-linkedin"></i></a></li>
+                            
+                                <li class="navbar-icon"><a href="https://www.stackoverflow.com/username/"><i class="fa fa-stack-overflow"></i></a></li>
+                            
+                        </ul>
+                    
+
+                </div>
+
+            </div>
+
+        </nav>
+
+
+<main>
+
+    <h2>Posts</h2>
+
+     <div class="item">
 
     
-
+    
     
 
     
+    
 
+    <h4><a href="/post/leveldb-storage-log/">Leveldb: Log</a></h4>
+    <h5>January 28, 2017</h5>
+    
+
+</div>
+  <div class="item">
+
+    
+    
     
 
     
+    
 
+    <h4><a href="/post/leveldb-cache/">Leveldb: Block Cache</a></h4>
+    <h5>January 25, 2017</h5>
+    
+
+</div>
+  <div class="item">
+
+    
+    
     
 
     
+    
 
+    <h4><a href="/post/leveldb-storage-memtable/">Leveldb: Storage MemTable</a></h4>
+    <h5>December 20, 2016</h5>
+    
+
+</div>
+  <div class="item">
+
+    
+    
     
 
     
+    
 
+    <h4><a href="/post/leveldb-basic-concept/">Leveldb: Basic Settings</a></h4>
+    <h5>December 19, 2016</h5>
+    
+
+</div>
+  <div class="item">
+
+    
+    
     
 
     
-    <li class="pure-menu-item">
-      <a class="pure-menu-link" href="https://github.com/Wiesen" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
-    </li>
     
 
+    <h4><a href="/post/leveldb-introduction/">Leveldb: Introduction</a></h4>
+    <h5>November 28, 2016</h5>
     
 
+</div>
+ 
+
+</main>
+
+
+
+<div class="pages">
+
+     
+    <a class="icon pages-icon" href="/post/page/2/" rel="next">
+        <i class="fa fa-arrow-right"></i>
+    </a>
     
 
-    
-
-    
-
-  </ul>
 </div>
 
 
-  <div>
-  <div class="small-print">
-    <small>&copy; 2016. All rights reserved.</small>
-  </div>
-  <div class="small-print">
-    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
-    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
-  </div>
-</div>
 
-</div>
+        <footer>
 
+            <p class="copyright text-muted">&copy; All rights reserved. Powered by <a href="https://gohugo.io">Hugo</a> and <a href="https://github.com/calintat/minimal">Minimal</a></p>
 
-  <div id="main">
+        </footer>
+       
+    </body>
 
-
-<div class="header">
-  <h1>Posts</h1>
-</div>
-<div class="content">
-  
-  <h2>2017</h2>
-  <ul>
-  
-    <li><time>28 Jan 2017, 21:31</time> - <a href="http://wiesen.github.io/post/Leveldb-Storage-Log/">Leveldb: Log</a></li>
-
-  
-    <li><time>25 Jan 2017, 21:31</time> - <a href="http://wiesen.github.io/post/Leveldb-Cache/">Leveldb: Block Cache</a></li>
-
-  
-    <li><time>20 Jan 2017, 21:31</time> - <a href="http://wiesen.github.io/post/Leveldb-Arena/">Leveldb: Arena</a></li>
-
-  
-  </ul>
-  
-  <h2>2016</h2>
-  <ul>
-  
-    <li><time>20 Dec 2016, 21:31</time> - <a href="http://wiesen.github.io/post/leveldb-Storage-MemTable/">Leveldb: Storage MemTable</a></li>
-
-  
-    <li><time>19 Dec 2016, 21:31</time> - <a href="http://wiesen.github.io/post/Leveldb-Basic-Concept/">Leveldb: Basic Settings</a></li>
-
-  
-    <li><time>28 Nov 2016, 21:31</time> - <a href="http://wiesen.github.io/post/leveldb-Introduction/">Leveldb: Introduction</a></li>
-
-  
-    <li><time>24 Nov 2016, 21:31</time> - <a href="http://wiesen.github.io/post/IO-Event-Handling-Design-Patterns/">I/O Event Handling Design Patterns</a></li>
-
-  
-    <li><time>26 Oct 2016, 10:32</time> - <a href="http://wiesen.github.io/post/TCP%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/">TCP粘包问题：分包</a></li>
-
-  
-    <li><time>18 Sep 2016, 17:32</time> - <a href="http://wiesen.github.io/post/Solution-to-Raspberry-Pi-ROS-rivz-Segmentation-Fault/">Solution to Raspberry Pi ROS rivz Core Dumped</a></li>
-
-  
-    <li><time>09 Sep 2016, 17:32</time> - <a href="http://wiesen.github.io/post/MIT-6.824-Lab4-Sharded-KeyValue-Service/">MIT 6.824: Lab 4 Sharded KeyValue Service Implementation</a></li>
-
-  
-    <li><time>16 Aug 2016, 17:32</time> - <a href="http://wiesen.github.io/post/Robotics-Estimation-and-Learning/">Robotics: Estimation and learning</a></li>
-
-  
-    <li><time>06 Aug 2016, 17:32</time> - <a href="http://wiesen.github.io/post/MIT-6.824-lab3-Fault-Tolerant-KVService-Implementation/">MIT 6.824: lab3 Fault-Tolerant Key/Value Service Implementation</a></li>
-
-  
-    <li><time>10 Jun 2016, 21:32</time> - <a href="http://wiesen.github.io/post/MIT-6.824-lab2-Raft-Consensus-Algorithm-Implementation/">MIT 6.824: lab2 Raft Consensus Algorithm Implementation</a></li>
-
-  
-    <li><time>15 Apr 2016, 21:31</time> - <a href="http://wiesen.github.io/post/%E5%BE%AE%E8%BD%AF2016%E6%A0%A1%E6%8B%9B%E5%9C%A8%E7%BA%BF%E7%AC%94%E8%AF%95%E9%A2%98%E8%A7%A3/">微软2016校招在线笔试题解</a></li>
-
-  
-    <li><time>30 Mar 2016, 21:33</time> - <a href="http://wiesen.github.io/post/Flat-Datacenter-Storage-Paper-Review/">Flat Datacenter Storage Paper Review</a></li>
-
-  
-    <li><time>19 Mar 2016, 21:33</time> - <a href="http://wiesen.github.io/post/Chain-Replication-Paper-Review/">Chain Replication Paper Review</a></li>
-
-  
-    <li><time>15 Mar 2016, 21:31</time> - <a href="http://wiesen.github.io/post/%E5%BF%AB%E9%80%9F%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/">快速排序笔记</a></li>
-
-  
-    <li><time>10 Mar 2016, 21:24</time> - <a href="http://wiesen.github.io/post/%E5%BD%92%E5%B9%B6%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/">归并排序笔记</a></li>
-
-  
-  </ul>
-  
-</div>
-
-</div>
-</div>
-<script src="http://wiesen.github.io/js/ui.js"></script>
-
-
-<script>
-  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
-
-  ga('create', 'UA-73790691-1', 'auto');
-  ga('send', 'pageview');
-
-</script>
-
-
-
-</body>
 </html>
 

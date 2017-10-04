@@ -1,227 +1,153 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-us">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Leveldb: Storage MemTable</title>
+        <style>
 
-<head>
-  <meta http-equiv="content-type" content="text/html; charset=utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="">
-  <meta name="generator" content="Hugo 0.18" />
+    html body {
+        font-family: Raleway, sans-serif;
+        background-color: white;
+    }
 
-  <title>Leveldb: Storage MemTable &middot; Wiesen&#39;s Blog</title>
+    :root {
+        --accent: red;
+        --border-width:  5px ;
+    }
 
-  
-  
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
-
-  <!--[if lte IE 8]>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
-  <![endif]-->
-  <!--[if gt IE 8]><!-->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
-  <!--<![endif]-->
-
-  <!--[if lte IE 8]>
-  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu-old-ie.css">
-  <![endif]-->
-  <!--[if gt IE 8]><!-->
-  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu.css">
-  <!--<![endif]-->
-
-  <link rel="stylesheet" href="http://wiesen.github.io/css/blackburn.css">
-
-  
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
-
-  
-  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
-
-  
-  
-
-  
-  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/monokai-sublime.min.css">
-  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
-  <script>hljs.initHighlightingOnLoad();</script>
-  
-
-  <link rel="shortcut icon" href="http://wiesen.github.io/img/favicon.ico" type="image/x-icon" />
-
-</head>
+</style>
 
 
-<body>
-<div id="layout">
-
-  
-<a href="#menu" id="menuLink" class="menu-link">
-  
-  <span></span>
-</a>
-<div id="menu">
-
-  
-  <a class="pure-menu-heading brand" href="http://wiesen.github.io/">Wiesen</a>
+<link rel="stylesheet" href="/css/main.css">
 
 
-  <div class="pure-menu">
-    <ul class="pure-menu-list">
-      
-      
-        <li class="pure-menu-item">
-          <a class="pure-menu-link" href="http://wiesen.github.io/"><i class='fa fa-home fa-fw'></i>Home</a>
-      
-        </li>
-      
-      
-        <li class="pure-menu-item">
-          <a class="pure-menu-link" href="http://wiesen.github.io/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
-      
-        </li>
-      
-      
-        <li class="pure-menu-item">
-          <a class="pure-menu-link" href="http://wiesen.github.io/topics/"><i class='fa fa-folder fa-fw'></i>Topics</a>
-      
-        </li>
-      
-      
-        <li class="pure-menu-item">
-          <a class="pure-menu-link" href="http://wiesen.github.io/about/"><i class='fa fa-user fa-fw'></i>About</a>
-      
-        </li>
-      
-      
-        <li class="pure-menu-item">
-          <a class="pure-menu-link" href="http://wiesen.github.io/contact/"><i class='fa fa-phone fa-fw'></i>Contact</a>
-      
-        </li>
-      
-    </ul>
-  </div>
 
-  <div class="pure-menu social">
-  <ul class="pure-menu-list">
 
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
+
+
+ <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/solarized-dark.min.css"> 
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+ 
+
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+
+     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/go.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/haskell.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/kotlin.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c&#43;&#43;.min.js"></script> 
+
+    <script>hljs.initHighlightingOnLoad();</script>
+
+
+
+
+
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+
+<script>$(document).on('click', function() { $('.collapse').collapse('hide'); })</script>
+ <meta name="generator" content="Hugo 0.29" />
+        
+        
+        <script async src="https://www.googletagmanager.com/gtag/js?id="></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments)};
+          gtag('js', new Date());
+
+          gtag('config', '');
+        </script>
+    </head>
+
+    <body>
+
+        <nav class="navbar navbar-default navbar-fixed-top">
+
+            <div class="container">
+
+                <div class="navbar-header">
+
+                    <a class="navbar-brand visible-xs" href="#">Leveldb: Storage MemTable</a>
+
+                    <button class="navbar-toggle" data-target=".navbar-collapse" data-toggle="collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+
+                </div>
+
+                <div class="collapse navbar-collapse">
+
+                    
+                        <ul class="nav navbar-nav">
+                            
+                                <li><a href="/">Home</a></li>
+                            
+                                <li><a href="/post/">Posts</a></li>
+                            
+                                <li><a href="/project/">Projects</a></li>
+                            
+                        </ul>
+                    
+
+                    
+                        <ul class="nav navbar-nav navbar-right">
+                            
+                                <li class="navbar-icon"><a href="mailto:me@example.com"><i class="fa fa-envelope-o"></i></a></li>
+                            
+                                <li class="navbar-icon"><a href="https://github.com/username/"><i class="fa fa-github"></i></a></li>
+                            
+                                <li class="navbar-icon"><a href="https://twitter.com/username/"><i class="fa fa-twitter"></i></a></li>
+                            
+                                <li class="navbar-icon"><a href="https://www.linkedin.com/in/username/"><i class="fa fa-linkedin"></i></a></li>
+                            
+                                <li class="navbar-icon"><a href="https://www.stackoverflow.com/username/"><i class="fa fa-stack-overflow"></i></a></li>
+                            
+                        </ul>
+                    
+
+                </div>
+
+            </div>
+
+        </nav>
+
+
+<main>
+
+    <div class="item">
+
+    
+    
     
 
     
-
     
 
+    <h4><a href="/post/leveldb-storage-memtable/">Leveldb: Storage MemTable</a></h4>
+    <h5>December 20, 2016</h5>
     
-
-    
-    <li class="pure-menu-item">
-      <a class="pure-menu-link" href="https://facebook.com/100010837531785" target="_blank"><i class="fa fa-facebook-square fa-fw"></i>Facebook</a>
-    </li>
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <li class="pure-menu-item">
-      <a class="pure-menu-link" href="https://github.com/Wiesen" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
-    </li>
-    
-
-    
-
-    
-
-    
-
-    
-
-  </ul>
-</div>
-
-
-  <div>
-  <div class="small-print">
-    <small>&copy; 2016. All rights reserved.</small>
-  </div>
-  <div class="small-print">
-    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
-    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
-  </div>
-</div>
 
 </div>
 
 
-  <div id="main">
-
-
-<div class="header">
-  <h1>Leveldb: Storage MemTable</h1>
-  <h2></h2>
-</div>
-<div class="content">
-
-  <div class="post-meta">
-
-  <div>
-    <i class="fa fa-calendar fa-fw"></i>
-    <time>20 Dec 2016, 21:31</time>
-  </div>
-
-  
-
-  
-  
-  
-  <div>
-    <i class="fa fa-folder fa-fw"></i>
-    
-      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/database">Database</a>&nbsp;&#47;
-    
-      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/leveldb">Leveldb</a>
-    
-  </div>
-  
-  
-
-  
-
-</div>
-
-  
+    <br> <div class="text-justify">
 
 <p>Leveldb 存储主要分为 SSTable（磁盘） 和 MemTable（内存，包括 MemTable 和 Immutable MemTable），此外还有一些辅助文件:Manifest, Log, Current。</p>
 
-<p>本篇主要解答：Leveldb一条记录在内存中的形式是什么，记录以怎样的方式被组织？</p>
+<p>本篇 blog 主要分析 Memtable：Leveldb一条记录在内存中的形式是什么，记录以怎样的方式被组织。</p>
 
 <h2 id="memtable-db-skiplist-h-db-memtable-h-memtable-cc">Memtable (<code>db/skiplist.h</code>,<code>db/memtable.h &amp; memtable.cc</code>)</h2>
 
@@ -234,109 +160,64 @@
 
 <p>MemTable 是 leveldb 的 kv 数据在内存中的存储结构。当 Memtable 写入的数据占用内存到达指定大小 (Options.write_buffer_size)，则自动转换为 Immutable Memtable（只读），同时生成新的 Memtable 供写操作写入新数据。后台的 compact 进程会负责将 immutable memtable dump to disk 生成 sstable。</p>
 
+<p>通过 Memtable 和 Immutable Memtable，Leveldb 可在持久化到磁盘上的同时保持对外服务可用。这种特性是由 Leveldb 的适用场景催生的：Append 写。</p></li>
+
+<li><p>Structure &amp; Operation</p>
+
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_memtable_key.png" alt="leveldb memtable key" /></p>
+
+<p>memtable key 的组成参照 <strong>Leveldb: Basic Settings</strong>。memtable 存储同一 key 的多个版本的数据。KeyComparator 首先按照递增顺序比较 user key，然后安装递减顺序比较sequence number，这两个足以唯一确定一条 entry。</p>
+
 <p>MemTable 提供内存中 KV entry 的 Add 和 Get 操作接口。 Memtable 实际上并不存在 Delete 操作，删除某个 Key 的 Value 在 Memtable 内是作为插入一条记录实施的，但是会打上一个 Key 的删除标记，真正的删除操作是 Lazy 的，会在以后的 Compaction 过程中删除这个 KV。</p>
 
-<p>Memtable 类只是一个接口类，其底层实现依赖于两大核心组件 Arena 和 SkipList。其中 Arena 内存分配器统一管理内存，SkipList 用于实际 KV 存储。</p></li>
+<p>Memtable 类只是一个接口类，其底层实现依赖于两大核心组件 Arena 和 SkipList。其中 Arena 内存分配器统一管理内存，SkipList 用于实际 KV 存储（Memtable 的所有数据操作接口都是对 SkipList 的封装）。</p></li>
 
 <li><p>Component</p>
 
-<p>Arena： memtable 内存管理</p>
+<ol>
+<li><p>Arena： memtable 内存管理</p>
 
 <ol>
-<li>封装内存操作以便进行内存使用统计：memtable 有阈值限制（write buffer size），通过统一的接口来分配不同大小的内存；</li>
-<li>预先分配一整块内存来</li>
-<li>保证内存对齐：Arena 每次按 klockSize(<code>static const int kBlockSize = 4096;</code>)单位向系统申请内存，提供地址对齐内存，方便记录内存的使用并且提高内存使用效率；</li>
-<li>解决频繁分配小块内存降低效率，直接分配大块内存浪费内存的问题，同时避免个别大内存使用影响：当memtable申请内存时，若 <code>size &lt;= kBlockSize / 4</code> 则在当前的内存block中分配，否则直接向系统申请（new）。</li>
+<li><p>封装内存操作以便进行内存使用统计：memtable 有阈值限制（write buffer size），通过统一的接口来分配不同大小的内存；</p></li>
+
+<li><p>保证内存对齐：Arena 每次按 klockSize(<code>static const int kBlockSize = 4096;</code>)单位向系统申请内存，提供地址对齐内存，方便记录内存的使用并且提高内存使用效率；</p></li>
+
+<li><p>解决频繁分配小块内存降低效率，直接分配大块内存浪费内存的问题，同时避免个别大内存使用影响：当memtable申请内存时，若 <code>size &lt;= kBlockSize / 4</code> 则在当前的内存block中分配，否则直接向系统申请（new）；</p></li>
+
+<li><p>由Arena的析构函数统一释放所有的内存：和 leveldb 特定的应用场景相关的，比如一个memtable使用一个Arena，当memtable被释放时，由Arena统一释放其内存，不需要额外提供内存释放接口。</p></li>
+
+<li><p>Arena 类内存管理方法：</p></li>
+
+<li><p>采用 vector 来存储每次分配的内存，每一次分配的内存为一个块（block），block默认大小为4096kb；</p></li>
+
+<li><p>当达到阈值时将 dump to disk，完成后由析构函数完成所有内存的一次性释放，由于业务的特殊性因此无需提供内存释放的接口</p></li>
 </ol>
 
-<p>SkipList：memtable 的实际数据结构</p>
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/arena.png" alt="arena" />)</p></li>
+
+<li><p>SkipList：memtable 的实际数据结构</p>
 
 <ol>
 <li>根据上一篇 blog 中 LSM tree 的性质，table 应当保持有序性。而对一个排序结构执行插入操作开销很大（随机写），通常性能瓶颈集中在这里。一些数据结构如链表, AVL 树, B 树, skiplist 等都加速了随机写。leveldb 的 memtable 实现没有使用复杂的 B 树，采用更轻量级的 <a href="https://en.wikipedia.org/wiki/Skip_list">skiplist</a>。</li>
-<li>skiplist 是一种可以代替平衡树的数据结构。其从概率上保证数据平衡（依赖于系统设计时的随机假设），结构和实现比平衡树简单。概率上时间复杂度近似 O(logN)，与平衡树相同，但空间上比较节省，一个节点平均只需要 1.333 个指针。</li>
-<li>Leveldb 中，Skiplist 中的操作不需要任何锁或者 node 的引用计数，利用内存屏障来进行线程同步，原因主要为以下两个：
-
-<ol>
-<li>Skiplist 中 node 内保存的是 InternalKey 与对应 value 组成的数据，SequenceNumber 的全局唯一保证了不会有相同的弄得出现，因此保证了不会有node更新的情况；</li>
+<li>skiplist 是一种可以代替平衡树的数据结构：skiplist 从概率上保证数据平衡（依赖于系统设计时的随机假设），结构和实现比平衡树简单。概率上时间复杂度近似 O(logN)，与平衡树相同，但空间上比较节省，一个节点平均只需要 1.333 个指针。</li>
+<li>skiplist 拥有比平衡树更好的并发性能：平衡树在更新时可能会触发 rebalancing，改操作牵涉到大量节点，争锁的代价相对较高。而 skiplist 的操作需要更新的部分比较少，加锁的粒度和数量都更少，所以不同线程争锁的代价相对较低</li>
+<li>Leveldb 中，Skiplist 中的操作不需要任何锁或者 node 的引用计数，利用内存屏障来进行线程同步，原因主要为以下两个：</li>
+<li>Skiplist 中 node 内保存的是 InternalKey 与对应 value 组成的数据，SequenceNumber 的全局唯一保证了不会有相同的 node 出现，因此保证了不会有node更新的情况.</li>
 <li>delete 操作等同于 put 操作，因此不会需要引用计数记录 node 的生存周期。</li>
 </ol></li>
 </ol></li>
 
 <li><p>Declaration</p>
 
-<pre><code>class MemTable {
- public:
-  // MemTables are reference counted.  The initial reference count
-  // is zero and the caller must call Ref() at least once.
-  explicit MemTable(const InternalKeyComparator&amp; comparator);
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_memtable.png" alt="memtable" /></p>
 
-  // Increase reference count.
-  void Ref() { ++refs_; }
-
-  // Drop reference count.  Delete if no more references exist.
-  void Unref() {
-    --refs_;
-    assert(refs_ &gt;= 0);
-    if (refs_ &lt;= 0) {
-      delete this;
-    }
-  }
-
-  // Returns an estimate of the number of bytes of data in use by this data structure.
-  // REQUIRES: external synchronization to prevent simultaneous operations on the same MemTable.
-  size_t ApproximateMemoryUsage();
-
-  // Return an iterator that yields the contents of the memtable.
-  //
-  // The caller must ensure that the underlying MemTable remains live
-  // while the returned iterator is live.  The keys returned by this
-  // iterator are internal keys encoded by AppendInternalKey in the
-  // db/format.{h,cc} module.
-  Iterator* NewIterator();
-
-  // Add an entry into memtable that maps key to value at the
-  // specified sequence number and with the specified type.
-  // Typically value will be empty if type==kTypeDeletion.
-  void Add(SequenceNumber seq, ValueType type,
-           const Slice&amp; key,
-           const Slice&amp; value);
-
-  // If memtable contains a value for key, store it in *value and return true.
-  // If memtable contains a deletion for key, store a NotFound() error in *status and return true.
-  // Else, return false.
-  bool Get(const LookupKey&amp; key, std::string* value, Status* s);
-
- private:
-  ~MemTable();  // Private since only Unref() should be used to delete it
-
-  struct KeyComparator {
-    const InternalKeyComparator comparator;
-    explicit KeyComparator(const InternalKeyComparator&amp; c) : comparator(c) { }
-    int operator()(const char* a, const char* b) const;
-  };
-  friend class MemTableIterator;
-  friend class MemTableBackwardIterator;
-
-  typedef SkipList&lt;const char*, KeyComparator&gt; Table;
-
-  KeyComparator comparator_;
-  int refs_;
-  Arena arena_;
-  Table table_;
-
-  // No copying allowed
-  MemTable(const MemTable&amp;);
-  void operator=(const MemTable&amp;);
-};
-</code></pre></li>
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_skiplist.png" alt="skiplist" /></p></li>
 
 <li><p>Coding &amp; Function Analysis</p>
 
-<p>构造和析构：MemTable 的对象构造必须显式调用，重点在于初始 Arena 和 SkipList 两大核心组件，且提供引用计数初始为 0，使用时必须先 Ref()，实际对象销毁在 Unref() 引用计数为 0 时。</p>
+<p>构造和析构：MemTable 的对象构造必须显式调用，重点在于初始 Arena 和 SkipList 两大核心组件。MemTable class 由 <code>Unref()</code> 完成实际的内存释放操作，因此 Leveldb 中禁用了 copy ctor 和 assignment operator（C++ class基本功，正确管理内存和其他资源）。</p>
 
-<p>C++ class基本功（正确管理内存和其他资源）：MemTable class 由 <code>Unref()</code> 完成实际的内存释放操作，因此 Leveldb 中禁用了 copy ctor 和 assignment operator（声明为private，并且只提供声明，而不提供定义）（C++11 中可以使用 = delete)</p>
-
-<p>功能：memtable 对 key 的查找和遍历是 MemTableIterator，而 MemTableIterator 实际上是 SkipList iterator wrapper。NewIterator 即是返回一个 MemTableIterator，用于有序遍历 memtable 的存储数据。</p>
+<p>操作：memtable 对 key 的查找和遍历是 MemTableIterator，而 MemTableIterator 实际上是 SkipList iterator wrapper。NewIterator 即是返回一个 MemTableIterator，用于有序遍历 memtable 的存储数据。</p>
 
 <ol>
 <li><p>写入： <code>void Add(SequenceNumber seq, ValueType type, const Slice&amp; key, const Slice&amp; value)</code>:</p>
@@ -365,85 +246,52 @@
 <li><a href="http://blog.csdn.net/sparkliang/article/details/8567602">Leveldb 源码分析 &ndash;1</a></li>
 <li><a href="http://mingxinglai.com/cn/2013/01/leveldb-memtable/">LevelDB : MemTable</a></li>
 <li><a href="http://luodw.cc/2015/10/16/leveldb-05/">leveldb skiplist 实现分析</a></li>
-<li><a href="http://www.pandademo.com/2016/03/memtable-and-skiplist-leveldb-source-dissect-3/">MemTable 与 SkipList-leveldb 源码剖析 (3)</a>
-<br />
-<br /></li>
+<li><a href="http://www.pandademo.com/2016/03/memtable-and-skiplist-leveldb-source-dissect-3/">MemTable 与 SkipList-leveldb 源码剖析 (3)</a></li>
+<li><a href="http://www.grakra.com/2017/06/17/Leveldb-RTFSC/">LevelDB: Read the Fucking Source Code</a></li>
 </ol>
-
-
-  
-<div class="prev-next-post pure-g">
-  <div class="pure-u-1-24" style="text-align: left;">
-    
-    <a href="http://wiesen.github.io/post/Leveldb-Basic-Concept/"><i class="fa fa-chevron-left"></i></a>
-    
-  </div>
-  <div class="pure-u-10-24">
-    
-    <nav class="prev">
-      <a href="http://wiesen.github.io/post/Leveldb-Basic-Concept/">Leveldb: Basic Settings</a>
-    </nav>
-    
-  </div>
-  <div class="pure-u-2-24">
-    &nbsp;
-  </div>
-  <div class="pure-u-10-24">
-    
-    <nav class="next">
-      <a href="http://wiesen.github.io/post/Leveldb-Arena/">Leveldb: Arena</a>
-    </nav>
-    
-  </div>
-  <div class="pure-u-1-24" style="text-align: right;">
-    
-    <a href="http://wiesen.github.io/post/Leveldb-Arena/"><i class="fa fa-chevron-right"></i></a>
-    
-  </div>
 </div>
 
-
-
-  
-<div id="disqus_thread"></div>
-<script type="text/javascript">
-
-(function() {
     
     
-    if (window.location.hostname == "localhost")
-        return;
 
-    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-    var disqus_shortname = 'Wiesen';
-    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-})();
-</script>
-<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    
 
+    
 
-</div>
+        <h4 class="page-header">Comments</h4>
 
-</div>
-</div>
-<script src="http://wiesen.github.io/js/ui.js"></script>
-
-
+        <div id="disqus_thread"></div>
 <script>
-  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
-
-  ga('create', 'UA-73790691-1', 'auto');
-  ga('send', 'pageview');
-
+    var disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "username" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
 </script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 
+    
 
+</main>
 
-</body>
+        <footer>
+
+            <p class="copyright text-muted">&copy; All rights reserved. Powered by <a href="https://gohugo.io">Hugo</a> and <a href="https://github.com/calintat/minimal">Minimal</a></p>
+
+        </footer>
+       
+    </body>
+
 </html>
 

@@ -1,246 +1,201 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-us">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Leveldb: Log</title>
+        <style>
 
-<head>
-  <meta http-equiv="content-type" content="text/html; charset=utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="">
-  <meta name="generator" content="Hugo 0.18" />
+    html body {
+        font-family: Raleway, sans-serif;
+        background-color: white;
+    }
 
-  <title>Leveldb: Log &middot; Wiesen&#39;s Blog</title>
+    :root {
+        --accent: red;
+        --border-width:  5px ;
+    }
 
-  
-  
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
-
-  <!--[if lte IE 8]>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
-  <![endif]-->
-  <!--[if gt IE 8]><!-->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
-  <!--<![endif]-->
-
-  <!--[if lte IE 8]>
-  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu-old-ie.css">
-  <![endif]-->
-  <!--[if gt IE 8]><!-->
-  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu.css">
-  <!--<![endif]-->
-
-  <link rel="stylesheet" href="http://wiesen.github.io/css/blackburn.css">
-
-  
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
-
-  
-  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
-
-  
-  
-
-  
-  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/monokai-sublime.min.css">
-  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
-  <script>hljs.initHighlightingOnLoad();</script>
-  
-
-  <link rel="shortcut icon" href="http://wiesen.github.io/img/favicon.ico" type="image/x-icon" />
-
-</head>
+</style>
 
 
-<body>
-<div id="layout">
-
-  
-<a href="#menu" id="menuLink" class="menu-link">
-  
-  <span></span>
-</a>
-<div id="menu">
-
-  
-  <a class="pure-menu-heading brand" href="http://wiesen.github.io/">Wiesen</a>
+<link rel="stylesheet" href="/css/main.css">
 
 
-  <div class="pure-menu">
-    <ul class="pure-menu-list">
-      
-      
-        <li class="pure-menu-item">
-          <a class="pure-menu-link" href="http://wiesen.github.io/"><i class='fa fa-home fa-fw'></i>Home</a>
-      
-        </li>
-      
-      
-        <li class="pure-menu-item">
-          <a class="pure-menu-link" href="http://wiesen.github.io/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
-      
-        </li>
-      
-      
-        <li class="pure-menu-item">
-          <a class="pure-menu-link" href="http://wiesen.github.io/topics/"><i class='fa fa-folder fa-fw'></i>Topics</a>
-      
-        </li>
-      
-      
-        <li class="pure-menu-item">
-          <a class="pure-menu-link" href="http://wiesen.github.io/about/"><i class='fa fa-user fa-fw'></i>About</a>
-      
-        </li>
-      
-      
-        <li class="pure-menu-item">
-          <a class="pure-menu-link" href="http://wiesen.github.io/contact/"><i class='fa fa-phone fa-fw'></i>Contact</a>
-      
-        </li>
-      
-    </ul>
-  </div>
 
-  <div class="pure-menu social">
-  <ul class="pure-menu-list">
 
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
+
+
+ <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/solarized-dark.min.css"> 
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+ 
+
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+
+     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/go.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/haskell.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/kotlin.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c&#43;&#43;.min.js"></script> 
+
+    <script>hljs.initHighlightingOnLoad();</script>
+
+
+
+
+
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+
+<script>$(document).on('click', function() { $('.collapse').collapse('hide'); })</script>
+ <meta name="generator" content="Hugo 0.29" />
+        
+        
+        <script async src="https://www.googletagmanager.com/gtag/js?id="></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments)};
+          gtag('js', new Date());
+
+          gtag('config', '');
+        </script>
+    </head>
+
+    <body>
+
+        <nav class="navbar navbar-default navbar-fixed-top">
+
+            <div class="container">
+
+                <div class="navbar-header">
+
+                    <a class="navbar-brand visible-xs" href="#">Leveldb: Log</a>
+
+                    <button class="navbar-toggle" data-target=".navbar-collapse" data-toggle="collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+
+                </div>
+
+                <div class="collapse navbar-collapse">
+
+                    
+                        <ul class="nav navbar-nav">
+                            
+                                <li><a href="/">Home</a></li>
+                            
+                                <li><a href="/post/">Posts</a></li>
+                            
+                                <li><a href="/project/">Projects</a></li>
+                            
+                        </ul>
+                    
+
+                    
+                        <ul class="nav navbar-nav navbar-right">
+                            
+                                <li class="navbar-icon"><a href="mailto:me@example.com"><i class="fa fa-envelope-o"></i></a></li>
+                            
+                                <li class="navbar-icon"><a href="https://github.com/username/"><i class="fa fa-github"></i></a></li>
+                            
+                                <li class="navbar-icon"><a href="https://twitter.com/username/"><i class="fa fa-twitter"></i></a></li>
+                            
+                                <li class="navbar-icon"><a href="https://www.linkedin.com/in/username/"><i class="fa fa-linkedin"></i></a></li>
+                            
+                                <li class="navbar-icon"><a href="https://www.stackoverflow.com/username/"><i class="fa fa-stack-overflow"></i></a></li>
+                            
+                        </ul>
+                    
+
+                </div>
+
+            </div>
+
+        </nav>
+
+
+<main>
+
+    <div class="item">
+
+    
+    
     
 
     
-
     
 
+    <h4><a href="/post/leveldb-storage-log/">Leveldb: Log</a></h4>
+    <h5>January 28, 2017</h5>
     
-
-    
-    <li class="pure-menu-item">
-      <a class="pure-menu-link" href="https://facebook.com/100010837531785" target="_blank"><i class="fa fa-facebook-square fa-fw"></i>Facebook</a>
-    </li>
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <li class="pure-menu-item">
-      <a class="pure-menu-link" href="https://github.com/Wiesen" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
-    </li>
-    
-
-    
-
-    
-
-    
-
-    
-
-  </ul>
-</div>
-
-
-  <div>
-  <div class="small-print">
-    <small>&copy; 2016. All rights reserved.</small>
-  </div>
-  <div class="small-print">
-    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
-    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
-  </div>
-</div>
 
 </div>
 
 
-  <div id="main">
+    <br> <div class="text-justify">
 
+<p>Leveldb 存储主要分为 SSTable（磁盘） 和 MemTable（内存，包括 MemTable 和 Immutable MemTable），此外还有一些辅助文件:Manifest, Log, Current。</p>
 
-<div class="header">
-  <h1>Leveldb: Log</h1>
-  <h2></h2>
-</div>
-<div class="content">
+<p>本篇 blog 主要分析 Log：log 在 Leveldb 中的作用，一条log 在内存中的形式是什么，以怎样的方式被组织。</p>
 
-  <div class="post-meta">
+<h2 id="log-db-log-format-h-cc-db-log-writer-h-cc-db-log-reader-h-cc">Log：(<code>db/log_format.h&amp;cc</code>,<code>db/log_writer.h&amp;.cc</code>,<code>db/log_reader.h&amp;.cc</code>)</h2>
 
-  <div>
-    <i class="fa fa-calendar fa-fw"></i>
-    <time>28 Jan 2017, 21:31</time>
-  </div>
-
-  
-
-  
-  
-  
-  <div>
-    <i class="fa fa-folder fa-fw"></i>
-    
-      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/database">Database</a>&nbsp;&#47;
-    
-      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/leveldb">Leveldb</a>
-    
-  </div>
-  
-  
-
-  
-
-</div>
-
-  
-
-<p>Log：(<code>db/log_format.h</code>,<code>db/log_writer.h&amp;.cc</code>,<code>db/log_reader.h&amp;.cc</code>)</p>
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_log_commit.png" alt="log commit" /></p>
 
 <ol>
-<li><p>Introduction</p>
+<li>Introduction</li>
+</ol>
 
 <p>日志（logging）分两种：</p>
 
 <ol>
 <li>诊断日志（diagnostic log）：即log4j、glog、log4cxx等常用日志库提供的日志功能</li>
-<li>交易日志（transaction log）：即数据库的 write-ahead log、文件系统的journaling等，用于记录状态变更，通过 replay log 可以逐步恢复每一次修改之后的状态。</li>
+<li>交易日志（transaction log）：即<strong>数据库的 write-ahead log</strong>、文件系统的journaling等，用于记录状态变更，通过 replay log 可以逐步恢复每一次修改之后的状态。</li>
 </ol>
 
-<p>LevelDb 中的 log 是后者，主要作用是系统故障时进行数据恢复。利用 WAL，当故障时内存 Memtable 中的数据没有来得及 Dump 到磁盘的 SSTable 文件，LevelDB 可根据 log 文件恢复内存数据。</p>
+<p>LevelDb 中的 log 是后者，主要作用是系统故障时进行数据恢复。<strong>利用 WAL（write-ahead log），当故障时 Memtable 中的数据没来得及 Dump 成 SSTable 文件，LevelDB 可根据 log 文件恢复内存数据，保持数据（data和metadata）的持久性。</strong></p>
 
-<p>log 文件中的数据也是以 block 为单位组织（32k）。写日志时，一致性考虑，并没有按 block 单位写，每次更新均对 log 文件进行 IO，根据 WriteOption::sync 决定是否做强制 sync。读取时以 block 为单位做 IO 以及校验。log 的写入是顺序写，读取只会在启动时发生，不会是性能的瓶颈。</p></li>
+<ol>
+<li><a href="http://www.cnblogs.com/cobbliu/p/6243550.html">Format</a></li>
+</ol>
 
-<li><p><a href="http://www.cnblogs.com/cobbliu/p/6243550.html">Format</a></p></li>
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_log.png" alt="log format" /></p>
 
+<p>log record 以 block 为单位组织（32k）。写日志时，一致性考虑，并没有以 block 为单位写，而是每次更新均对 log 文件进行 IO，根据 WriteOption::sync 决定是否做强制 sync。读取时以 block 为单位做 IO 以及校验。log 的写入是顺序写，读取只会在启动时发生，不会是性能的瓶颈。</p>
+
+<p>Log  entry header 包含三个字段，checksum 是对“类型”和“数据”字段的校验码，为了避免处理不完整或者是被破坏的数据，当 leveldb 读取记录数据时候会对数据进行校验，如果 checksum 相同则说明数据完整无破坏，可以继续后续流程。length 表示 payload 长度，type 字段则指出了每条 log record 和 log block 之间的结构关系，主要有五种类型：ZERO/FULL/FIRST/MIDDLE/LAST，具体结构关系如上图所示。</p>
+
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_log_payload.png" alt="log record payload" /></p>
+
+<p>上图为 log record payload 的具体结构，主要为 PUT_OP 和 DELETE_OP 两种操作，读操作不写 log。</p>
+
+<p>Leveldb 采用 write batch 来优化并发写。对每一个写操作，先通过传入的键值对构造一个 WriteBatch 对象。多个并发写的 write batch 最后会被合并成一个，再写入 log 和 memtable。</p>
+
+<ol>
+<li>Declaration</li>
+</ol>
+
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_log_reader.png" alt="log reader" /></p>
+
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_log_writer.png" alt="log writer" /></p>
+
+<ol>
 <li><p>Analysis</p>
 
 <ol>
-<li><p>写入 （<code>Writer::AddRecord() log_writer.cc</code>）</p>
+<li>写入 （<code>Writer::AddRecord() log_writer.cc</code>）</li>
+</ol>
 
 <p>对 log 的每次写入作为 record 添加：</p>
 
@@ -249,11 +204,11 @@
 <li>根据当前 block 剩余的 size 和写入 size，划分出满足写入的最大 record，确定 record type。</li>
 <li>写入 record（Writer::EmitPhysicalRecord()）</li>
 <li>循环1-3,直至写入处理完成</li>
-<li>根据 option 指定的 sync 决定是否做 log 文件的强制 sync
-<br /></li>
-</ol></li>
 
-<li><p>读取（<code>Reader::ReadRecord() db/log_reader.cc</code>）</p>
+<li><p>根据 option 指定的 sync 决定是否做 log 文件的强制 sync</p></li>
+
+<li><p>读取（<code>Reader::ReadRecord() db/log_reader.cc</code>）</p></li>
+</ol>
 
 <p>log 的读取仅发生在 db 启动的时候，每次读取出当时写入的一次完整更新：</p>
 
@@ -261,9 +216,7 @@
 <li>第一次读取， 根据指定的 <code>initial_offset</code>_跳过 log 文件开始的 init_data(<code>Reader::SkipToInitialBlock()</code>)，如果从跳过的 offset 开始，当前 block 剩余的 size 小于 record 的头长度（是个 trailer），则直接跳过这个 block。当前实现中指定的initial_offset_为 0。</li>
 <li>从 log 文件中读一个 record（<code>Reader::ReadPhysicalRecord()</code>)</li>
 <li>根据读到 record 的 type 做进一步处理</li>
-<li>循环 1-3 直至读取出当时写入的一个完整更新。
-<br /></li>
-</ol></li>
+<li>循环 1-3 直至读取出当时写入的一个完整更新。</li>
 </ol></li>
 </ol>
 
@@ -273,76 +226,51 @@
 <li><a href="http://luodw.cc/2015/10/18/leveldb-08/">leveldb源码分析之读写log文件</a></li>
 <li><a href="http://mingxinglai.com/cn/2013/01/leveldb-log-and-env/">LevelDB源码剖析之Env与log::Writer</a></li>
 <li>leveldb实现解析 by 淘宝-核心系统研发-存储 那岩</li>
+<li><a href="http://www.grakra.com/2017/06/17/Leveldb-RTFSC/">LevelDB: Read the Fucking Source Code</a></li>
 </ol>
-
-
-  
-<div class="prev-next-post pure-g">
-  <div class="pure-u-1-24" style="text-align: left;">
-    
-    <a href="http://wiesen.github.io/post/Leveldb-Cache/"><i class="fa fa-chevron-left"></i></a>
-    
-  </div>
-  <div class="pure-u-10-24">
-    
-    <nav class="prev">
-      <a href="http://wiesen.github.io/post/Leveldb-Cache/">Leveldb: Block Cache</a>
-    </nav>
-    
-  </div>
-  <div class="pure-u-2-24">
-    &nbsp;
-  </div>
-  <div class="pure-u-10-24">
-    
-  </div>
-  <div class="pure-u-1-24" style="text-align: right;">
-    
-  </div>
 </div>
 
-
-
-  
-<div id="disqus_thread"></div>
-<script type="text/javascript">
-
-(function() {
     
     
-    if (window.location.hostname == "localhost")
-        return;
 
-    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-    var disqus_shortname = 'Wiesen';
-    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-})();
-</script>
-<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    
 
+    
 
-</div>
+        <h4 class="page-header">Comments</h4>
 
-</div>
-</div>
-<script src="http://wiesen.github.io/js/ui.js"></script>
-
-
+        <div id="disqus_thread"></div>
 <script>
-  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
-
-  ga('create', 'UA-73790691-1', 'auto');
-  ga('send', 'pageview');
-
+    var disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "username" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
 </script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 
+    
 
+</main>
 
-</body>
+        <footer>
+
+            <p class="copyright text-muted">&copy; All rights reserved. Powered by <a href="https://gohugo.io">Hugo</a> and <a href="https://github.com/calintat/minimal">Minimal</a></p>
+
+        </footer>
+       
+    </body>
+
 </html>
 

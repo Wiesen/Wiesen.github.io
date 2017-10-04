@@ -1,223 +1,149 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-us">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Leveldb: Introduction</title>
+        <style>
 
-<head>
-  <meta http-equiv="content-type" content="text/html; charset=utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="">
-  <meta name="generator" content="Hugo 0.18" />
+    html body {
+        font-family: Raleway, sans-serif;
+        background-color: white;
+    }
 
-  <title>Leveldb: Introduction &middot; Wiesen&#39;s Blog</title>
+    :root {
+        --accent: red;
+        --border-width:  5px ;
+    }
 
-  
-  
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
-
-  <!--[if lte IE 8]>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
-  <![endif]-->
-  <!--[if gt IE 8]><!-->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
-  <!--<![endif]-->
-
-  <!--[if lte IE 8]>
-  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu-old-ie.css">
-  <![endif]-->
-  <!--[if gt IE 8]><!-->
-  <link rel="stylesheet" href="http://wiesen.github.io/css/side-menu.css">
-  <!--<![endif]-->
-
-  <link rel="stylesheet" href="http://wiesen.github.io/css/blackburn.css">
-
-  
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
-
-  
-  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
-
-  
-  
-
-  
-  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/monokai-sublime.min.css">
-  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
-  <script>hljs.initHighlightingOnLoad();</script>
-  
-
-  <link rel="shortcut icon" href="http://wiesen.github.io/img/favicon.ico" type="image/x-icon" />
-
-</head>
+</style>
 
 
-<body>
-<div id="layout">
-
-  
-<a href="#menu" id="menuLink" class="menu-link">
-  
-  <span></span>
-</a>
-<div id="menu">
-
-  
-  <a class="pure-menu-heading brand" href="http://wiesen.github.io/">Wiesen</a>
+<link rel="stylesheet" href="/css/main.css">
 
 
-  <div class="pure-menu">
-    <ul class="pure-menu-list">
-      
-      
-        <li class="pure-menu-item">
-          <a class="pure-menu-link" href="http://wiesen.github.io/"><i class='fa fa-home fa-fw'></i>Home</a>
-      
-        </li>
-      
-      
-        <li class="pure-menu-item">
-          <a class="pure-menu-link" href="http://wiesen.github.io/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
-      
-        </li>
-      
-      
-        <li class="pure-menu-item">
-          <a class="pure-menu-link" href="http://wiesen.github.io/topics/"><i class='fa fa-folder fa-fw'></i>Topics</a>
-      
-        </li>
-      
-      
-        <li class="pure-menu-item">
-          <a class="pure-menu-link" href="http://wiesen.github.io/about/"><i class='fa fa-user fa-fw'></i>About</a>
-      
-        </li>
-      
-      
-        <li class="pure-menu-item">
-          <a class="pure-menu-link" href="http://wiesen.github.io/contact/"><i class='fa fa-phone fa-fw'></i>Contact</a>
-      
-        </li>
-      
-    </ul>
-  </div>
 
-  <div class="pure-menu social">
-  <ul class="pure-menu-list">
 
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
+
+
+ <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/solarized-dark.min.css"> 
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+ 
+
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+
+     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/go.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/haskell.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/kotlin.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c&#43;&#43;.min.js"></script> 
+
+    <script>hljs.initHighlightingOnLoad();</script>
+
+
+
+
+
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+
+<script>$(document).on('click', function() { $('.collapse').collapse('hide'); })</script>
+ <meta name="generator" content="Hugo 0.29" />
+        
+        
+        <script async src="https://www.googletagmanager.com/gtag/js?id="></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments)};
+          gtag('js', new Date());
+
+          gtag('config', '');
+        </script>
+    </head>
+
+    <body>
+
+        <nav class="navbar navbar-default navbar-fixed-top">
+
+            <div class="container">
+
+                <div class="navbar-header">
+
+                    <a class="navbar-brand visible-xs" href="#">Leveldb: Introduction</a>
+
+                    <button class="navbar-toggle" data-target=".navbar-collapse" data-toggle="collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+
+                </div>
+
+                <div class="collapse navbar-collapse">
+
+                    
+                        <ul class="nav navbar-nav">
+                            
+                                <li><a href="/">Home</a></li>
+                            
+                                <li><a href="/post/">Posts</a></li>
+                            
+                                <li><a href="/project/">Projects</a></li>
+                            
+                        </ul>
+                    
+
+                    
+                        <ul class="nav navbar-nav navbar-right">
+                            
+                                <li class="navbar-icon"><a href="mailto:me@example.com"><i class="fa fa-envelope-o"></i></a></li>
+                            
+                                <li class="navbar-icon"><a href="https://github.com/username/"><i class="fa fa-github"></i></a></li>
+                            
+                                <li class="navbar-icon"><a href="https://twitter.com/username/"><i class="fa fa-twitter"></i></a></li>
+                            
+                                <li class="navbar-icon"><a href="https://www.linkedin.com/in/username/"><i class="fa fa-linkedin"></i></a></li>
+                            
+                                <li class="navbar-icon"><a href="https://www.stackoverflow.com/username/"><i class="fa fa-stack-overflow"></i></a></li>
+                            
+                        </ul>
+                    
+
+                </div>
+
+            </div>
+
+        </nav>
+
+
+<main>
+
+    <div class="item">
+
+    
+    
     
 
     
-
     
 
+    <h4><a href="/post/leveldb-introduction/">Leveldb: Introduction</a></h4>
+    <h5>November 28, 2016</h5>
     
-
-    
-    <li class="pure-menu-item">
-      <a class="pure-menu-link" href="https://facebook.com/100010837531785" target="_blank"><i class="fa fa-facebook-square fa-fw"></i>Facebook</a>
-    </li>
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <li class="pure-menu-item">
-      <a class="pure-menu-link" href="https://github.com/Wiesen" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
-    </li>
-    
-
-    
-
-    
-
-    
-
-    
-
-  </ul>
-</div>
-
-
-  <div>
-  <div class="small-print">
-    <small>&copy; 2016. All rights reserved.</small>
-  </div>
-  <div class="small-print">
-    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
-    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
-  </div>
-</div>
 
 </div>
 
 
-  <div id="main">
-
-
-<div class="header">
-  <h1>Leveldb: Introduction</h1>
-  <h2></h2>
-</div>
-<div class="content">
-
-  <div class="post-meta">
-
-  <div>
-    <i class="fa fa-calendar fa-fw"></i>
-    <time>28 Nov 2016, 21:31</time>
-  </div>
-
-  
-
-  
-  
-  
-  <div>
-    <i class="fa fa-folder fa-fw"></i>
-    
-      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/database">Database</a>&nbsp;&#47;
-    
-      <a class="post-taxonomy-topic" href="http://wiesen.github.io/topics/leveldb">Leveldb</a>
-    
-  </div>
-  
-  
-
-  
-
-</div>
-
-  
+    <br> <div class="text-justify">
 
 <p>看了不少 blog 分析 leveldb，但很少看到有人从设计原因和策略上进行总结。所以这个系列对 leveldb 的实现做一点设计分析，争取将内部实现逻辑串联起来，至于源码注释之类的网上一扒拉就有很多啦。</p>
 
@@ -276,7 +202,7 @@
 <img src="http://7vij5d.com1.z0.glb.clouddn.com/memtable.png" width="500"/> <img src="http://7vij5d.com1.z0.glb.clouddn.com/compaction.png" width="500"/>
 </div>
 
-<p>LSM tree 针对<strong>写入速度瓶颈问题</strong>而提出的方法，其基本思想是：<strong>将随机写转换为顺序写，交换读和写的随机 IO</strong>。主要组成结构为：MemTable（内存中）+ SSTable (Sorted String Table)</p>
+<p>LSM tree 针对<strong>写入速度瓶颈问题</strong>而提出的方法，其基本思想是：<strong>将随机写转换为顺序写，交换读和写的随机 IO</strong>。主要组成结构为：MemTable（内存数据组织结构）+ SSTable (Sorted String Table，磁盘数据组织结构)</p>
 
 <p>首先数据更新增量写入 MemTable，其后保存为有序文件 SSTable 到磁盘中（read only），每个文件保存一段时间内的数据更新。为了均衡读写效率，SSTable 文件是一种分层次（level）管理。</p>
 
@@ -291,35 +217,37 @@
 <h2 id="leveldb的工程优化">Leveldb的工程优化</h2>
 
 <ol>
-<li><p><strong>write batch</strong></p>
+<li><strong><a href="http://www.cnblogs.com/cobbliu/p/6193164.htm">write batch</a></strong></li>
+</ol>
 
-<p>Leveldb 采用 write batc h来优化并发写。</p>
+<p>Leveldb 采用 write batch 来优化并发写。</p>
 
 <p>对每一个写操作，先通过传入的键值对构造一个 WriteBatch 对象，里面其实就是一个字符串。多个并发写的 write batch 最后会被合并成一个，再写入 log 和 memtable。</p>
 
-<p><a href="http://www.cnblogs.com/cobbliu/p/6193164.html">leveldb并发写处理</a></p></li>
-
+<ol>
 <li><p><a href="https://en.wikipedia.org/wiki/Bloom_filter"><strong>Bloom Filter</strong></a></p>
 
 <div style="text-align: center">
 <img src="http://7vij5d.com1.z0.glb.clouddn.com/bloomfilter.png" width="550"/>
 </div>
-    
 
 <p>由于 LSM Tree 会产生大量文件，因此 LevelDb 利用 bloomfilter 来避免大量的读操作。</p>
 
 <p>bloomfilter 以概率性算法高效检索一个 key 是否在一个 SSTable (核心为 hash，若判断为不存在则必定不存在，若判断为存在则可能不存在)。</p></li>
 
-<li><p><a href="https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_Recently_Used_.28LRU.29"><strong>Shard LRU Cache</strong></a></p>
+<li><p><a href="https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_Recently_Used_.28LRU.29"><strong>Shard LRU Cache</strong></a></p></li>
+</ol>
 
 <p>Leveldb 是基于磁盘存储，cache优化是非常自然的想法，主要作用还是在加速读操作。</p>
 
-<p>leveldb 中的 cache 分为 Table Cache 和 Block Cache 两种，其中 Table Cache 中缓存的是 sstable 的索引数据，Block Cache 缓存的是 sstable 的 Block 数据（可选打开）。</p>
+<pre><code>leveldb 中的 cache 分为 Table Cache 和 Block Cache 两种，其中 Table Cache 中缓存的是 sstable 的索引数据，Block Cache 缓存的是 sstable 的 Block 数据（可选打开）。
+</code></pre>
 
-<p>由于 levelDB 为多线程，每个线程访问 cache 时都会对 cache 加锁。为了保证多线程安全并且减少锁开销，leveldb 定义了一个 SharedLRUCache。</p>
+<p>​<br />
+    由于 levelDB 为多线程，每个线程访问 cache 时都会对 cache 加锁。为了保证多线程安全并且减少锁开销，leveldb 定义了一个 SharedLRUCache。</p>
 
-<p>ShardedLRUCache 内部有 16 个 LRUCache，查找 Key 时根据 key 的高四位进行 hash 索引，然后在相应的 LRUCache 中进行查找或更新。当 LRUCache 使用率大于总容量后, 根据 LRU 淘汰 key.</p></li>
-</ol>
+<pre><code>ShardedLRUCache 内部有 16 个 LRUCache，查找 Key 时根据 key 的高四位进行 hash 索引，然后在相应的 LRUCache 中进行查找或更新。当 LRUCache 使用率大于总容量后, 根据 LRU 淘汰 key.
+</code></pre>
 
 <h2 id="overall-architecture">Overall Architecture</h2>
 
@@ -329,11 +257,30 @@
 
 <p>Leveldb 存储主要分为 SSTable 和 MemTable。前者为不可变且存储于持久设备上，后者位于内存上并且可变。其中有两个 MemTable，一个为当前写入 MemTable，另一个为等待持久化的 Immutable MemTable。此外还有一些辅助文件，后面详述。</p>
 
-<p><strong>Write Operation</strong>：当用户需要插入一条 kv 到 Leveldb 中时，首先会被存储到 log 中 <strong>(Write Ahead Log, WAL, 保证数据持久性)</strong>；然后插入到 MemTable 中；当 MemTable 达到一定大小后会转化为 read-only Immutable MemTable，并且创建一个新的 MemTable；同时开启一个新的后台线程将 Immutable MemTable 的内容 dump 到磁盘中，创建一个新的 SSTable；</p>
+<p><strong>Write Operation</strong>：当用户需要插入一条 kv 到 Leveldb 中时，首先会被存储到 log 中 <strong>(Write Ahead Log, WAL, 保证数据持久性)</strong>；然后插入到 MemTable 中；当 MemTable 达到一定大小后会转化为 read-only Immutable MemTable，并且创建一个新的 MemTable；同时开启一个新的后台线程将 Immutable MemTable 的内容 dump 到磁盘中，创建一个新的 SSTable。</p>
 
 <p><strong>Deletion Operation</strong>：在 Leveldb 中视为特殊的 Write operation，写入一个 deletion marker。</p>
 
-<p><strong>Read Operation</strong>：当 leveldb 收到一个 Get 请求时，首先会在 MemTable 进行查找；然后在 Immutable MemTable 查找；最后在 SSTable 中查找（从 level 0 到 higher level），直到匹配到一个 kv item 或者为 NULL。</p>
+<p><strong>Read Operation</strong>：当 leveldb 收到一个 Get 请求时，首先会在 MemTable 进行查找 key；然后在 Immutable MemTable 查找；最后在 SSTable 中查找（从 level 0 到 higher level），直到匹配到一个 kv item 或者为 NULL。确定一个随机的 key 的位置而需要搜索文件的次数的上界是由最大的层数来决定的。</p>
+
+<p><strong>Compaction</strong>：每一层所有文件的大小是有限制的，大约是以10倍依次递增。当某一层的总大小超过了它的限制时，合并线程就会从该层选择一个文件将其和下一层的所有重叠的文件进行归并排序产生一个新的 SSTable 文件放在下一层中。合并线程会一直运行下去直到所有层的大小都在规定的限制内。当然，在合并的过程中，LevelDB 会保持除 level 0 之外的每一层上的所有文件的 key 的范围不会重叠，L0 层上文件的 key 的范围是可以重复的，因为它是直接从 memtable 上刷新过来的。</p>
+
+<h2 id="problem">Problem</h2>
+
+<p><a href="http://idning.github.io/leveldb-rocksdb-on-large-value.html">http://idning.github.io/leveldb-rocksdb-on-large-value.html</a></p>
+
+<p>写放大：LevelDB 中的写放大是很严重的。假如，每一层的大小是上一层的10倍，那么当把 i-1 层中的一个文件合并到 i 层中时，LevelDB 需要读取 i 层中的文件的数量多达10个，排序后再将他们写回到 i 层中去。所以这个时候的写放大是10。对于一个很大的数据集，生成一个新的 table 文件可能会导致 L0-L6 中相邻层之间发生合并操作，这个时候的写放大就是50（L1-L6中每一层是10）。</p>
+
+<p>读放大：LevelDB 中的读放大也是一个主要的问题。读放大主要来源于两方面：</p>
+
+<ol>
+<li>查找一个 key-value 对时，LevelDB 可能需要在多个层中去查找。在最坏的情况下，LevelDB 在 L0 中需要查找8个文件，在 L1-L6 每层中需要查找1个文件，累计就需要查找14个文件。</li>
+<li>在一个 SSTable 文件中查找一个 key-value 对时，LevelDB 需要读取该文件的多个元数据块。所以实际读取的数据量应该是：index block + bloom-filter blocks + data block。例如，当查找 1KB 的 key-value 对时，LevelDB 需要读取 16KB 的 index block，4KB的 bloom-filter block 和 4KB 的 data block，总共要读取 24 KB 的数据。在最差的情况下需要读取 14 个 SSTable 文件，所以这个时候的写放大就是 24*14=336。较小的 key-value 对会带来更高的读放大。</li>
+</ol>
+
+<p>解决方法
+1. 每个mmtable太小(2M), 存在如下问题:如果写入200G数据, 在db目录下就会有20w个文件, 需要频繁打开/关闭文件, 一个目录里面20w个文件的性能会很差(当然btrfs之类好些）；对于50K的value, 一个文件只能放40个key-value对, 效率很低
+2. Compaction不可控：不能自定义compaction函数, 如果可以自定义, 则可以在compaction的时候做ttl功能；compaction不能限速.</p>
 
 <h2 id="file-layout">File Layout</h2>
 
@@ -383,81 +330,49 @@
 
 <p><a href="http://www.open-open.com/lib/view/open1424916275249.html">Log Structured Merge Trees(LSM) 原理</a></p>
 </blockquote>
-
-
-  
-<div class="prev-next-post pure-g">
-  <div class="pure-u-1-24" style="text-align: left;">
-    
-    <a href="http://wiesen.github.io/post/IO-Event-Handling-Design-Patterns/"><i class="fa fa-chevron-left"></i></a>
-    
-  </div>
-  <div class="pure-u-10-24">
-    
-    <nav class="prev">
-      <a href="http://wiesen.github.io/post/IO-Event-Handling-Design-Patterns/">I/O Event Handling Design Patterns</a>
-    </nav>
-    
-  </div>
-  <div class="pure-u-2-24">
-    &nbsp;
-  </div>
-  <div class="pure-u-10-24">
-    
-    <nav class="next">
-      <a href="http://wiesen.github.io/post/Leveldb-Basic-Concept/">Leveldb: Basic Settings</a>
-    </nav>
-    
-  </div>
-  <div class="pure-u-1-24" style="text-align: right;">
-    
-    <a href="http://wiesen.github.io/post/Leveldb-Basic-Concept/"><i class="fa fa-chevron-right"></i></a>
-    
-  </div>
 </div>
 
-
-
-  
-<div id="disqus_thread"></div>
-<script type="text/javascript">
-
-(function() {
     
     
-    if (window.location.hostname == "localhost")
-        return;
 
-    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-    var disqus_shortname = 'Wiesen';
-    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-})();
-</script>
-<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    
 
+    
 
-</div>
+        <h4 class="page-header">Comments</h4>
 
-</div>
-</div>
-<script src="http://wiesen.github.io/js/ui.js"></script>
-
-
+        <div id="disqus_thread"></div>
 <script>
-  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
-
-  ga('create', 'UA-73790691-1', 'auto');
-  ga('send', 'pageview');
-
+    var disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "username" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
 </script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 
+    
 
+</main>
 
-</body>
+        <footer>
+
+            <p class="copyright text-muted">&copy; All rights reserved. Powered by <a href="https://gohugo.io">Hugo</a> and <a href="https://github.com/calintat/minimal">Minimal</a></p>
+
+        </footer>
+       
+    </body>
+
 </html>
 
