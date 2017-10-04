@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en-us">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>快速排序笔记</title>
+        <style>
+
+    html body {
+        font-family: Raleway, sans-serif;
+        background-color: white;
+    }
+
+    :root {
+        --accent: red;
+        --border-width:  5px ;
+    }
+
+</style>
+
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
+
+
+ <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/solarized-dark.min.css"> 
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+ 
+
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+
+     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/go.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/java.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/python.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c&#43;&#43;.min.js"></script> 
+
+    <script>hljs.initHighlightingOnLoad();</script>
+
+
+
+
+
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+
+<script>$(document).on('click', function() { $('.collapse').collapse('hide'); })</script>
+ <meta name="generator" content="Hugo 0.29" />
+        
+        
+        <script async src="https://www.googletagmanager.com/gtag/js?id="></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments)};
+          gtag('js', new Date());
+
+          gtag('config', '');
+        </script>
+    </head>
+
+    <body>
+
+        <nav class="navbar navbar-default navbar-fixed-top">
+
+            <div class="container">
+
+                <div class="navbar-header">
+
+                    <a class="navbar-brand visible-xs" href="#">快速排序笔记</a>
+
+                    <button class="navbar-toggle" data-target=".navbar-collapse" data-toggle="collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+
+                </div>
+
+                <div class="collapse navbar-collapse">
+
+                    
+                        <ul class="nav navbar-nav">
+                            
+                                <li><a href="/">Home</a></li>
+                            
+                                <li><a href="/post/">Posts</a></li>
+                            
+                                <li><a href="/project/">Projects</a></li>
+                            
+                        </ul>
+                    
+
+                    
+                        <ul class="nav navbar-nav navbar-right">
+                            
+                                <li class="navbar-icon"><a href="mailto:yangwj92@gmail.com"><i class="fa fa-envelope-o"></i></a></li>
+                            
+                                <li class="navbar-icon"><a href="https://github.com/Wiesen/"><i class="fa fa-github"></i></a></li>
+                            
+                        </ul>
+                    
+
+                </div>
+
+            </div>
+
+        </nav>
+
+
+<main>
+
+    <div class="item">
+
+    
+    
+    
+
+    
+    
+
+    <h4><a href="/post/%E5%BF%AB%E9%80%9F%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/">快速排序笔记</a></h4>
+    <h5>March 15, 2016</h5>
+     <kbd class="item-tag">Algorithm</kbd> 
+
+</div>
+
+
+    <br> <div class="text-justify">
+
+<p>快排最引人注目的特点是原地排序（只需要一个很小的辅助栈），且将长度为 <em>N</em> 的数组排序所需的时间和 <em>NlgN</em> 成正比。
+而快排的主要缺点是非常脆弱，在实现时必须非常小心才能避免性能低下。</p>
+
+<p>同前述一致：以 C++ 实现,仅针对 vector 进行操作, 并且遵循 C++ 左闭右开的区间标准: [a,b)。</p>
+
+<h2 id="基本算法">基本算法</h2>
+
+<p>快排也是一种分治的排序算法，快排与归并排序是互补的：</p>
+
+<ul>
+<li>归并排序将数组分成两个子数组分别排序，再将有序子数组归并以将整个数组排序，其递归调用发生在处理整个数组<strong>之前</strong>；</li>
+<li>而快排则是先确定 <code>key</code> 的位置，而后当两个子数组都有序时则整个数组即有序，其递归调用发生在处理整个数组<strong>之后</strong>。</li>
+</ul>
+
+<p>快排的关键在划分，划分过程需要使得数组满足以下三个条件：</p>
+
+<ul>
+<li>对于某个 <code>key</code>，<code>a[key]</code> 已经排定；</li>
+<li><code>[low,key)</code> 中所有元素都不大于 <code>a[key]</code>；</li>
+<li><code>[key,high)</code> 中所有元素都不小于 <code>a[key]</code>。
+<br /></li>
+</ul>
+
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/quick.png" alt="quick" /></p>
+
+<p>据此，快排的基本思想是:</p>
+
+<ul>
+<li>选取一个元素作为切分元素 <code>key</code>，然后从数组左端开始向右扫描直到找到一个大于等于它的元素，再从数组右端开始向左扫描直到找到一个小于等于它的元素，而后交换它们的位置;</li>
+<li>如此继续，就可以保证左指针 <code>left</code> 的左侧元素都不大于 <code>key</code>，右指针 <code>right</code> 的右侧都不小于 <code>key</code>;</li>
+
+<li><p>当左右指针相遇时 <code>（left &gt;= right）</code>，将切分元素 key 与左子数组最右元素（也就是 <code>right</code> 最终停下的位置）交换然后返回划分位置 <code>right</code> 即可。</p>
+
+<pre><code>int Partition(std::vector&lt;T&gt; &amp;vec, int low, int high) {
+    int left = low, right = high;
+    while (true) {
+        // Avoid subscript beging out of range
+        while (vec[++left] &lt; vec[low]) if (left == high - 1)break;
+        while (vec[low] &lt; vec[--right]) if (right == low)break;
+        // Terminate the loop
+        if (left &gt;= right)break;
+        std::swap(vec[left], vec[right]);
+    }
+    std::swap(vec[low], vec[right]);
+    return right;
+}
+</code></pre></li>
+</ul>
+
+<p>快排中有若干细节问题值得注意，否则会导致实现错误或者性能下降:</p>
+
+<ul>
+<li>越界：这里遵循左闭右开原则 [a,b)，因此左侧不能访问最右元素（右侧可以访问最左元素），否则将会出现越界。本文在内循环中左指针的 break 处理上与右指针有所差异：<code>if (left == high - 1) break</code>。</li>
+<li>随机性：快排是一个<strong>随机化</strong>的算法，因此在排序前需将数组随机打乱，在 C++ 中使用    <code>std::random_shuffle</code> 函数对数组进行处理。将数组随机化的原因是希望能够预测并依赖该算法的性能特点，后续本文阐述。</li>
+<li>循环：当左指针大于或等于右指针时终于划分<code>Partition()</code>中的循环,最后将切分元素 <code>key</code> 放入正确位置： <code>std::swap(vec[key], vec[right])</code>。而事实上， <code>left</code> 和 <code>right</code> 的位置正好一致或相邻。当一侧元素全部小于或大于 <code>key</code> 时，则 <code>left == right</code>，否则 <code>left - 1 == right</code>。</li>
+
+<li><p>递归：当子数组为空或所含元素仅为1个时则无需再处理，在左闭右开区间 [a,b) 中即为 <code>b - a &lt;= 1</code>。否则继续处理，同时为了贯彻左闭右开原则，代码中的递归如下:</p>
+
+<pre><code>void NormalQuick(std::vector&lt;T&gt; &amp;vec, int low, int high) {
+    // Terminate the recursive
+    if (high - low &lt;= 1){
+        Insertion(vec, low, high);
+        return;
+    }
+    int nCut = Partition(vec, low, high);
+    // Detail: Use range[low, high)
+    NormalQuick(vec, low, nCut);
+    NormalQuick(vec, nCut + 1, high);
+｝
+</code></pre></li>
+</ul>
+
+<h2 id="算法改进">算法改进</h2>
+
+<ol>
+<li><p><strong>切换到插入排序</strong></p>
+
+<p>和大多数递归排序算法一样，改进快排性能的一个简单办法是在排序小树组时切换到插入排序，从而避免递归调用，并且对于小数组来说快排比插入排序慢。</p>
+
+<p>经验表明，在大多数情况下 <code>CUTOFF</code> 取值 5~15 能够取得比较好的性能。</p>
+
+<pre><code>if (high - low &lt;= CUTOFF) {
+    Insertion(vec, low, high);
+    return;
+}
+</code></pre></li>
+
+<li><p><strong>三取样切分</strong></p>
+
+<p>待补充</p></li>
+
+<li><p><strong>熵最优快排——三向切分</strong></p>
+
+<p>所谓的“熵最优”是指：对于任意分布的输入，最优的基于比较的排序算法平均所需的比较次数与三向切分快排平均所需的比较次数相比，处于常数因子范围之内。当然前提是需要将数组进行随机化。</p>
+
+<p>进一步使用信息论来解释快排性能可参考 Algs4 中的快排章节，Mackayd的<a href="http://users.aims.ac.za/~mackay/sorting/sorting.html">Heapsort, Quicksort, and Entropy</a>。刘未鹏的<a href="http://mindhacks.cn/2008/06/13/why-is-quicksort-so-quick/">数学之美番外篇：快排为什么那样快</a>也值得一看，浅显易懂。</p>
+
+<p>三向切分快排的运行时间和输入的信息量的 <em>N</em> 倍成正比。对于含有大量重复元素的数组，它将快排的排序时间从<strong>线性对数级</strong>降低到<strong>线性级别</strong>。</p>
+
+<p>基本想法是将数组切分为三部分，分别对应小于、等于和大于切分元素的数组元素。</p>
+
+<p><strong>Dijkstra 三向切分</strong></p>
+
+<p>Dijkstra 提出的“三向切分快速排序”极为简洁。这里的额外交换用于和切分元素<strong>不等</strong>的元素。 其从左到右遍历数组一次：</p>
+
+<ul>
+<li>维护指针 <code>left</code> 使得 <code>[low, left)</code> 中的元素均小于 key；</li>
+<li>维护一个指针 <code>right</code> 使得 <code>[right, high)</code> 中的元素均大于 key；</li>
+<li><code>nMid</code> 使得 <code>[left, nMid)</code> 中的元素均等于 key；</li>
+<li>余下 <code>[nMid, right)</code> 中的元素尚未排定。</li>
+</ul>
+
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/3-wayquick.png" alt="3wayquick" /></p>
+
+<pre><code>void OptimalQuick(std::vector&lt;T&gt; &amp;vec, int low, int high) {
+    if (high - low &lt;= CUTOFF){
+        Insertion(vec, low, high);
+        return;
+    }
+    int left = low, nMid = low + 1, right = high - 1;
+    T key = vec[low];
+    while (nMid &lt;= right)
+    {
+        if (vec[nMid] &lt; key){
+            std::swap(vec[left], vec[nMid]);
+            left++; nMid++;
+        }
+        else if (key &lt; vec[nMid]){
+            std::swap(vec[nMid], vec[right]);
+            right--;
+        }
+        else nMid++;
+    }
+    OptimalQuick(vec, low, nMid);
+    OptimalQuick(vec, right + 1, high);
+}
+</code></pre>
+
+<p><strong>快速三向切分（J.Bently, D.McIlroy)</strong></p>
+
+<p>通过将重复元素置于子数组两端，从而实现一个信息量最优的排序算法。该方法与上述方法是等价的，只是快速三向切分中的额外交换用于和切分元素<strong>相等</strong>的元素。过程如下：</p>
+
+<ul>
+<li>维护指针 <code>p</code> 和 <code>q</code> 使得 <code>vec[low, p)</code> 和 <code>vec[q, high)</code> 中的元素都和 <code>key</code> 相等;</li>
+<li>维护指针 <code>i</code> 和 <code>j</code> 使得 <code>vec[p, i)</code> 中的元素小于 <code>key</code> ，<code>vec[j, q)</code> 中的元素大于 <code>key</code>;</li>
+<li>在切分循环结束后将和 <code>key</code> 相等的元素交换到正确的位置上。</li>
+</ul>
+
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/bmquick.png" alt="quickX" /></p>
+
+<pre><code>void QuickX(std::vector&lt;T&gt; &amp;vec, int low, int high) {
+    if (high - low &lt;= CUTOFF){
+        Insertion(vec, low, high);
+        return;
+    }
+
+    int p = low, q = high, i = low, j = high;
+    T key = vec[low];
+    while (true){
+        while (vec[++i] &lt; key)if (i == high - 1)break;
+        while (key &lt; vec[--j])if (j == low)break;
+        if (i == j &amp;&amp; key == vec[i]){
+            std::swap(vec[++p], vec[i]);
+        }
+        if (i &gt;= j)break;
+        std::swap(vec[i], vec[j]);
+        // exchange only when equal to key
+        if(vec[i] == key)std::swap(vec[++p], vec[i]);
+        if(vec[j] == key)std::swap(vec[--q], vec[j]);
+    }
+    // exchange to right position
+    i = j + 1;
+    while (p &gt;= low)std::swap(vec[p--], vec[j--]);
+    while (q &lt; high)std::swap(vec[q++], vec[i++]);
+    // recursive
+    QuickX(vec, low, j + 1);
+    QuickX(vec, i, high);
+}
+</code></pre></li>
+</ol>
+
+<hr />
+
+<p>Reference：</p>
+
+<blockquote>
+<p><a href="http://algs4.cs.princeton.edu/home/">Algs4</a></p>
+
+<p><a href="http://users.aims.ac.za/~mackay/sorting/sorting.html">Heapsort, Quicksort, and Entropy</a></p>
+
+<p><a href="http://mindhacks.cn/2008/06/13/why-is-quicksort-so-quick/">数学之美番外篇：快排为什么那样快</a></p>
+</blockquote>
+</div>
+
+    
+    
+
+    
+
+        <h4 class="page-header">Related</h4>
+
+         <div class="item">
+
+    
+    
+    
+
+    
+    
+
+    <h4><a href="/post/%E5%BE%AE%E8%BD%AF2016%E6%A0%A1%E6%8B%9B%E5%9C%A8%E7%BA%BF%E7%AC%94%E8%AF%95%E9%A2%98%E8%A7%A3/">微软2016校招在线笔试题解</a></h4>
+    <h5>April 15, 2016</h5>
+     <kbd class="item-tag">Algorithm</kbd> 
+
+</div>
+  <div class="item">
+
+    
+    
+    
+
+    
+    
+
+    <h4><a href="/post/%E5%BD%92%E5%B9%B6%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/">归并排序笔记</a></h4>
+    <h5>March 10, 2016</h5>
+     <kbd class="item-tag">Algorithm</kbd> 
+
+</div>
+ 
+
+    
+
+    
+
+        <h4 class="page-header">Comments</h4>
+
+        <div id="disqus_thread"></div>
+<script>
+    var disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "Wiesen" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+    
+
+</main>
+
+        <footer>
+
+            <p class="copyright text-muted">&copy; All rights reserved. Powered by <a href="https://gohugo.io">Hugo</a> and <a href="https://github.com/calintat/minimal">Minimal</a></p>
+
+        </footer>
+       
+    </body>
+
+</html>
+

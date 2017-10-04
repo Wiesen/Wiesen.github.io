@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en-us">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>微软2016校招在线笔试题解</title>
+        <style>
+
+    html body {
+        font-family: Raleway, sans-serif;
+        background-color: white;
+    }
+
+    :root {
+        --accent: red;
+        --border-width:  5px ;
+    }
+
+</style>
+
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
+
+
+ <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/solarized-dark.min.css"> 
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+ 
+
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+
+     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/go.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/java.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/python.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c&#43;&#43;.min.js"></script> 
+
+    <script>hljs.initHighlightingOnLoad();</script>
+
+
+
+
+
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+
+<script>$(document).on('click', function() { $('.collapse').collapse('hide'); })</script>
+ <meta name="generator" content="Hugo 0.29" />
+        
+        
+        <script async src="https://www.googletagmanager.com/gtag/js?id="></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments)};
+          gtag('js', new Date());
+
+          gtag('config', '');
+        </script>
+    </head>
+
+    <body>
+
+        <nav class="navbar navbar-default navbar-fixed-top">
+
+            <div class="container">
+
+                <div class="navbar-header">
+
+                    <a class="navbar-brand visible-xs" href="#">微软2016校招在线笔试题解</a>
+
+                    <button class="navbar-toggle" data-target=".navbar-collapse" data-toggle="collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+
+                </div>
+
+                <div class="collapse navbar-collapse">
+
+                    
+                        <ul class="nav navbar-nav">
+                            
+                                <li><a href="/">Home</a></li>
+                            
+                                <li><a href="/post/">Posts</a></li>
+                            
+                                <li><a href="/project/">Projects</a></li>
+                            
+                        </ul>
+                    
+
+                    
+                        <ul class="nav navbar-nav navbar-right">
+                            
+                                <li class="navbar-icon"><a href="mailto:yangwj92@gmail.com"><i class="fa fa-envelope-o"></i></a></li>
+                            
+                                <li class="navbar-icon"><a href="https://github.com/Wiesen/"><i class="fa fa-github"></i></a></li>
+                            
+                        </ul>
+                    
+
+                </div>
+
+            </div>
+
+        </nav>
+
+
+<main>
+
+    <div class="item">
+
+    
+    
+    
+
+    
+    
+
+    <h4><a href="/post/%E5%BE%AE%E8%BD%AF2016%E6%A0%A1%E6%8B%9B%E5%9C%A8%E7%BA%BF%E7%AC%94%E8%AF%95%E9%A2%98%E8%A7%A3/">微软2016校招在线笔试题解</a></h4>
+    <h5>April 15, 2016</h5>
+     <kbd class="item-tag">Algorithm</kbd> 
+
+</div>
+
+
+    <br> <div class="text-justify">
+
+<p>微软2016校招在线笔试题解
+题目地址：<a href="http://hihocoder.com/contest/mstest2016april1/problems">mstest2016april1</a></p>
+
+<p>感受：一定要理解好题意，注意细节。另外微软特别喜欢考察反向思维。</p>
+
+<h2 id="a-font-size">A. Font Size</h2>
+
+<p>选择一个最大字号刚好可以令页数不超过给定阈值P。</p>
+
+<p>逻辑理清即可。页由行组成，行由字符组成，其中字符为方形。需要注意的地方是：(1) 每段都从新的一行开始；(2) 每页至少显示一个字符。</p>
+
+<p>字号是整数，可以暴力求解遍历直到合适字号，单点时间复杂度为<code>O(10^6)</code>，没有超过题目限制。但如果题目再卡紧点就有点危险了，所以更好的方法是利用二分查找，注意好边界条件即可。</p>
+
+<p>编码思路如下：</p>
+
+<p>1.确定字号最小值为1，最大值为 <code>min(W, H)</code></p>
+
+<p>2.求字号为中值 <code>m</code> 时的页数：每段所占行数 <code>a[i]/(W/m)</code>，对所有段所占行数求和，最后求所占页数 <code>total/(H/m)</code>。</p>
+
+<p>3.当所占页数大于等于阈值P，则<code>r=m</code>，小于则<code>l=m+1</code>，直到<code>l&gt;=r</code>。注意等于阈值P时并不代表已经找到解，字号可能还能增大。</p>
+
+<p>4.解为 <code>r-1</code>。</p>
+
+<h2 id="b-403-forbidden">B. 403 Forbidden</h2>
+
+<p>题目的要求是进行 IP 地址匹配，返回最先（序号最小）匹配到的规则的动作，没有匹配的规则则返回 allow。</p>
+
+<p>一种方法是利用前缀树求解。建树方法: 在插入新规则 new 时，在该规则的前缀路径上（含等长）已有规则 old，意味着 old 屏蔽了new，直接丢弃新规则new。
+由此，在匹配一个 IP 地址时，只需要返回前缀树上匹配这个 IP 地址的最长规则。</p>
+
+<p>建树时间复杂度为 <code>O(N)</code>，匹配一次只需要常数时间，整体时间复杂度为 <code>O(min{N,M})</code>。</p>
+
+<h2 id="c-demo-day">C. Demo Day</h2>
+
+<p>动态规划水题，起始位置为 (1,1)，动作为向下或向右，考虑好各个状态转移,并且注意边界特殊情况即可。时间复杂度为 <code>O(N*M)</code>。</p>
+
+<p><code>DP[i][j][k]</code> 含义为：在第 i 行 第 j 列时，向 k 方向前进需要改变多少个格子 <code>(1&lt;=i&lt;=N, 1&lt;=j&lt;=M, k=right or down)</code>。</p>
+
+<pre><code>DP[i][j][right] = min{DP[i][j-1][right], DP[i-1][j][down] + (i + 1 &lt; n &amp;&amp; maze[i+1][j] != 'b')} + (maze[i][j] == 'b');
+DP[i][j][down] = min{DP[i-1][j][down], DP[i][j-1][right] + (j + 1 &lt; m &amp;&amp; maze[i][j+1] != 'b')} + (maze[i][j] == 'b');
+DP[i-1][j][k] 仅在 i - 1 &gt; 0 时存在，同理 DP[i][j-1][k] 仅在 j - 1 &gt; 0 时存在。
+最后结果：ans = min{DP[N][M][right], DP[N][M][down])
+</code></pre>
+
+<h2 id="d-building-in-sandbox">D. Building in Sandbox</h2>
+
+<p>思路参考<a href="https://www.zhihu.com/question/42406890/answer/94388263">知乎</a>。</p>
+
+<p>题目的初始条件是地面([1,1,0]~[100,100,0])已经摆满了方块。</p>
+
+<p>对于新添加的方块有下面两个要求：
+1. 相邻性：必须与之前之前放置的立方体(包括地面)相邻；
+2. 可达性：必须能够从空间外部在不穿过任何方块的前提下到达该方块，换言之就是不能处于封闭空间中。</p>
+
+<p>对于第一个要求每次添加时进行简单的逻辑判断即可。</p>
+
+<p>第二个要求根据一位答主的想法，由闭空间判断转换为开空间判断，就变成了图论里的简单题目了：先对外部空间做一个FloodFill；然后倒序判断方块 <code>i</code> 是否与外部空间相邻；相邻的话就删除该方块，然后做FloodFill；一旦存在不相邻就是处于封闭空间中。</p>
+
+<p>不过该方法是离线判断，强制在线可参考另一个<a href="https://www.zhihu.com/question/42406890/answer/94480532">回答</a>。</p>
+
+<hr />
+
+<p>阅读参考</p>
+
+<blockquote>
+<p><a href="https://www.zhihu.com/question/42406890">https://www.zhihu.com/question/42406890</a></p>
+
+<p><a href="http://www.gotit.sinaapp.com/">http://www.gotit.sinaapp.com/</a></p>
+
+<p><a href="http://yfwz100.github.io/articles/interv/microsoft-2016.html">http://yfwz100.github.io/articles/interv/microsoft-2016.html</a></p>
+</blockquote>
+</div>
+
+    
+    
+
+    
+
+        <h4 class="page-header">Related</h4>
+
+         <div class="item">
+
+    
+    
+    
+
+    
+    
+
+    <h4><a href="/post/%E5%BF%AB%E9%80%9F%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/">快速排序笔记</a></h4>
+    <h5>March 15, 2016</h5>
+     <kbd class="item-tag">Algorithm</kbd> 
+
+</div>
+  <div class="item">
+
+    
+    
+    
+
+    
+    
+
+    <h4><a href="/post/%E5%BD%92%E5%B9%B6%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/">归并排序笔记</a></h4>
+    <h5>March 10, 2016</h5>
+     <kbd class="item-tag">Algorithm</kbd> 
+
+</div>
+ 
+
+    
+
+    
+
+        <h4 class="page-header">Comments</h4>
+
+        <div id="disqus_thread"></div>
+<script>
+    var disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "Wiesen" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+    
+
+</main>
+
+        <footer>
+
+            <p class="copyright text-muted">&copy; All rights reserved. Powered by <a href="https://gohugo.io">Hugo</a> and <a href="https://github.com/calintat/minimal">Minimal</a></p>
+
+        </footer>
+       
+    </body>
+
+</html>
+

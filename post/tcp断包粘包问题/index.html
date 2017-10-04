@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en-us">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>TCP粘包问题：分包</title>
+        <style>
+
+    html body {
+        font-family: Raleway, sans-serif;
+        background-color: white;
+    }
+
+    :root {
+        --accent: red;
+        --border-width:  5px ;
+    }
+
+</style>
+
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
+
+
+ <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/solarized-dark.min.css"> 
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+ 
+
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+
+     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/go.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/java.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/python.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c&#43;&#43;.min.js"></script> 
+
+    <script>hljs.initHighlightingOnLoad();</script>
+
+
+
+
+
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+
+<script>$(document).on('click', function() { $('.collapse').collapse('hide'); })</script>
+ <meta name="generator" content="Hugo 0.29" />
+        
+        
+        <script async src="https://www.googletagmanager.com/gtag/js?id="></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments)};
+          gtag('js', new Date());
+
+          gtag('config', '');
+        </script>
+    </head>
+
+    <body>
+
+        <nav class="navbar navbar-default navbar-fixed-top">
+
+            <div class="container">
+
+                <div class="navbar-header">
+
+                    <a class="navbar-brand visible-xs" href="#">TCP粘包问题：分包</a>
+
+                    <button class="navbar-toggle" data-target=".navbar-collapse" data-toggle="collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+
+                </div>
+
+                <div class="collapse navbar-collapse">
+
+                    
+                        <ul class="nav navbar-nav">
+                            
+                                <li><a href="/">Home</a></li>
+                            
+                                <li><a href="/post/">Posts</a></li>
+                            
+                                <li><a href="/project/">Projects</a></li>
+                            
+                        </ul>
+                    
+
+                    
+                        <ul class="nav navbar-nav navbar-right">
+                            
+                                <li class="navbar-icon"><a href="mailto:yangwj92@gmail.com"><i class="fa fa-envelope-o"></i></a></li>
+                            
+                                <li class="navbar-icon"><a href="https://github.com/Wiesen/"><i class="fa fa-github"></i></a></li>
+                            
+                        </ul>
+                    
+
+                </div>
+
+            </div>
+
+        </nav>
+
+
+<main>
+
+    <div class="item">
+
+    
+    
+    
+
+    
+    
+
+    <h4><a href="/post/tcp%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/">TCP粘包问题：分包</a></h4>
+    <h5>October 26, 2016</h5>
+     <kbd class="item-tag">network</kbd> 
+
+</div>
+
+
+    <br> <div class="text-justify">
+
+<h2 id="update-2017-01-17">Update 2017-01-17</h2>
+
+<p>From Muduo：</p>
+
+<p>TCP 是<strong>“字节流”</strong>协议，其本身没有“消息包”的概念，因此“粘包问题”是个伪命题。但对利用 TCP 进行通信的应用层程序来说，分包是其基本需求。</p>
+
+<p>分包指的是在发送一个消息（message）或者一帧（frame）数据时，通过一定的处理，令接收方能从字节流中识别并截取（还原）出一个个消息包。</p>
+
+<p>对于短连接的 TCP 服务，分包不是问题。只要发送方主动关闭连接，就表示一条消息发送完毕，接收方 read() 返回0，从而得知消息结尾。</p>
+
+<p>对于长连接的 TCP 服务，分包有4种方法：</p>
+
+<ol>
+<li>消息长度固定（亦即是提前确定包长度，适合定长消息包）；</li>
+<li>使用特殊的字符或字符串作为消息的边界，例如 HTTP 协议的 headers 以“\r\n”为字段的分隔符；</li>
+<li>在每条消息的头部加一个长度字段，最常见的做法；</li>
+<li>利用消息本身的格式来分包，例如 XML 格式的消息中<root>&hellip;</root>的配对，或者json格式中的{&hellip;}的配对。解析这种消息格式通常会用到状态机。</li>
+</ol>
+
+<h2 id="粘包问题">粘包问题</h2>
+
+<p>一个完整的消息可能会被TCP拆分成多个包进行发送，也有可能把多个小的包封装成一个大的数据包发送。粘包是指发送方发送的若干包数据到接收方接收时粘成一包，从接收缓冲区看，后一包数据的头紧接着前一包数据的尾。</p>
+
+<p>粘包问题是由 TCP 是面向字节流协议因此没有消息边界所引起的。而 UDP 是面向数据报的协议，所以不存在拆包粘包问题。</p>
+
+<p>存在以下特殊情况：</p>
+
+<ol>
+<li>如果发送数据无结构，如文件传输，这样发送方只管发送，接收方只管接收存储就 ok，不用考虑粘包；</li>
+<li>如果利用 TCP 短连接时，不会出现粘包问题；</li>
+<li>当发送数据<strong>存在一定结构，并且需要维护长连接时</strong>，则需要考虑粘包问题；</li>
+</ol>
+
+<h2 id="问题原因">问题原因</h2>
+
+<p>出现拆包粘包现象的原因既可能由发送方造成，也可能由接收方造成:</p>
+
+<ol>
+<li>要发送的数据大于TCP发送缓冲区剩余空间大小，发生拆包；</li>
+<li>待发送数据大于MSS（最大报文长度），TCP在传输前进行拆包；</li>
+<li>要发送的数据小于TCP发送缓冲区的大小，TCP将多次写入缓冲区的数据一次发送出去，造成粘包;</li>
+<li>接收方没能及时地接收缓冲区的数据，造成粘包;</li>
+</ol>
+
+<h2 id="解决方法">解决方法</h2>
+
+<p>解决粘包的方法，是由应用层进行<strong>分包处理</strong>，本质上就是由<strong>应用层</strong>来维护消息和消息的边界（即定义自己的会话层和表示层协议）。</p>
+
+<p>本文处理办法：</p>
+
+<ol>
+<li>发送方在每次发送消息时将数据报长度写入一个int32作为包头一并发送出去, 称之为Encode；</li>
+
+<li><p>接受方则先读取一个int32的长度的消息长度信息, 再根据长度读取相应长的byte数据, 称之为Decode；</p>
+
+<pre><code>//codec.go
+
+package codec
+
+import (
+    &quot;bufio&quot;
+    &quot;bytes&quot;
+    &quot;encoding/binary&quot;
+)
+
+func Encode(message string) ([]byte, error) {
+    // 读取消息的长度
+    var length int32 = int32(len(message))
+    var pkg *bytes.Buffer = new(bytes.Buffer)
+    // 写入消息头
+    err := binary.Write(pkg, binary.LittleEndian, length)
+    if err != nil {
+        return nil, err
+    }
+    // 写入消息实体
+    err = binary.Write(pkg, binary.LittleEndian, []byte(message))
+    if err != nil {
+        return nil, err
+    }
+
+    return pkg.Bytes(), nil
+}
+
+func Decode(reader *bufio.Reader) (string, error) {
+    // 读取消息的长度
+    lengthByte, _ := reader.Peek(4)
+    lengthBuff := bytes.NewBuffer(lengthByte)
+    var length int32
+    err := binary.Read(lengthBuff, binary.LittleEndian, &amp;length)
+    if err != nil {
+        return &quot;&quot;, err
+    }
+    if int32(reader.Buffered()) &lt; length+4 {
+        return &quot;&quot;, err
+    }
+
+    // 读取消息真正的内容
+    pack := make([]byte, int(4+length))
+    _, err = reader.Read(pack)
+    if err != nil {
+        return &quot;&quot;, err
+    }
+    return string(pack[4:]), nil
+}
+</code></pre></li>
+</ol>
+</div>
+
+    
+    
+
+    
+
+    
+
+        <h4 class="page-header">Comments</h4>
+
+        <div id="disqus_thread"></div>
+<script>
+    var disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "Wiesen" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+    
+
+</main>
+
+        <footer>
+
+            <p class="copyright text-muted">&copy; All rights reserved. Powered by <a href="https://gohugo.io">Hugo</a> and <a href="https://github.com/calintat/minimal">Minimal</a></p>
+
+        </footer>
+       
+    </body>
+
+</html>
+

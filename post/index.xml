@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Posts on Wiesen&#39;s Blog</title>
+    <link>https://wiesen.github.io/post/</link>
+    <description>Recent content in Posts on Wiesen&#39;s Blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 28 Jan 2017 21:31:20 +0800</lastBuildDate>
+    
+	<atom:link href="https://wiesen.github.io/post/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Leveldb: Log</title>
+      <link>https://wiesen.github.io/post/leveldb-storage-log/</link>
+      <pubDate>Sat, 28 Jan 2017 21:31:20 +0800</pubDate>
+      
+      <guid>https://wiesen.github.io/post/leveldb-storage-log/</guid>
+      <description>Leveldb 存储主要分为 SSTable（磁盘） 和 MemTable（内存，包括 MemTable 和 Immutable MemTable），此外还有一些辅助文件:Manifest, Log, Current。
+本篇 blog 主要分析 Log：log 在 Leveldb 中的作用，一条log 在内存中的形式是什么，以怎样的方式被组织。
+Log (db/log_format.h&amp;amp;cc,db/log_writer.h&amp;amp;.cc,db/log_reader.h&amp;amp;.cc) Introduction 日志（logging）分两种：
+ 诊断日志（diagnostic log）：即log4j、glog、log4cxx等常用日志库提供的日志功能 交易日志（transaction log）：即数据库的 write-ahead log、文件系统的journaling等，用于记录状态变更，通过 replay log 可以逐步恢复每一次修改之后的状态。  LevelDb 中的 log 是后者，主要作用是系统故障时进行数据恢复。**利用 WAL（write-ahead log），当故障时 Memtable 中的数据没来得及 Dump 成 SSTable 文件，LevelDB 可根据 log 文件恢复内存数据，保持数据（data和metadata）的持久性。
+Format log record 以 block 为单位组织（32k）。写日志时，一致性考虑，并没有以 block 为单位写，而是每次更新均对 log 文件进行 IO，根据 WriteOption::sync 决定是否做强制 sync。读取时以 block 为单位做 IO 以及校验。log 的写入是顺序写，读取只会在启动时发生，不会是性能的瓶颈。
+Log entry header 包含三个字段，checksum 是对“类型”和“数据”字段的校验码，为了避免处理不完整或者是被破坏的数据，当 leveldb 读取记录数据时候会对数据进行校验，如果 checksum 相同则说明数据完整无破坏，可以继续后续流程。length 表示 payload 长度，type 字段则指出了每条 log record 和 log block 之间的结构关系，主要有五种类型：ZERO/FULL/FIRST/MIDDLE/LAST，具体结构关系如上图所示。</description>
+    </item>
+    
+    <item>
+      <title>Leveldb: Block Cache</title>
+      <link>https://wiesen.github.io/post/leveldb-cache/</link>
+      <pubDate>Wed, 25 Jan 2017 21:31:20 +0800</pubDate>
+      
+      <guid>https://wiesen.github.io/post/leveldb-cache/</guid>
+      <description>Block Cache (util/cache.cc)：
+ Introduction
+Cache 的目的：减少磁盘IO，加快 CURD 速度。
+leveldb 中的 cache 分为 Table Cache 和 Block Cache 两种，其中 Table Cache 中缓存的是 sstable 的索引数据，Block Cache 缓存的是 Block 数据（可选打开）。
+leveldb 中支持用户自己实现 block cache 逻辑，作为 option 传入。默认使用的是内部实现的 LRU。
+ 基于简单以及效率考虑，leveldb 中实现了一个简单的 hash table（LRUHandle），采用定长数组存放 node，链表解决 hash 冲突。每次 insert 后，如果 node 数量大于数组的容量（期望短的冲突链表长度），就将容量扩大2倍，做一次 rehash； LRU 的逻辑由 LRUCache 控制， insert 和 lookup 时更新链表即可； 由于 levelDB 为多线程，每个线程访问 cache 时都会对 cache 加锁。为了保证多线程安全并且减少锁开销，又将 LRUCache 再做 shard（ShardedLRUCache）。  整体来看：ShardedLRUCache 内部有 16 个 LRUCache（定长），查找 Key 时根据 key 的高四位进行 hash 索引，然后在相应的 LRUCache 中进行查找或更新。当 LRUCache 使用率大于总容量后, 根据 LRU 淘汰 key.</description>
+    </item>
+    
+    <item>
+      <title>Leveldb: Storage MemTable</title>
+      <link>https://wiesen.github.io/post/leveldb-storage-memtable/</link>
+      <pubDate>Tue, 20 Dec 2016 21:31:20 +0800</pubDate>
+      
+      <guid>https://wiesen.github.io/post/leveldb-storage-memtable/</guid>
+      <description>Leveldb 存储主要分为 SSTable（磁盘） 和 MemTable（内存，包括 MemTable 和 Immutable MemTable），此外还有一些辅助文件:Manifest, Log, Current。
+本篇 blog 主要分析 Memtable：Leveldb一条记录在内存中的形式是什么，记录以怎样的方式被组织。
+Memtable (db/skiplist.h,db/memtable.h &amp;amp; memtable.cc)  Introduction MemTable 是 leveldb 的 kv 数据在内存中的存储结构。当 Memtable 写入的数据占用内存到达指定大小 (Options.write_buffer_size)，则自动转换为 Immutable Memtable（只读），同时生成新的 Memtable 供写操作写入新数据。后台的 compact 进程会负责将 immutable memtable dump to disk 生成 sstable。
+通过 Memtable 和 Immutable Memtable，Leveldb 可在持久化到磁盘上的同时保持对外服务可用。这种特性是由 Leveldb 的适用场景催生的：Append 写。
+Structure &amp;amp; Operation memtable key 的组成参照 Leveldb: Basic Settings。memtable 存储同一 key 的多个版本的数据。KeyComparator 首先按照递增顺序比较 user key，然后安装递减顺序比较sequence number，这两个足以唯一确定一条 entry。</description>
+    </item>
+    
+    <item>
+      <title>Leveldb: Basic Settings</title>
+      <link>https://wiesen.github.io/post/leveldb-basic-concept/</link>
+      <pubDate>Mon, 19 Dec 2016 21:31:20 +0800</pubDate>
+      
+      <guid>https://wiesen.github.io/post/leveldb-basic-concept/</guid>
+      <description>（待完善……）
+ Slice(include/leveldb/slice.h)
+为操作数据的方便，将数据和长度包装成 Slice 使用，直接操控指针以避免不必要的数据拷贝
+class Slice { … private: const char* data_; size_t size_; };  Option(include/leveldb/option.h)
+leveldb 中启动时的一些配置，通过 Option 传入，get/put/delete 时，也有相应的 ReadOption/WriteOption。
+ Env(include/leveldb/env.h util/evn_posix.h)
+考虑到移植以及灵活性，leveldb 将系统相关的处理（文件/进程/时间之类）抽象成 Env，用户可以自己实现相应的接口，作为 Option 传入。默认使用自带的实现。
+ varint(util/coding.h)
+leveldb 采用了 protocalbuffer 里使用的变长整形编码方法，节省空间。
+ ValueType(db/dbformat.h)
+leveldb更新（put/delete）某个key时不会操控到db中的数据，每次操作都是直接新插入一份kv数据，具体的数据合并和清除由后台的compact完成。
+所以，每次 put 都会添加一份 KV 数据，即使该 key 已经存在；而 delete 等同于 put 空的 value。为了区分 live 数据和已删除的 mock 数据，leveldb 使用 ValueType 来标识：
+enum ValueType { kTypeDeletion = 0x0, kTypeValue = 0x1 };  SequenceNumber(db/dbformat.</description>
+    </item>
+    
+    <item>
+      <title>Leveldb: Introduction</title>
+      <link>https://wiesen.github.io/post/leveldb-introduction/</link>
+      <pubDate>Mon, 28 Nov 2016 21:31:20 +0800</pubDate>
+      
+      <guid>https://wiesen.github.io/post/leveldb-introduction/</guid>
+      <description>看了不少 blog 分析 leveldb，但很少看到有人从设计原因和策略上进行总结。所以这个系列对 leveldb 的实现做一点设计分析，争取将内部实现逻辑串联起来，至于源码注释之类的网上一扒拉就有很多啦。
+Introduction Leveldb 库提供持久层 kv 存储，其中 keys 和values 可以是任意字节数组。目前有 C++，golang 的实现。
+作者 Jeff Dean, Sanjay Ghemawat 同时也是设计实现 BigTable 的作者。在 BigTable 中有两个关键部分：master server 和 tablet server。
+ master server 负责存储 meta-data，并且调度管理 tablet server； tablet server 负责存储具体数据，并且响应读写操作。  Leveldb 可视为 BigTable 中 tablet server 的简化实现。
+Features, Limitations, Performance 详见 leveldb homepage
+How to use 详见 leveldb 使用文档
+Background 冯诺依曼体系结构的计算机系统主要为两点：存储 + 计算。数据库即为存储方面，依赖于存储硬件特性。
+当前磁盘物理结构特性导致 (磁头寻道，旋转延迟)：随机读写慢，连续读写快，相差三个数量级。内存和 SSD 同样表现，只不过原因是：连续读写可预判，因此会被优化 (相差量级也没磁盘那么大)。</description>
+    </item>
+    
+    <item>
+      <title>I/O Event Handling Design Patterns</title>
+      <link>https://wiesen.github.io/post/io-event-handling-design-patterns/</link>
+      <pubDate>Thu, 24 Nov 2016 21:31:20 +0800</pubDate>
+      
+      <guid>https://wiesen.github.io/post/io-event-handling-design-patterns/</guid>
+      <description>Introduction System I/O can be blocking, or non-blocking synchronous, or non-blocking asynchronous:
+ Blocking I/O means that the calling system does not return control to the caller until the operation is finished a non-blocking synchronous call returns control to the caller immediately  I/O multiplexing mechanisms rely on an event demultiplexor: dispatches I/O events from a limited number of sources to the appropriate read/write event handlers.
+There are two non-blocking I/O multiplexing mechanisms: reactor &amp;amp;&amp;amp; proactor.</description>
+    </item>
+    
+    <item>
+      <title>TCP粘包问题：分包</title>
+      <link>https://wiesen.github.io/post/tcp%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/</link>
+      <pubDate>Wed, 26 Oct 2016 10:32:46 +0800</pubDate>
+      
+      <guid>https://wiesen.github.io/post/tcp%E6%96%AD%E5%8C%85%E7%B2%98%E5%8C%85%E9%97%AE%E9%A2%98/</guid>
+      <description>Update 2017-01-17 From Muduo：
+TCP 是“字节流”协议，其本身没有“消息包”的概念，因此“粘包问题”是个伪命题。但对利用 TCP 进行通信的应用层程序来说，分包是其基本需求。
+分包指的是在发送一个消息（message）或者一帧（frame）数据时，通过一定的处理，令接收方能从字节流中识别并截取（还原）出一个个消息包。
+对于短连接的 TCP 服务，分包不是问题。只要发送方主动关闭连接，就表示一条消息发送完毕，接收方 read() 返回0，从而得知消息结尾。
+对于长连接的 TCP 服务，分包有4种方法：
+ 消息长度固定（亦即是提前确定包长度，适合定长消息包）； 使用特殊的字符或字符串作为消息的边界，例如 HTTP 协议的 headers 以“\r\n”为字段的分隔符； 在每条消息的头部加一个长度字段，最常见的做法； 利用消息本身的格式来分包，例如 XML 格式的消息中&amp;hellip;的配对，或者json格式中的{&amp;hellip;}的配对。解析这种消息格式通常会用到状态机。  粘包问题 一个完整的消息可能会被TCP拆分成多个包进行发送，也有可能把多个小的包封装成一个大的数据包发送。粘包是指发送方发送的若干包数据到接收方接收时粘成一包，从接收缓冲区看，后一包数据的头紧接着前一包数据的尾。
+粘包问题是由 TCP 是面向字节流协议因此没有消息边界所引起的。而 UDP 是面向数据报的协议，所以不存在拆包粘包问题。
+存在以下特殊情况：
+ 如果发送数据无结构，如文件传输，这样发送方只管发送，接收方只管接收存储就 ok，不用考虑粘包； 如果利用 TCP 短连接时，不会出现粘包问题； 当发送数据存在一定结构，并且需要维护长连接时，则需要考虑粘包问题；  问题原因 出现拆包粘包现象的原因既可能由发送方造成，也可能由接收方造成:
+ 要发送的数据大于TCP发送缓冲区剩余空间大小，发生拆包； 待发送数据大于MSS（最大报文长度），TCP在传输前进行拆包； 要发送的数据小于TCP发送缓冲区的大小，TCP将多次写入缓冲区的数据一次发送出去，造成粘包; 接收方没能及时地接收缓冲区的数据，造成粘包;  解决方法 解决粘包的方法，是由应用层进行分包处理，本质上就是由应用层来维护消息和消息的边界（即定义自己的会话层和表示层协议）。
+本文处理办法：
+ 发送方在每次发送消息时将数据报长度写入一个int32作为包头一并发送出去, 称之为Encode； 接受方则先读取一个int32的长度的消息长度信息, 再根据长度读取相应长的byte数据, 称之为Decode；
+//codec.go package codec import ( &amp;quot;bufio&amp;quot; &amp;quot;bytes&amp;quot; &amp;quot;encoding/binary&amp;quot; ) func Encode(message string) ([]byte, error) { // 读取消息的长度 var length int32 = int32(len(message)) var pkg *bytes.</description>
+    </item>
+    
+    <item>
+      <title>Solution to Raspberry Pi ROS rivz Core Dumped</title>
+      <link>https://wiesen.github.io/post/solution-to-raspberry-pi-ros-rivz-segmentation-fault/</link>
+      <pubDate>Sun, 18 Sep 2016 17:32:46 +0800</pubDate>
+      
+      <guid>https://wiesen.github.io/post/solution-to-raspberry-pi-ros-rivz-segmentation-fault/</guid>
+      <description>Recently I installed ROS on Raspberry Pi2 (both Jessie and Ubuntu 14.04) in order to implement SLAM algorithm on it. However when runs the rviz (rosrun rviz rviz) I get core dumped message.
+After searching I found the solution here. What I do is upgrade libpcre3 to 3_8.35 (upgrade collada-dom to 2.4.4 does not help). Here is the download link.
+I confirm that rviz now works properly on my Raspberry Pi2 running the official ubuntu 14.</description>
+    </item>
+    
+    <item>
+      <title>MIT 6.824: Lab 4 Sharded KeyValue Service Implementation</title>
+      <link>https://wiesen.github.io/post/mit-6.824-lab4-sharded-keyvalue-service/</link>
+      <pubDate>Fri, 09 Sep 2016 17:32:46 +0800</pubDate>
+      
+      <guid>https://wiesen.github.io/post/mit-6.824-lab4-sharded-keyvalue-service/</guid>
+      <description>lab4 是基于 lab2 和 lab3 实现的 Raft Consensus Algorithm 之上实现 Sharded KeyValue Service。主要分为两部分：
+ Part A：The Shard Master Part B: Sharded Key/Value Server  除了最后一个 challenge test case TestDelete() 以外，目前代码其余都可以 pass。但偶尔会 fail 在 unreliable test case，目前的定位是 raft 的实现还有点 bug。
+Code Link:
+ PART A PART B  Architecture lab4 的架构是典型的 M/S 架构（a configuration service and a set of replica groups)，不过实现十分基础，很多功能没有实现：1) shards 之间的传递很慢并且不允许 concurrent client acess；2) 每个 raft group 中的 member 不会改变。</description>
+    </item>
+    
+    <item>
+      <title>Robotics: Estimation and learning</title>
+      <link>https://wiesen.github.io/post/robotics-estimation-and-learning/</link>
+      <pubDate>Tue, 16 Aug 2016 17:32:46 +0800</pubDate>
+      
+      <guid>https://wiesen.github.io/post/robotics-estimation-and-learning/</guid>
+      <description>Course Link: One of the course of Robotics in Coursera from the University of Pennsylvania. It is helpful to learn the classical algorithm of robotics.
+Here are some course notes in Chinese collected from Zhihu. These notes introduce algorithm in a little more detial than course.
+However, the code in these notes has bug and even can not run normally, which are no worthy of learning. The code in my GitHub pass all homeworks.</description>
+    </item>
+    
+    <item>
+      <title>MIT 6.824: lab3 Fault-Tolerant Key/Value Service Implementation</title>
+      <link>https://wiesen.github.io/post/mit-6.824-lab3-fault-tolerant-kvservice-implementation/</link>
+      <pubDate>Sat, 06 Aug 2016 17:32:46 +0800</pubDate>
+      
+      <guid>https://wiesen.github.io/post/mit-6.824-lab3-fault-tolerant-kvservice-implementation/</guid>
+      <description>lab3 是基于 lab2 实现的 Raft Consensus Algorithm 之上实现 KV Service。主要分为两部分：
+ Part A：Key/value service without log compaction，即实现基本的分布式存储服务。 Part B: Key/value service with log compaction，即在 Part A 基础上实现 log compaction。  代码分别可以 pass 各个 test case，但所有一起跑时有时会卡在 TestPersistPartition() 这里，初步猜测是 raft 的实现还有点 bug。
+Code Link
+Part A：Key/value service  KV Database Client API
+key/value database 的 client API 必须满足以下要求：
+ 保证仅执行一次(at most once semantics)：API 必须为每个 Client 及 每个 Request 赋予唯一的 id； 必须向使用该 API 的应用提供 sequential consistency：对于每个 Client，仅有一条 Request RPC 在显式执行(利用 lock 实现)；  此外，API 应当一直尝试向 key/value server 发起 RPC 直到收到 positive reply；并且记住 leader id，从而尽可能避免失败次数。</description>
+    </item>
+    
+    <item>
+      <title>MIT 6.824: lab2 Raft Consensus Algorithm Implementation</title>
+      <link>https://wiesen.github.io/post/mit-6.824-lab2-raft-consensus-algorithm-implementation/</link>
+      <pubDate>Fri, 10 Jun 2016 21:32:46 +0800</pubDate>
+      
+      <guid>https://wiesen.github.io/post/mit-6.824-lab2-raft-consensus-algorithm-implementation/</guid>
+      <description>Raft 将一致性问题分为了三个相对独立的子问题，分别是：
+ Leader election：当前 leader 崩溃时，集群中必须选举出一个新的 leader； Log replication：leader 必须接受来自 clients 的 log entries，并且将其 replicate 到集群机器中，强制其余 logs 与其保持一致； Safety：Raft 中最关键的 safety property 是 State Machine Safety Property，亦即是，当任一机器 apply 了某一特定 log entry 到其 state machine 中，则其余服务器都不可能 apply 了一个 index 相同但 command 不同的 log。  差不多依据上述划分，6.824 中 Raft 的实现指导逻辑还是挺清晰的，其中 safety property 由 Leader election 和 Log replication 共同承担，并且将 Persistence 作为最后一部分。实现过程主要分为：
+ Leader Election and Heartbeats：首先令 Raft 能够在不存在故障的情景下选举出一个 leader，并且稳定保持状态； Log Replication：其次令 Raft 能够保持一个 consistent 并且 replicated 的 log； Persistence：最后令 Raft 能够持久化保存 persistent state，这样在重启后可以进行恢复。  其中，本文主要参考 Raft paper，其中的 figure 2 作用很大。本文实现大量依赖 channel 实现消息传递和线程同步。</description>
+    </item>
+    
+    <item>
+      <title>微软2016校招在线笔试题解</title>
+      <link>https://wiesen.github.io/post/%E5%BE%AE%E8%BD%AF2016%E6%A0%A1%E6%8B%9B%E5%9C%A8%E7%BA%BF%E7%AC%94%E8%AF%95%E9%A2%98%E8%A7%A3/</link>
+      <pubDate>Fri, 15 Apr 2016 21:31:33 +0800</pubDate>
+      
+      <guid>https://wiesen.github.io/post/%E5%BE%AE%E8%BD%AF2016%E6%A0%A1%E6%8B%9B%E5%9C%A8%E7%BA%BF%E7%AC%94%E8%AF%95%E9%A2%98%E8%A7%A3/</guid>
+      <description>微软2016校招在线笔试题解 题目地址：mstest2016april1
+感受：一定要理解好题意，注意细节。另外微软特别喜欢考察反向思维。
+A. Font Size 选择一个最大字号刚好可以令页数不超过给定阈值P。
+逻辑理清即可。页由行组成，行由字符组成，其中字符为方形。需要注意的地方是：(1) 每段都从新的一行开始；(2) 每页至少显示一个字符。
+字号是整数，可以暴力求解遍历直到合适字号，单点时间复杂度为O(10^6)，没有超过题目限制。但如果题目再卡紧点就有点危险了，所以更好的方法是利用二分查找，注意好边界条件即可。
+编码思路如下：
+1.确定字号最小值为1，最大值为 min(W, H)
+2.求字号为中值 m 时的页数：每段所占行数 a[i]/(W/m)，对所有段所占行数求和，最后求所占页数 total/(H/m)。
+3.当所占页数大于等于阈值P，则r=m，小于则l=m+1，直到l&amp;gt;=r。注意等于阈值P时并不代表已经找到解，字号可能还能增大。
+4.解为 r-1。
+B. 403 Forbidden 题目的要求是进行 IP 地址匹配，返回最先（序号最小）匹配到的规则的动作，没有匹配的规则则返回 allow。
+一种方法是利用前缀树求解。建树方法: 在插入新规则 new 时，在该规则的前缀路径上（含等长）已有规则 old，意味着 old 屏蔽了new，直接丢弃新规则new。 由此，在匹配一个 IP 地址时，只需要返回前缀树上匹配这个 IP 地址的最长规则。
+建树时间复杂度为 O(N)，匹配一次只需要常数时间，整体时间复杂度为 O(min{N,M})。
+C. Demo Day 动态规划水题，起始位置为 (1,1)，动作为向下或向右，考虑好各个状态转移,并且注意边界特殊情况即可。时间复杂度为 O(N*M)。
+DP[i][j][k] 含义为：在第 i 行 第 j 列时，向 k 方向前进需要改变多少个格子 (1&amp;lt;=i&amp;lt;=N, 1&amp;lt;=j&amp;lt;=M, k=right or down)。
+DP[i][j][right] = min{DP[i][j-1][right], DP[i-1][j][down] + (i + 1 &amp;lt; n &amp;amp;&amp;amp; maze[i+1][j] !</description>
+    </item>
+    
+    <item>
+      <title>Flat Datacenter Storage Paper Review</title>
+      <link>https://wiesen.github.io/post/flat-datacenter-storage-paper-review/</link>
+      <pubDate>Wed, 30 Mar 2016 21:33:37 +0800</pubDate>
+      
+      <guid>https://wiesen.github.io/post/flat-datacenter-storage-paper-review/</guid>
+      <description>A review for paper Nightingale E B, Elson J, Fan J, et al. Flat datacenter storage[C]//Presented as part of the 10th USENIX Symposium on Operating Systems Design and Implementation (OSDI 12). 2012: 1-15.
+Introduction What is FDS?
+ Flat Datacenter Storage (FDS) is a high-performance, fault-tolerant, large-scale, locality-oblivious blob store. Using a novel combination of full bisection bandwidth networks, data and metadata striping, and** flow control**, FDS multiplexes an application’s large-scale I/O across the available throughput and latency budget of every disk in a cluster.</description>
+    </item>
+    
+    <item>
+      <title>Chain Replication Paper Review</title>
+      <link>https://wiesen.github.io/post/chain-replication-paper-review/</link>
+      <pubDate>Sat, 19 Mar 2016 21:33:09 +0800</pubDate>
+      
+      <guid>https://wiesen.github.io/post/chain-replication-paper-review/</guid>
+      <description>本文是读完 Van Renesse R, Schneider F B. Chain Replication for Supporting High Throughput and Availability[C]//OSDI. 2004. 的总结。
+Summary Chain replication is a new approach to coordinating clusters of fail-stop storage servers.
+Chain replication 采用 ROWAA (read one, write all available) 方法, 具有良好的 Scalability.
+该方法目的是, 不以牺牲强一致性为代价来实现高吞吐和高可用, 从而提供分布式存储服务.
+A Storage Service Interface Clients 发送 query 或 update 操作 request
+The storage service 为每个 request 生成 reply 发送会 client 告知其已经接收或已经处理完成, 从而 client 可以得知某 request 是否接收成功以及是否处理完成.</description>
+    </item>
+    
+    <item>
+      <title>快速排序笔记</title>
+      <link>https://wiesen.github.io/post/%E5%BF%AB%E9%80%9F%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/</link>
+      <pubDate>Tue, 15 Mar 2016 21:31:20 +0800</pubDate>
+      
+      <guid>https://wiesen.github.io/post/%E5%BF%AB%E9%80%9F%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/</guid>
+      <description>快排最引人注目的特点是原地排序（只需要一个很小的辅助栈），且将长度为 N 的数组排序所需的时间和 NlgN 成正比。 而快排的主要缺点是非常脆弱，在实现时必须非常小心才能避免性能低下。
+同前述一致：以 C++ 实现,仅针对 vector 进行操作, 并且遵循 C++ 左闭右开的区间标准: [a,b)。
+基本算法 快排也是一种分治的排序算法，快排与归并排序是互补的：
+ 归并排序将数组分成两个子数组分别排序，再将有序子数组归并以将整个数组排序，其递归调用发生在处理整个数组之前； 而快排则是先确定 key 的位置，而后当两个子数组都有序时则整个数组即有序，其递归调用发生在处理整个数组之后。  快排的关键在划分，划分过程需要使得数组满足以下三个条件：
+ 对于某个 key，a[key] 已经排定； [low,key) 中所有元素都不大于 a[key]； [key,high) 中所有元素都不小于 a[key]。   据此，快排的基本思想是:
+ 选取一个元素作为切分元素 key，然后从数组左端开始向右扫描直到找到一个大于等于它的元素，再从数组右端开始向左扫描直到找到一个小于等于它的元素，而后交换它们的位置; 如此继续，就可以保证左指针 left 的左侧元素都不大于 key，右指针 right 的右侧都不小于 key; 当左右指针相遇时 （left &amp;gt;= right），将切分元素 key 与左子数组最右元素（也就是 right 最终停下的位置）交换然后返回划分位置 right 即可。
+int Partition(std::vector&amp;lt;T&amp;gt; &amp;amp;vec, int low, int high) { int left = low, right = high; while (true) { // Avoid subscript beging out of range while (vec[++left] &amp;lt; vec[low]) if (left == high - 1)break; while (vec[low] &amp;lt; vec[--right]) if (right == low)break; // Terminate the loop if (left &amp;gt;= right)break; std::swap(vec[left], vec[right]); } std::swap(vec[low], vec[right]); return right; }   快排中有若干细节问题值得注意，否则会导致实现错误或者性能下降:</description>
+    </item>
+    
+    <item>
+      <title>归并排序笔记</title>
+      <link>https://wiesen.github.io/post/%E5%BD%92%E5%B9%B6%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/</link>
+      <pubDate>Thu, 10 Mar 2016 21:24:46 +0800</pubDate>
+      
+      <guid>https://wiesen.github.io/post/%E5%BD%92%E5%B9%B6%E6%8E%92%E5%BA%8F%E7%AC%94%E8%AE%B0/</guid>
+      <description>归并排序是一种渐近最优的基于比较排序的算法, 意即: 其在最坏情况下的比较次数和任意基于比较的排序算法所需的最少比较次数都是~NlgN。其主要的优点是可以保证将任意长度为 N 的数组排序的时间复杂度为 O(NlgN); 其主要缺点是空间复杂度为 O(N)。
+这里均以 C++ 实现, 为了避免陷入到语言细节里所以仅针对 vector 进行操作, 并且遵循 C++ 左闭右开的区间标准: [a,b)。值得注意的是区间表示一致性这个细节对针对数组和搜索(如二分查找)的算法有着举足轻重的影响。
+至于倾向于 [a,b) 左闭右开区间表示的原因可参考链接。简单来说主要原因有二: 一是 end-begin 即可得到区间大小; 二是当区间退化为 0 时包含左界更加&amp;rdquo;natural&amp;rdquo;。
+自顶向下的归并排序 递归实现的归并排序是算法设计中分治思想的典型应用。
+主要是两个函数: 由 MergeSort() 负责递归调用, Merge() 负责归并。
+ 优化一: 对小规模子数组使用插入排序
+递归会使小规模问题中方法的调度过于频繁, 而插入或者选择在小数组上比归并要快, 所以改进对小规模子数组的处理方法可以改进整个算法。根据经验, 使用插入处理小规模子数组(&amp;lt;15)可将归并的运行时间缩短10%~15%。
+ 优化二: 测试子数组是否有序
+添加一个判断条件: if (a[mid] &amp;gt; a[mid+1]) 再进行 Merge() 操作, 否则数组已经是有序的。进行此优化可以令任意有序的子数组算法时间复杂度变为线性。
+ 优化三: 不将元素复制到辅助数组
+在递归调用的每个层次交换输入数组和辅助数组的角色, 可节省将数组元素复制到用于归并的辅助数组的时间(无法节省空间)。
+template&amp;lt;class T&amp;gt; void Merge(std::vector&amp;lt;T&amp;gt; &amp;amp;src, std::vector&amp;lt;T&amp;gt; &amp;amp;dest, int nHead, int nMid, int nEnd) { int nLeftIndex = nHead, nRightIndex = nMid; for (int i = nHead; i &amp;lt; nEnd; ++i){ // Detail: Use range[nHead, nEnd) if (nLeftIndex &amp;gt;= nMid) dest[i] = src[nRightIndex++]; else if (nRightIndex &amp;gt;= nEnd) dest[i] = src[nLeftIndex++]; else if (src[nLeftIndex] &amp;lt; src[nRightIndex]) dest[i] = src[nLeftIndex++]; else dest[i] = src[nRightIndex++]; } } template&amp;lt;class T&amp;gt; void MergeSort(std::vector&amp;lt;T&amp;gt; &amp;amp;src, std::vector&amp;lt;T&amp;gt; &amp;amp;dest, int nHead, int nEnd) { // if (nEnd - nHead &amp;lt;= 1) return; // Before optimizing // Optimization 1: Use InsertSort when small scale if (nEnd - nHead &amp;lt;= 15) { InsertSort(dest, nHead, nEnd); return; } int nMid = (nHead + nEnd) / 2; // Optimization 2: Avoid copying to auxiliary array MergeSort(dest, src, nHead, nMid); MergeSort(dest, src, nMid, nEnd); // Optimization 3: If the sub-array is sorted then skip merge if (src[nMid - 1] &amp;lt;= src[nMid]){ std::copy(src.</description>
+    </item>
+    
+  </channel>
+</rss>
