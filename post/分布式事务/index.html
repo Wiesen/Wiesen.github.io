@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en-us">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>分布式事务</title>
+        <style>
+
+    html body {
+        font-family: Raleway, sans-serif;
+        background-color: white;
+    }
+
+    :root {
+        --accent: red;
+        --border-width:  5px ;
+    }
+
+</style>
+
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
+
+
+ <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/solarized-dark.min.css"> 
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+ 
+
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+
+     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/go.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/java.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/python.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c&#43;&#43;.min.js"></script> 
+
+    <script>hljs.initHighlightingOnLoad();</script>
+
+
+
+
+
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+
+<script>$(document).on('click', function() { $('.collapse').collapse('hide'); })</script>
+ <meta name="generator" content="Hugo 0.29" />
+        
+        
+        <script async src="https://www.googletagmanager.com/gtag/js?id=UA-73790691-1"></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments)};
+          gtag('js', new Date());
+
+          gtag('config', 'UA-73790691-1');
+        </script>
+    </head>
+
+    <body>
+
+        <nav class="navbar navbar-default navbar-fixed-top">
+
+            <div class="container">
+
+                <div class="navbar-header">
+
+                    <a class="navbar-brand visible-xs" href="#">分布式事务</a>
+
+                    <button class="navbar-toggle" data-target=".navbar-collapse" data-toggle="collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+
+                </div>
+
+                <div class="collapse navbar-collapse">
+
+                    
+                        <ul class="nav navbar-nav">
+                            
+                                <li><a href="/">Home</a></li>
+                            
+                                <li><a href="/post/">Posts</a></li>
+                            
+                                <li><a href="/project/">Projects</a></li>
+                            
+                        </ul>
+                    
+
+                    
+                        <ul class="nav navbar-nav navbar-right">
+                            
+                                <li class="navbar-icon"><a href="mailto:yangwj92@gmail.com"><i class="fa fa-envelope-o"></i></a></li>
+                            
+                                <li class="navbar-icon"><a href="https://github.com/Wiesen/"><i class="fa fa-github"></i></a></li>
+                            
+                        </ul>
+                    
+
+                </div>
+
+            </div>
+
+        </nav>
+
+
+<main>
+
+    <div class="item">
+
+    
+    
+    
+
+    
+    
+
+    <h4><a href="/post/%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1/">分布式事务</a></h4>
+    <h5>March 21, 2017</h5>
+     <kbd class="item-tag">Distributed System</kbd> 
+
+</div>
+
+
+    <br> <div class="text-justify">
+
+<h3 id="introduction">Introduction</h3>
+
+<p>(from Wikipedia)</p>
+
+<p>A <strong>distributed transaction</strong> is a database transaction in which two or more network hosts are involved.</p>
+
+<p>Usually, hosts provide <strong>transactional resources</strong>, while the <strong>transaction manager</strong> is responsible for creating and managing a global transaction that encompasses all operations against such resources.</p>
+
+<p>Distributed transactions, as any other transactions, must have all four <strong>ACID (atomicity, consistency, isolation, durability)</strong> properties, where atomicity guarantees all-or-nothing outcomes for the unit of work (operations bundle).</p>
+
+<p>distributed transactions = distributed commit + concurrency control</p>
+
+<p>柔性事务满足 BASE 理论（基本可用，最终一致）, 刚性事务满足 ACID 理论</p>
+
+<h3 id="solution">Solution</h3>
+
+<ol>
+<li><p>2PC (XA、JTA/JTS)</p>
+
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/2pc.png" alt="2pc" /></p>
+
+<p>Idea:</p>
+
+<ul>
+<li>tentative changes, later commit or undo (abort)</li>
+<li>single entity decides whether to commit —— Transaction Coordinator (TC)</li>
+</ul>
+
+<p>But it has a bad reputation:</p>
+
+<ul>
+<li>slow because of multiple phases / message exchanges</li>
+<li>locks are held over the prepare/commit exchanges; blocks other transactions</li>
+<li>TC crash can cause <strong>indefinite blocking</strong>, with locks held
+<br /></li>
+</ul>
+
+<p>Conclusion:
+ - Used in sharded DBs when a transaction uses data on multiple shards
+ - Usually used only in a single small domain
+    (E.g. not between banks, not between airlines, not over wide area)</p></li>
+
+<li><p>3PC</p>
+
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/Three-phase_commit_diagram.png" alt="3pc" /></p>
+
+<p>Improvement:</p>
+
+<ul>
+<li>3PC is <strong>non-blocking</strong>: it places an upper bound on the amount of time required before a transaction either commits or aborts. This property ensures that if a given transaction is attempting to commit via 3PC and holds some resource locks, it will release the locks after the timeout.</li>
+</ul></li>
+
+<li><p>MQ (RabbitMQ, Kafka)</p>
+
+<p>Idea: Decoupling, Eventually Consistency, broadcast, flow control,</p>
+
+<p>Duplicated message, Sequence, Reliability</p></li>
+
+<li><p>TCC (Try/Confirm/Cancel)</p>
+
+<p>事务补偿型</p>
+
+<p>Transactions for SOA</p>
+
+<p><a href="https://github.com/liuyangming/ByteTCC">ByteTCC</a></p></li>
+</ol>
+
+<h3 id="reference">Reference</h3>
+
+<ol>
+<li><a href="https://en.wikipedia.org/wiki/Distributed_transaction">Distributed transaction</a></li>
+<li><a href="http://tech.meituan.com/mq-design.html">消息队列设计精要</a></li>
+<li><a href="http://mindhacks.cn/2008/06/13/why-is-quicksort-so-quick/">数学之美番外篇：快排为什么那样快</a></li>
+</ol>
+</div>
+
+    
+    
+
+    
+
+        <h4 class="page-header">Related</h4>
+
+         <div class="item">
+
+    
+    
+    
+
+    
+    
+
+    <h4><a href="/post/mit-6.824-lab4-sharded-keyvalue-service/">MIT 6.824: Lab 4 Sharded KeyValue Service Implementation</a></h4>
+    <h5>September 9, 2016</h5>
+     <kbd class="item-tag">Distributed System</kbd>  <kbd class="item-tag">MIT 6.824</kbd> 
+
+</div>
+  <div class="item">
+
+    
+    
+    
+
+    
+    
+
+    <h4><a href="/post/mit-6.824-lab3-fault-tolerant-kvservice-implementation/">MIT 6.824: lab3 Fault-Tolerant Key/Value Service Implementation</a></h4>
+    <h5>August 6, 2016</h5>
+     <kbd class="item-tag">Distributed System</kbd>  <kbd class="item-tag">MIT 6.824</kbd> 
+
+</div>
+  <div class="item">
+
+    
+    
+    
+
+    
+    
+
+    <h4><a href="/post/mit-6.824-lab2-raft-consensus-algorithm-implementation/">MIT 6.824: lab2 Raft Consensus Algorithm Implementation</a></h4>
+    <h5>June 10, 2016</h5>
+     <kbd class="item-tag">Distributed System</kbd>  <kbd class="item-tag">MIT 6.824</kbd> 
+
+</div>
+ 
+
+    
+
+    
+
+        <h4 class="page-header">Comments</h4>
+
+        <div id="disqus_thread"></div>
+<script>
+    var disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "Wiesen" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+    
+
+</main>
+
+        <footer>
+
+            <p class="copyright text-muted">&copy; All rights reserved. Powered by <a href="https://gohugo.io">Hugo</a> and <a href="https://github.com/calintat/minimal">Minimal</a></p>
+
+        </footer>
+       
+    </body>
+
+</html>
+
