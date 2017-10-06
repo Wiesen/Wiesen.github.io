@@ -6,29 +6,15 @@
     <description>Recent content in Leveldb on Wiesen&#39;s Blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Sat, 28 Jan 2017 21:31:20 +0800</lastBuildDate>
+    <lastBuildDate>Sat, 25 Feb 2017 21:31:20 +0800</lastBuildDate>
     
 	<atom:link href="https://wiesen.github.io/tags/leveldb/index.xml" rel="self" type="application/rss+xml" />
     
     
     <item>
-      <title>Leveldb: Log</title>
-      <link>https://wiesen.github.io/post/leveldb-storage-log/</link>
-      <pubDate>Sat, 28 Jan 2017 21:31:20 +0800</pubDate>
-      
-      <guid>https://wiesen.github.io/post/leveldb-storage-log/</guid>
-      <description>Leveldb 存储主要分为 SSTable（磁盘） 和 MemTable（内存，包括 MemTable 和 Immutable MemTable），此外还有一些辅助文件:Manifest, Log, Current。
-本篇 blog 主要分析 Log：log 在 Leveldb 中的作用，一条log 在内存中的形式是什么，以怎样的方式被组织。
-Log (db/log_format.h&amp;amp;cc,db/log_writer.h&amp;amp;.cc,db/log_reader.h&amp;amp;.cc) Introduction 日志（logging）分两种：
- 诊断日志（diagnostic log）：即log4j、glog、log4cxx等常用日志库提供的日志功能 交易日志（transaction log）：即数据库的 write-ahead log、文件系统的journaling等，用于记录状态变更，通过 replay log 可以逐步恢复每一次修改之后的状态。  LevelDb 中的 log 是后者，主要作用是系统故障时进行数据恢复。**利用 WAL（write-ahead log），当故障时 Memtable 中的数据没来得及 Dump 成 SSTable 文件，LevelDB 可根据 log 文件恢复内存数据，保持数据（data和metadata）的持久性。
-Format log record 以 block 为单位组织（32k）。写日志时，一致性考虑，并没有以 block 为单位写，而是每次更新均对 log 文件进行 IO，根据 WriteOption::sync 决定是否做强制 sync。读取时以 block 为单位做 IO 以及校验。log 的写入是顺序写，读取只会在启动时发生，不会是性能的瓶颈。
-Log entry header 包含三个字段，checksum 是对“类型”和“数据”字段的校验码，为了避免处理不完整或者是被破坏的数据，当 leveldb 读取记录数据时候会对数据进行校验，如果 checksum 相同则说明数据完整无破坏，可以继续后续流程。length 表示 payload 长度，type 字段则指出了每条 log record 和 log block 之间的结构关系，主要有五种类型：ZERO/FULL/FIRST/MIDDLE/LAST，具体结构关系如上图所示。</description>
-    </item>
-    
-    <item>
       <title>Leveldb: Block Cache</title>
       <link>https://wiesen.github.io/post/leveldb-cache/</link>
-      <pubDate>Wed, 25 Jan 2017 21:31:20 +0800</pubDate>
+      <pubDate>Sat, 25 Feb 2017 21:31:20 +0800</pubDate>
       
       <guid>https://wiesen.github.io/post/leveldb-cache/</guid>
       <description>Block Cache (util/cache.cc)：
@@ -42,7 +28,7 @@ leveldb 中支持用户自己实现 block cache 逻辑，作为 option 传入。
     <item>
       <title>Leveldb: Storage MemTable</title>
       <link>https://wiesen.github.io/post/leveldb-storage-memtable/</link>
-      <pubDate>Tue, 20 Dec 2016 21:31:20 +0800</pubDate>
+      <pubDate>Tue, 31 Jan 2017 21:31:20 +0800</pubDate>
       
       <guid>https://wiesen.github.io/post/leveldb-storage-memtable/</guid>
       <description>Leveldb 存储主要分为 SSTable（磁盘） 和 MemTable（内存，包括 MemTable 和 Immutable MemTable），此外还有一些辅助文件:Manifest, Log, Current。
@@ -53,9 +39,23 @@ Structure &amp;amp; Operation memtable key 的组成参照 Leveldb: Basic Settin
     </item>
     
     <item>
+      <title>Leveldb: Log</title>
+      <link>https://wiesen.github.io/post/leveldb-storage-log/</link>
+      <pubDate>Fri, 27 Jan 2017 21:31:20 +0800</pubDate>
+      
+      <guid>https://wiesen.github.io/post/leveldb-storage-log/</guid>
+      <description>Leveldb 存储主要分为 SSTable（磁盘） 和 MemTable（内存，包括 MemTable 和 Immutable MemTable），此外还有一些辅助文件:Manifest, Log, Current。
+本篇 blog 主要分析 Log：log 在 Leveldb 中的作用，一条log 在内存中的形式是什么，以怎样的方式被组织。
+Log (db/log_format.h&amp;amp;cc,db/log_writer.h&amp;amp;.cc,db/log_reader.h&amp;amp;.cc) Introduction 日志（logging）分两种：
+ 诊断日志（diagnostic log）：即log4j、glog、log4cxx等常用日志库提供的日志功能 交易日志（transaction log）：即数据库的 write-ahead log、文件系统的journaling等，用于记录状态变更，通过 replay log 可以逐步恢复每一次修改之后的状态。  LevelDb 中的 log 是后者，主要作用是系统故障时进行数据恢复。**利用 WAL（write-ahead log），当故障时 Memtable 中的数据没来得及 Dump 成 SSTable 文件，LevelDB 可根据 log 文件恢复内存数据，保持数据（data和metadata）的持久性。
+Format log record 以 block 为单位组织（32k）。写日志时，一致性考虑，并没有以 block 为单位写，而是每次更新均对 log 文件进行 IO，根据 WriteOption::sync 决定是否做强制 sync。读取时以 block 为单位做 IO 以及校验。log 的写入是顺序写，读取只会在启动时发生，不会是性能的瓶颈。
+Log entry header 包含三个字段，checksum 是对“类型”和“数据”字段的校验码，为了避免处理不完整或者是被破坏的数据，当 leveldb 读取记录数据时候会对数据进行校验，如果 checksum 相同则说明数据完整无破坏，可以继续后续流程。length 表示 payload 长度，type 字段则指出了每条 log record 和 log block 之间的结构关系，主要有五种类型：ZERO/FULL/FIRST/MIDDLE/LAST，具体结构关系如上图所示。</description>
+    </item>
+    
+    <item>
       <title>Leveldb: Basic Settings</title>
       <link>https://wiesen.github.io/post/leveldb-basic-concept/</link>
-      <pubDate>Mon, 19 Dec 2016 21:31:20 +0800</pubDate>
+      <pubDate>Sat, 26 Nov 2016 21:31:20 +0800</pubDate>
       
       <guid>https://wiesen.github.io/post/leveldb-basic-concept/</guid>
       <description>（待完善……）
@@ -76,7 +76,7 @@ enum ValueType { kTypeDeletion = 0x0, kTypeValue = 0x1 };  SequenceNumber(db/dbf
     <item>
       <title>Leveldb: Introduction</title>
       <link>https://wiesen.github.io/post/leveldb-introduction/</link>
-      <pubDate>Mon, 28 Nov 2016 21:31:20 +0800</pubDate>
+      <pubDate>Fri, 25 Nov 2016 21:31:20 +0800</pubDate>
       
       <guid>https://wiesen.github.io/post/leveldb-introduction/</guid>
       <description>看了不少 blog 分析 leveldb，但很少看到有人从设计原因和策略上进行总结。所以这个系列对 leveldb 的实现做一点设计分析，争取将内部实现逻辑串联起来，至于源码注释之类的网上一扒拉就有很多啦。

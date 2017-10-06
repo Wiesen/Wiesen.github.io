@@ -29,7 +29,7 @@ I confirm that rviz now works properly on my Raspberry Pi2 running the official 
       
       <guid>https://wiesen.github.io/post/robotics-estimation-and-learning/</guid>
       <description>Course Link: One of the course of Robotics in Coursera from the University of Pennsylvania. It is helpful to learn the classical algorithm of robotics.
-Here are some course notes in Chinese collected from Zhihu. These notes introduce algorithm in a little more detial than course.
+Here are some course notes in Chinese collected from Zhihu. These notes introduce algorithm in a little more detail than course.
 However, the code in these notes has bug and even can not run normally, which are no worthy of learning. The code in my GitHub pass all homeworks.</description>
     </item>
     

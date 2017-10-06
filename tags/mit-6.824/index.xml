@@ -12,6 +12,15 @@
     
     
     <item>
+      <title>6.824 Distributed Systems: Spring 2016</title>
+      <link>https://wiesen.github.io/project/6.824-distributed-systems-spring-2016/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://wiesen.github.io/project/6.824-distributed-systems-spring-2016/</guid>
+      <description></description>
+    </item>
+    
+    <item>
       <title>MIT 6.824: Lab 4 Sharded KeyValue Service Implementation</title>
       <link>https://wiesen.github.io/post/mit-6.824-lab4-sharded-keyvalue-service/</link>
       <pubDate>Fri, 09 Sep 2016 17:32:46 +0800</pubDate>
