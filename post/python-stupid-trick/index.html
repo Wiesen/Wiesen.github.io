@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en-us">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>python stupid trick</title>
+        <style>
+
+    html body {
+        font-family: Raleway, sans-serif;
+        background-color: white;
+    }
+
+    :root {
+        --accent: red;
+        --border-width:  5px ;
+    }
+
+</style>
+
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
+
+
+ <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/solarized-dark.min.css"> 
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+ 
+
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+
+     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/go.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/java.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/python.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c.min.js"></script>  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/c&#43;&#43;.min.js"></script> 
+
+    <script>hljs.initHighlightingOnLoad();</script>
+
+
+
+
+
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+
+<script>$(document).on('click', function() { $('.collapse').collapse('hide'); })</script>
+ <meta name="generator" content="Hugo 0.29" />
+        
+        
+        <script async src="https://www.googletagmanager.com/gtag/js?id=UA-73790691-1"></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments)};
+          gtag('js', new Date());
+
+          gtag('config', 'UA-73790691-1');
+        </script>
+    </head>
+
+    <body>
+
+        <nav class="navbar navbar-default navbar-fixed-top">
+
+            <div class="container">
+
+                <div class="navbar-header">
+
+                    <a class="navbar-brand visible-xs" href="#">python stupid trick</a>
+
+                    <button class="navbar-toggle" data-target=".navbar-collapse" data-toggle="collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+
+                </div>
+
+                <div class="collapse navbar-collapse">
+
+                    
+                        <ul class="nav navbar-nav">
+                            
+                                <li><a href="/">Home</a></li>
+                            
+                                <li><a href="/post/">Posts</a></li>
+                            
+                                <li><a href="/project/">Projects</a></li>
+                            
+                        </ul>
+                    
+
+                    
+                        <ul class="nav navbar-nav navbar-right">
+                            
+                                <li class="navbar-icon"><a href="mailto:yangwj92@gmail.com"><i class="fa fa-envelope-o"></i></a></li>
+                            
+                                <li class="navbar-icon"><a href="https://github.com/Wiesen/"><i class="fa fa-github"></i></a></li>
+                            
+                        </ul>
+                    
+
+                </div>
+
+            </div>
+
+        </nav>
+
+
+<main>
+
+    <div class="item">
+
+    
+    
+    
+
+    
+    
+
+    <h4><a href="/post/python-stupid-trick/">python stupid trick</a></h4>
+    <h5>February 18, 2018</h5>
+     <kbd class="item-tag">python</kbd> 
+
+</div>
+
+
+    <br> <div class="text-justify"><p><a href="https://docs.python.org/2/library/queue.html#Queue.Queue.join">python queue: put、get、task_done、join</a></p>
+
+<ol>
+<li><p><code>Queue.put(item[, block[, timeout]])</code>:</p>
+
+<ol>
+<li>Put item into the queue.</li>
+<li>If optional args block is true and timeout is None (the default), block if necessary until a free slot is available.</li>
+<li>If timeout is a positive number, it <strong>blocks at most timeout seconds and raises the Full exception if no free slot was available within that time</strong>.</li>
+<li>Otherwise (block is false), put an item on the queue if a free slot is immediately available, else <strong>raise the Full exception (timeout is ignored in that case).</strong></li>
+</ol></li>
+
+<li><p><code>Queue.get([block[, timeout]])</code>:</p>
+
+<ol>
+<li>Remove and return an item from the queue.</li>
+<li>If optional args block is true and timeout is None (the default), block if necessary until an item is available.</li>
+<li>If timeout is a positive number, it **blocks at most timeout seconds and raises the Empty exception if no item was available within that time. **</li>
+<li>Otherwise (block is false), return an item if one is immediately available, else <strong>raise the Empty exception (timeout is ignored in that case).</strong></li>
+</ol></li>
+
+<li><p><code>Queue.task_done()</code>:</p>
+
+<ol>
+<li>Indicate that a formerly enqueued task is complete.</li>
+<li><strong>Used by queue consumer threads</strong>. For each get() used to fetch a task, <strong>a subsequent call to task_done() tells the queue that the processing on the task is complete.</strong></li>
+<li>If a join() is currently blocking, it will resume when all items have been processed (meaning that a task_done() call was received for every item that had been put() into the queue).</li>
+<li>Raises a ValueError if called more times than there were items placed in the queue.</li>
+</ol></li>
+
+<li><p><code>Queue.join()</code>：</p>
+
+<ol>
+<li>Blocks until all items in the queue have been gotten and processed.</li>
+<li>The count of unfinished tasks <strong>goes up whenever an item is added to the queue</strong>.</li>
+<li>The count <strong>goes down whenever a consumer thread calls task_done()</strong> to indicate that the item was retrieved and all work on it is complete.</li>
+<li>When the count of unfinished tasks drops to zero, join() unblocks.</li>
+</ol></li>
+</ol>
+
+<p><a href="http://effbot.org/zone/stupid-exceptions-keyboardinterrupt.htm">The KeyboardInterrupt Exception</a>:</p>
+
+<ol>
+<li>If you try to stop a CPython program using Control-C, the interpreter throws a KeyboardInterrupt exception.</li>
+<li>this is an ordinary exception, and is, like all other exceptions, caught by a “catch-all” try-except statement</li>
+<li>if the update process isn’t an atomic operation in itself, it’s also a good idea to use database transactions, and roll back when something goes wrong</li>
+</ol>
+
+<pre><code class="language-python">for record in database:
+    begin()
+    try:
+        process(record)
+        if changed:
+            update(record)
+    except (KeyboardInterrupt, SystemExit):
+        rollback()
+        raise
+    except:
+        rollback()
+        # report error and proceed
+    else:
+        commit()
+</code></pre>
+
+<p><a href="https://py.windrunner.me/design-patterns/singleton.html">Singleton Pattern</a>:</p>
+
+<p>装饰器：很方便的给不同的对象增添相同的功能</p>
+
+<pre><code class="language-python">def singleton(cls):
+    instance = cls()
+    instance.__call__ = lambda: instance
+    return instance
+
+@singleton
+class Highlander:
+    x = 100
+    # Of course you can have any attributes or methods you like.
+
+highlander = Highlander()
+another_highlander = Highlander()
+assert id(highlander) == id(another_highlander)
+</code></pre>
+
+<p>metaclass：希望的是有单例特性的类而不是为类添加单例限制</p>
+
+<pre><code class="language-python">class Singleton(type):
+    def __init__(cls, name, bases, dict):
+        super(Singleton, cls).__init__(name, bases, dict)
+        cls._instance = None
+    def __call__(cls, *args, **kw):
+        if cls._instance is None:
+            cls._instance = super(Singleton, cls).__call__(*args, **kw)
+        return cls._instance
+
+class MyClass(object):
+    __metaclass__ = Singleton
+
+one = MyClass()
+two = MyClass()
+</code></pre>
+
+<p><a href="http://lvxiaoyu.com/static/posts/20170414.0.html">select</a>：</p>
+
+<ol>
+<li>检查多个waitable object并阻塞，直到它变成ready object为止，并返回相应的ready object列表</li>
+
+<li><p>接收四个参数：</p>
+
+<ol>
+<li>用于读操作的 waitable object 列表</li>
+<li>用于写操作的 waitable object 列表</li>
+<li>表示异常的 waitable object 列表</li>
+<li><strong>超时时间：超时后select函数返回0，并且上述三个列表为空</strong></li>
+</ol></li>
+
+<li><p>返回三项返回值：</p>
+
+<ol>
+<li>用于读操作的 ready object 列表</li>
+<li>用于写操作的 ready object 列表</li>
+<li>表示异常的 ready object 列表</li>
+</ol></li>
+</ol>
+
+<pre><code class="language-python">import socket
+import select
+
+s = socket.socket()
+s.bind(('', 50007))
+s.listen(5)
+inputs = [s]
+num = 0
+while True:
+    rs, ws, es = select.select(inputs, [], [])
+    for r in rs:
+        if r is s:
+            c, addr = s.accept()
+            print 'got conn from :', addr
+            inputs.append(c)
+        else:
+            data = r.recv(1024)
+            r.sendall('You send: ' +  data)
+            if not data:
+                inputs.remove(r)
+            else:
+                print 'receive data : ', data
+</code></pre>
+</div>
+
+    
+    
+
+    
+
+    
+
+        <h4 class="page-header">Comments</h4>
+
+        <div id="disqus_thread"></div>
+<script>
+    var disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "Wiesen" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+    
+
+</main>
+
+        <footer>
+
+            <p class="copyright text-muted">&copy; All rights reserved. Powered by <a href="https://gohugo.io">Hugo</a> and <a href="https://github.com/calintat/minimal">Minimal</a></p>
+
+        </footer>
+       
+    </body>
+
+</html>
+

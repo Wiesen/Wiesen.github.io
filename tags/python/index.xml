@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Python on Wiesen&#39;s Blog</title>
+    <link>https://wiesen.github.io/tags/python/</link>
+    <description>Recent content in Python on Wiesen&#39;s Blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sun, 18 Feb 2018 21:31:20 +0800</lastBuildDate>
+    
+	<atom:link href="https://wiesen.github.io/tags/python/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>python stupid trick</title>
+      <link>https://wiesen.github.io/post/python-stupid-trick/</link>
+      <pubDate>Sun, 18 Feb 2018 21:31:20 +0800</pubDate>
+      
+      <guid>https://wiesen.github.io/post/python-stupid-trick/</guid>
+      <description>python queue: put、get、task_done、join
+ Queue.put(item[, block[, timeout]]):
+ Put item into the queue. If optional args block is true and timeout is None (the default), block if necessary until a free slot is available. If timeout is a positive number, it blocks at most timeout seconds and raises the Full exception if no free slot was available within that time. Otherwise (block is false), put an item on the queue if a free slot is immediately available, else raise the Full exception (timeout is ignored in that case).</description>
+    </item>
+    
+  </channel>
+</rss>
