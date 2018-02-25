@@ -38,6 +38,26 @@ Application:
     </item>
     
     <item>
+      <title>2018年秋招面试总结</title>
+      <link>https://wiesen.github.io/post/%E7%A7%8B%E6%8B%9B%E9%9D%A2%E8%AF%95%E6%80%BB%E7%BB%93/</link>
+      <pubDate>Mon, 15 Jan 2018 21:31:33 +0800</pubDate>
+      
+      <guid>https://wiesen.github.io/post/%E7%A7%8B%E6%8B%9B%E9%9D%A2%E8%AF%95%E6%80%BB%E7%BB%93/</guid>
+      <description>折腾完毕设，记录一下校招的经历、心态和思考，以及对于行业、公司平台、技术方向的个人选择。
+首先认清自己的定位，是高校还是企业，也就是读研／博还是工作。刨除所谓学历和名校加成这些无聊因素外，以我个人见闻以及切身体会，国内绝大多数的研究生都不值得读，除非纯学术或者所加入的实验室口碑甚好并且课题方向有意义且合意。否则，对于cs专业来说到工业界工作才能接触到业务的锻炼。无论是工程还是算法都一样。
+其次，定位于工业界的话（忽略掉传统外企、国企和银行），需要选择业务／行业方向。包括：电商、游戏、金融、社交、ai（视觉／语音／自动驾驶等）、云计算、基础架构等。
+ 其中游戏最累但钱最多，电商和云计算次之，基础架构薪资相对少但加班情况也比较少，而ai作为最近三五年最受关注的方向薪酬和发展都是工业界的顶配。 在这里我并不打算以钱多少来区分业务方向的选择。一般来说，不同行业有自身的技术特点，比如游戏是一个很特殊的方向，而云计算中的IaaS和基础架构则与os和计算机系统关系比较紧密，这主要关乎于个人的技术方向。 除了个人技术方向外，我认为选择一个行业看的是未来，也就是预测3～5年后的发展情况。“以史为镜，可以知兴替“。（普通）人作为社会渺小的一员，若以世俗的成功眼光看待行业选择这个问题，那么选择的重要性比能力的重要性要大，这也成为了大多数人口中所说的运气。然而所谓的选择也必须需要先有得到这些选项的可能性，因此先打好基础吧～  我应聘的岗位是后台开发，根据自己擅长的内容初始定位在分布式系统方向。曾经在研一的时候在机器学习方向有点入门，参与过两个小比赛，但由于种种原因未能有时间和精力深入，权当扩展知识面。
+在秋招中我面试过的公司比较少，主要是：阿里、腾讯（offer）、网易（offer）、拼多多、华为（offer）、美团（二面放弃）。由于精力不足放弃面试的公司有：美团、网易游戏、百度、招银网络科技等。互联网外企在国内变数较多，长期比较稳定的是ms、Google，其他不好评估，刷题较少的我没在外企投入什么精力……
+拼多多 拼多多是秋招第一个面的公司（实际上华为最早但面试都在侃大山，略过），公司给我的感觉就是缺乏人手开发，据说是11-11-6，虽然累但工资高啊很高啊十分高啊……个人对这种电商模式持怀疑态度，尤其是盈利的方向。二面凑巧面到创始人，他直白地跟我说了当前并不需要考虑盈利，有人投钱就行，后续可以接广告投放之类的。
+一面：一面面试体验不错，面试官一直在认真听我讲项目内容，还提出几个关键的问题点，几乎也是我之前做项目时也在处理的，第一次碰上这样的面试官我还是挺兴奋的，跟他面了得有100分钟。
+ raft如何用于分布式kv数据库中保证数据一致性，主要的疑问点在于读操作是否要进行raft commit 分布式kv数据库中进行slave join／leave时，如何进行hash partition的transfer one loop per thread网络并发模型中，连接的并发数量受限在哪个点 问了一发实际业务场景的问题：如果设计抢购时商品数量的扣除，其中商品数量不能出现小于0  二面：二面面试官后面看新闻脸熟，发现是拼多多的创始人。其面试过程给人感觉相当不友好，一开始问了下实习内容怼了一发，后面手撕算法也莫名开怼。刷了三题leetcode hard后不耐烦的我不想写了。
+阿里巴巴：计算平台事业部 捞我的部门是大规模机器学习组。当时托师兄查到后我时相当困惑，我完全没在简历上表明我有机器学习的背景啊……总共是面了三面，莫名其妙到了总监面后就不了了之，吊了我两个多月简历后把我挂了，应该是发现方向不对口吧【不管怎么说一直吊简历太恶心了。
+一面：在晚上9点来了个电话面到10点，然后email了一个题目让11点前撕掉，这面试时间十分阿里……一面面试官比较重视基础，基本上针对简历问了点问题，但他通过基础一步步深入，到了后面转换到项目问题我才反应过来。通过这种方法能够测试一个人到底是否理解所做的项目，是一个不错的面试经历。
+ 进程线程：多线程和多进程的区别，进程和线程的通信方式（不太清楚面试官试图问什么，因为只有进程强调通信，线程本来就共享内存区域只强调同步） 为什么one loop per thread IO模型中采用管道进行master和worker之间的通信（为什么多线程的程序要用多进程的通信方式）：问这个个人觉得有点刁钻……有可能是我讲项目时没讲好，管道主要用于同步（定向唤醒），通信是用thread-safe queue来做的 线程和协程的区别  二面：二面面试官主要问了点Linux内存问题，包括文件系统、内存管理、信号处理等
+ 内存管理：逻辑地址空间和物理地址的关系  物理内存只有8g，malloc 10g内存会怎样 malloc之后memset呢：swap page；OOM，kill进程：This usually occurs because all available memory, including disk swap space, has been allocated.  网络编程：  libevent、epoll原理 epoll中注册的进程如何被唤醒   网易杭研：云计算存储 网易我一开始在投简历的时候发现c++只有考拉一个部门可以选择（后续hr面告诉我还有很多部门在招c++时，只想吐槽他们的招聘页面能不能好好做），然后我就只好改投云计算存储。分布式存储是我个人比较感兴趣的技术方向，只是网易云计算在业界的知名度比较低。</description>
+    </item>
+    
+    <item>
       <title>分布式事务</title>
       <link>https://wiesen.github.io/post/%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1/</link>
       <pubDate>Tue, 21 Mar 2017 21:31:20 +0800</pubDate>
@@ -213,9 +233,12 @@ key/value database 的 client API 必须满足以下要求：
       <pubDate>Fri, 10 Jun 2016 21:32:46 +0800</pubDate>
       
       <guid>https://wiesen.github.io/post/mit-6.824-lab2-raft-consensus-algorithm-implementation/</guid>
-      <description>Raft 将一致性问题分为了三个相对独立的子问题，分别是：
- Leader election：当前 leader 崩溃时，集群中必须选举出一个新的 leader； Log replication：leader 必须接受来自 clients 的 log entries，并且将其 replicate 到集群机器中，强制其余 logs 与其保持一致； Safety：Raft 中最关键的 safety property 是 State Machine Safety Property，亦即是，当任一机器 apply 了某一特定 log entry 到其 state machine 中，则其余服务器都不可能 apply 了一个 index 相同但 command 不同的 log。  差不多依据上述划分，6.824 中 Raft 的实现指导逻辑还是挺清晰的，其中 safety property 由 Leader election 和 Log replication 共同承担，并且将 Persistence 作为最后一部分。实现过程主要分为：
- Leader Election and Heartbeats：首先令 Raft 能够在不存在故障的情景下选举出一个 leader，并且稳定保持状态； Log Replication：其次令 Raft 能够保持一个 consistent 并且 replicated 的 log； Persistence：最后令 Raft 能够持久化保存 persistent state，这样在重启后可以进行恢复。  其中，本文主要参考 Raft paper，其中的 figure 2 作用很大。本文实现大量依赖 channel 实现消息传递和线程同步。</description>
+      <description>分布式一致性协议原理 分布式一致性协议关注的问题：普通服务器和网络的不可靠，导致分布式系统中的数据不一致
+分布式一致性协议的作用：令一个机器集群可以在部分主机故障或不可用时仍能似单机一样提供正常服务（并不是要求所有节点在任何时刻状态完全一致）
+ 强调在网络分区或节点异常时，是因为如果不考虑这种异常状况，一致性是非常容易保证的，单节点即可。而一致性协议所要做的就是在容忍异常的情况下保证一致。 这里的一致是对集群外部使用者而言的，将整个集群看做一个整体。  分布式一致性协议的优点：
+ 保证在非拜占庭环境下的可靠性和一致性 只要大多数主机正常并能互相通信则能提供正常服务 不依赖时间来确定数据的一致性  Quorum与Paxos，Raft等一致性协议大多使用了Quorum机制，但仅仅依靠 Quorum(R+W&amp;gt;N) 机制无法保证一致性。
+Raft 基于Quorum机制，将一致性问题分为了三个相对独立的子问题，分别是：
+ Leader election：组成一个 Raft 集群至少需要三台机器，并限制每一时刻最多只能有一个节点可以发起 entry，即为 leader，以简化了一致性的实现。当前 leader 崩溃时，集群中必须选举出一个新的 leader 才能继续发起 entry。该子问题需要解决以下两个问题：  如何保证任何时候最多只有一个 leader 节点； 当 leader 节点异常时如何尽快的选择出新的 leader 节点；  Log replication：leader 必须接受来自 clients 的 log entries，并且将其 replicate 到集群机器中，强制其余 logs 与其保持一致，以保证后续 Leader 节点变化后依然能够使得整个集群对外保持一致。该子问题需要解决以下两个问题：  Follower 以与 Leader 节点相同的顺序依次执行每个 committed entry； 每个 committed entry 必须有足够多的成功副本，来保证后续的访问一致；  Safety：Raft 中最关键的 safety property 是 State Machine Safety Property，亦即是，当任一机器 apply 了某一特定 log entry 到其 state machine 中，则其余服务器都不可能 apply 了一个 index 相同但 command 不同的 log。具体来说即添加了以下两个限制：  leader election 限制：为了避免数据从 Follower 到 Leader 的反向流动带来的复杂性，Raft 限制新 Leader 一定是当前 Log 最新的节点，即其拥有最多最大 term的 Log Entry log replication 限制：Leader 只能对自己本 Term 的 entry 采用统计大多数的方式进行 commit，而旧 Term 的 entry 则利用 “committed entry 之前的所有 Log entry 都已顺序 commit”的机制来提交（归纳法可得）   差不多依据上述划分，6.</description>
     </item>
     
     <item>
@@ -300,27 +323,6 @@ int Partition(std::vector&amp;lt;T&amp;gt; &amp;amp;vec, int low, int high) { in
  优化三: 不将元素复制到辅助数组
 在递归调用的每个层次交换输入数组和辅助数组的角色, 可节省将数组元素复制到用于归并的辅助数组的时间(无法节省空间)。
 template&amp;lt;class T&amp;gt; void Merge(std::vector&amp;lt;T&amp;gt; &amp;amp;src, std::vector&amp;lt;T&amp;gt; &amp;amp;dest, int nHead, int nMid, int nEnd) { int nLeftIndex = nHead, nRightIndex = nMid; for (int i = nHead; i &amp;lt; nEnd; ++i){ // Detail: Use range[nHead, nEnd) if (nLeftIndex &amp;gt;= nMid) dest[i] = src[nRightIndex++]; else if (nRightIndex &amp;gt;= nEnd) dest[i] = src[nLeftIndex++]; else if (src[nLeftIndex] &amp;lt; src[nRightIndex]) dest[i] = src[nLeftIndex++]; else dest[i] = src[nRightIndex++]; } } template&amp;lt;class T&amp;gt; void MergeSort(std::vector&amp;lt;T&amp;gt; &amp;amp;src, std::vector&amp;lt;T&amp;gt; &amp;amp;dest, int nHead, int nEnd) { // if (nEnd - nHead &amp;lt;= 1) return; // Before optimizing // Optimization 1: Use InsertSort when small scale if (nEnd - nHead &amp;lt;= 15) { InsertSort(dest, nHead, nEnd); return; } int nMid = (nHead + nEnd) / 2; // Optimization 2: Avoid copying to auxiliary array MergeSort(dest, src, nHead, nMid); MergeSort(dest, src, nMid, nEnd); // Optimization 3: If the sub-array is sorted then skip merge if (src[nMid - 1] &amp;lt;= src[nMid]){ std::copy(src.</description>
-    </item>
-    
-    <item>
-      <title>2018年秋招面试总结</title>
-      <link>https://wiesen.github.io/post/%E7%A7%8B%E6%8B%9B%E9%9D%A2%E8%AF%95%E6%80%BB%E7%BB%93/</link>
-      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
-      
-      <guid>https://wiesen.github.io/post/%E7%A7%8B%E6%8B%9B%E9%9D%A2%E8%AF%95%E6%80%BB%E7%BB%93/</guid>
-      <description>折腾完毕设，记录一下校招的经历、心态和思考，以及对于行业、公司平台、技术方向的个人选择。
-首先认清自己的定位，是高校还是企业，也就是读研／博还是工作。刨除所谓学历和名校加成这些无聊因素外，以我个人见闻以及切身体会，国内绝大多数的研究生都不值得读，除非纯学术或者所加入的实验室口碑甚好并且课题方向有意义且合意。否则，对于cs专业来说到工业界工作才能接触到业务的锻炼。无论是工程还是算法都一样。
-其次，定位于工业界的话（忽略掉传统外企、国企和银行），需要选择业务／行业方向。包括：电商、游戏、金融、社交、ai（视觉／语音／自动驾驶等）、云计算、基础架构等。其中游戏最累但钱最多，电商和云计算次之，基础架构薪资相对少但加班情况也比较少，而ai作为最近三五年最受关注的方向薪酬和发展都是工业界的顶配。在这里我并不打算以钱多少来区分业务方向的选择。一般来说，不同行业有自身的技术特点，比如游戏是一个很特殊的方向，而云计算中的IaaS和基础架构则与os和计算机系统关系比较紧密，这主要关乎于个人的技术方向。除了个人技术方向外，我认为选择一个行业看的是未来，也就是预测3～5年后的发展情况。“以史为镜，可以知兴替“。（普通）人作为社会渺小的一员，若以世俗的成功眼光看待行业选择这个问题，那么选择的重要性比能力的重要性要大，这也成为了大多数人口中所说的运气。然而所谓的选择也必须需要先有得到这些选项的可能性，因此先打好基础吧～
-我应聘的岗位是后台开发，根据自己擅长的内容初始定位在分布式系统方向。曾经在研一的时候在机器学习方向有点入门，参与过两个小比赛，但由于种种原因未能有时间和精力深入，权当扩展知识面。在秋招中我面试过的公司比较少，主要是：阿里、腾讯（offer）、网易（offer）、拼多多、华为（offer）、美团（二面放弃）。由于精力不足放弃面试的公司有：美团、网易游戏、百度、招银网络科技等。互联网外企在国内变数较多，长期比较稳定的是ms、Google，其他不好评估，刷题较少的我没在外企投入什么精力……
-拼多多 拼多多是秋招第一个面的公司（实际上华为最早但面试都在侃大山，略过），公司给我的感觉就是缺乏人手开发，据说是11-11-6，虽然累但工资高啊很高啊十分高啊……个人对这种电商模式持怀疑态度，尤其是盈利的方向。二面凑巧面到创始人，他直白地跟我说了当前并不需要考虑盈利，有人投钱就行，后续可以接广告投放之类的。
-一面：一面面试体验不错，面试官一直在认真听我讲项目内容，还提出几个关键的问题点，几乎也是我之前做项目时也在处理的，第一次碰上这样的面试官我还是挺兴奋的，跟他面了得有100分钟。 1. raft如何用于分布式kv数据库中保证数据一致性，主要的疑问点在于读操作是否要进行raft commit 2. 分布式kv数据库中进行slave join／leave时，如何进行hash partition的transfer 3. one loop per thread网络并发模型中，连接的并发数量受限在哪个点 4. 问了一发实际业务场景的问题：如果设计抢购时商品数量的扣除，其中商品数量不能出现小于0
-二面：二面面试官后面看新闻脸熟，发现是拼多多的创始人。其面试过程给人感觉相当不友好，一开始问了下实习内容怼了一发，后面手撕算法也莫名开怼。刷了三题leetcode hard后不耐烦的我不想写了。
-阿里巴巴：计算平台事业部 捞我的部门是大规模机器学习组。当时托师兄查到后我时相当困惑，我完全没在简历上表明我有机器学习的背景啊……总共是面了三面，莫名其妙到了总监面后就不了了之，吊了我两个多月简历后把我挂了，应该是发现方向不对口吧【不管怎么说一直吊简历太恶心了。
-一面：在晚上9点来了个电话面到10点，然后email了一个题目让11点前撕掉，这面试时间十分阿里……一面面试官比较重视基础，基本上针对简历问了点问题，但他通过基础一步步深入，到了后面转换到项目问题我才反应过来。通过这种方法能够测试一个人到底是否理解所做的项目，是一个不错的面试经历。 2. 进程线程：多线程和多进程的区别，进程和线程的通信方式（不太清楚面试官试图问什么，因为只有进程强调通信，线程本来就共享内存区域只强调同步） 1. 为什么one loop per thread IO模型中采用管道进行master和worker之间的通信（为什么多线程的程序要用多进程的通信方式）：问这个个人觉得有点刁钻……有可能是我讲项目时没讲好，管道主要用于同步（定向唤醒），通信是用thread-safe queue来做的 4. 线程和协程的区别
-二面：二面面试官主要问了点Linux内存问题，包括文件系统、内存管理、信号处理等 3. 内存管理：逻辑地址空间和物理地址的关系 4. 物理内存只有8g，malloc 10g内存会怎样 5. malloc之后memset呢：swap page；OOM，kill进程：This usually occurs because all available memory, including disk swap space, has been allocated. 4. 网络编程： 1. libevent、epoll原理 2. epoll中注册的进程如何被唤醒
-网易杭研：云计算存储 网易我一开始在投简历的时候发现c++只有考拉一个部门可以选择（后续hr面告诉我还有很多部门在招c++时，只想吐槽他们的招聘页面能不能好好做），然后我就只好改投云计算存储。分布式存储是我个人比较感兴趣的技术方向，只是网易云计算在业界的知名度比较低。
-整体说来网易的笔面试都比较玄学，看学校和项目经历（包括本科），笔试全a的也有可能没法得到面试机会。网易的面试经历个人体验有好有差，相对来说十分看面试官。面完以后我觉得很悬不抱什么希望，但后面还是莫名其妙得到了offer。
-一面：一面面试官十分认真面试过程挺好的，针对我的简历广度和深度都有涉及，从这次面试中我也对自己的知识面进行查漏补缺。逐层深入地问我golang并发、Linux多进程多线程网络编程、raft协议等，也多亏他将我从二面手下救回来给了我加面的机会……【鞠躬 1.</description>
     </item>
     
   </channel>

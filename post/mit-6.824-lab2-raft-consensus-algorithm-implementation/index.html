@@ -139,12 +139,48 @@
 
     <br> <div class="text-justify">
 
-<p>Raft 将一致性问题分为了三个相对独立的子问题，分别是：</p>
+<h2 id="分布式一致性协议原理">分布式一致性协议原理</h2>
+
+<p>分布式一致性协议关注的问题：普通服务器和网络的不可靠，导致分布式系统中的数据不一致</p>
+
+<p>分布式一致性协议的作用：令一个机器集群可以在部分主机故障或不可用时仍能似单机一样提供正常服务（并不是要求所有节点在任何时刻状态完全一致）</p>
+
+<ol>
+<li>强调在网络分区或节点异常时，是因为如果不考虑这种异常状况，一致性是非常容易保证的，单节点即可。而一致性协议所要做的就是在容忍异常的情况下保证一致。</li>
+<li>这里的一致是对集群外部使用者而言的，将整个集群看做一个整体。</li>
+</ol>
+
+<p>分布式一致性协议的优点：</p>
+
+<ol>
+<li>保证在非拜占庭环境下的可靠性和一致性</li>
+<li>只要大多数主机正常并能互相通信则能提供正常服务</li>
+<li>不依赖时间来确定数据的一致性</li>
+</ol>
+
+<p>Quorum与Paxos，Raft等一致性协议大多使用了Quorum机制，但仅仅依靠 Quorum(R+W&gt;N) 机制无法保证一致性。</p>
+
+<p>Raft 基于Quorum机制，将一致性问题分为了三个相对独立的子问题，分别是：</p>
 
 <ul>
-<li><strong>Leader election</strong>：当前 leader 崩溃时，集群中必须选举出一个新的 leader；</li>
-<li><strong>Log replication</strong>：leader 必须接受来自 clients 的 log entries，并且将其 replicate 到集群机器中，强制其余 logs 与其保持一致；</li>
-<li><strong>Safety</strong>：Raft 中最关键的 safety property 是 State Machine Safety Property，亦即是，当任一机器 apply 了某一特定 log entry 到其 state machine 中，则其余服务器都不可能 apply 了一个 index 相同但 command 不同的 log。</li>
+<li><strong>Leader election</strong>：组成一个 Raft 集群至少需要三台机器，并限制每一时刻最多只能有一个节点可以发起 entry，即为 leader，以简化了一致性的实现。当前 leader 崩溃时，集群中必须选举出一个新的 leader 才能继续发起 entry。该子问题需要解决以下两个问题：
+
+<ol>
+<li>如何保证任何时候最多只有一个 leader 节点；</li>
+<li>当 leader 节点异常时如何尽快的选择出新的 leader 节点；</li>
+</ol></li>
+<li><strong>Log replication</strong>：leader 必须接受来自 clients 的 log entries，并且将其 replicate 到集群机器中，强制其余 logs 与其保持一致，以保证后续 Leader 节点变化后依然能够使得整个集群对外保持一致。该子问题需要解决以下两个问题：
+
+<ol>
+<li>Follower 以与 Leader 节点相同的顺序依次执行每个 committed entry；</li>
+<li>每个 committed entry 必须有足够多的成功副本，来保证后续的访问一致；</li>
+</ol></li>
+<li><strong>Safety</strong>：Raft 中最关键的 safety property 是 State Machine Safety Property，亦即是，当任一机器 apply 了某一特定 log entry 到其 state machine 中，则其余服务器都不可能 apply 了一个 index 相同但 command 不同的 log。具体来说即添加了以下两个限制：
+
+<ol>
+<li>leader election 限制：为了避免数据从 Follower 到 Leader 的反向流动带来的复杂性，Raft 限制新 Leader 一定是当前 Log 最新的节点，即其拥有最多最大 term的 Log Entry</li>
+<li>log replication 限制：Leader 只能对自己本 Term 的 entry 采用统计大多数的方式进行 commit，而旧 Term 的 entry 则利用 “committed entry 之前的所有 Log entry 都已顺序 commit”的机制来提交（归纳法可得）</li>
+</ol></li>
 </ul>
 
 <p>差不多依据上述划分，6.824 中 Raft 的实现指导逻辑还是挺清晰的，其中 safety property 由 Leader election 和 Log replication 共同承担，并且将 Persistence 作为最后一部分。实现过程主要分为：</p>
@@ -155,18 +191,32 @@
 <li>Persistence：最后令 Raft 能够持久化保存 persistent state，这样在重启后可以进行恢复。</li>
 </ul>
 
-<p>其中，本文主要参考 Raft paper，其中的 <strong>figure 2</strong> 作用很大。本文实现<strong>大量依赖 channel 实现消息传递和线程同步</strong>。</p>
-
-<p><a href="https://github.com/Wiesen/MIT-6.824/blob/master/2016/raft/raft.go">Code Link</a></p>
+<p>本文实现<a href="https://github.com/Wiesen/MIT-6.824/blob/master/2016/raft/raft.go">Code Link</a>主要参考 Raft paper，其中的 <strong>figure 2</strong> 作用很大。本文实现<strong>大量依赖 channel 实现消息传递和线程同步</strong>。</p>
 
 <h2 id="leader-election-and-heartbeat">Leader Election and Heartbeat</h2>
+
+<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/raft-state.png" alt="raft-state" /></p>
 
 <p>实现 Leader Election，主要是需要完成以下三个功能：</p>
 
 <ol>
 <li><p><strong>Role Transfer：state machine &amp; election timer</strong></p>
 
-<p>首先实现 Raft 的 sate machine，所有 server 都应当在初始化 Raft peer 时开启一个单独的线程来维护状态，令其在 Follower，Candidate，Leader 三个状态之间进行转换。</p>
+<p>首先实现 Raft 的 sate machine，所有 server 都应当在初始化 Raft peer 时开启一个单独的线程来维护状态，令其在 Follower，Candidate，Leader 三个状态之间进行转换。如上图所示：</p>
+
+<ol>
+<li>所有的节点以 Follower 的角色启动；</li>
+<li>Leader 周期性给其他节点发送心跳；</li>
+<li>在超时时间内没有收到心跳包的 Follower 变成 Candidate，将自己的 Term 加一，并广播 Vote request，发起新一轮 election；</li>
+<li>election 结束：
+
+<ol>
+<li>收到大多数节点的投票，变成 Leader，并向其他节点发送自己Term的AppendEntry。在一个 Term 里，同一个 Server 只会给出一次投票，先到先得；</li>
+<li>收到相同或更大 Term 的 AppendEntry，承认对方为 Leader，自身变成 Follower；</li>
+<li>超时，重新开始新的选举，通过随机的超时时间（视集群网络状况而定，paper 中建议为 150-300ms）来减少发生选票瓜分的情况
+<br /></li>
+</ol></li>
+</ol>
 
 <p>有一点<strong>注意</strong>的是，<code>nextIndex[]</code> 和 <code>matchindex[]</code> 需要在 election 后进行 reinitialize。</p>
 
@@ -487,8 +537,6 @@ for server := range rf.peers {
 
 <p>本文还有些不足，有待后续优化。主要是<strong>不能稳定地</strong> pass <code>TestUnreliableAgree()</code> + <strong>不能</strong> pass <code>TestFigure8Unreliable()</code></p>
 
-<p>To Be Continue&hellip;</p>
-
 <h2 id="2016-8-11-update">2016-8-11 Update</h2>
 
 <p>最近几天 debug 了之前的代码，发现了若干个问题。目前的代码实现已经<strong>比较稳定</strong>地 pass 所有的 test case，上面的代码段也已经修改了。但仍然存在一个 bug: 在过 TestUnreliableAgree() 时 fail to reach agreement。这个 bug 的触发几率很低，还没想明白哪里出问题。</p>
@@ -507,12 +555,32 @@ for server := range rf.peers {
 <p>之前不能 pass <code>TestUnreliableAgree()</code> 和 <code>TestFigure8Unreliable()</code> 时丝毫没有提示，只能等程序运行时间过长然后被杀死。后来思考了一下问题原因：<strong>程序运行过慢，跟不上 test case 要求的速度，所以后续的测试代码也根本没有执行</strong>。</p>
 
 <p>然后发现程序执行慢的原因是：Leader 发送 AppendEntries RPC 每次仅携带一条 log entry，导致 server 无法快速 catch up。所以修改的主要内容就是：AppendEntries RPC 每次携带从 <code>nextIndex</code> 直到最新的 log entries。</p></li>
+
+<li><p><strong>CLIENT READ/WRITE</strong></p>
+
+<p>从 lab3 和lab4 得到的经验体会，整个副本系统最终的一致性并不单单取决于共识算法，Client 访问所遵循的规范也会有决定性的作用：</p>
+
+<ol>
+<li>write：all writes to the replicated log go through Raft</li>
+<li>read：(various trade-offs)  there are 3 different consistency modes for reads
+
+<ol>
+<li>强一致：从 leader 上读，且每次读 leader 都需要向 quorum of peers 确认其 leader 地位；保持一致读但增加延迟</li>
+<li>时间租约：leader 可在该时间窗口内认为其 leader 地位稳定；仅需从leader上读；但当出现网络分区时可能导致 stale read</li>
+<li>任意响应：client 可从任意 server 上读无需考虑是否为leader；读进一步加快但存在 stale read；即使集群不可用仍然响应读
+<br /></li>
+</ol></li>
+</ol></li>
 </ol>
 
 <h2 id="reference">Reference</h2>
 
 <blockquote>
-<p><a href="https://www.douban.com/note/549229678/">MIT 6.824 Week 3 notes</a></p>
+<ol>
+<li><a href="https://raft.github.io/raft.pdf">In Search of an Understandable Consensus Algorithm</a></li>
+<li><a href="https://www.douban.com/note/549229678/">MIT 6.824 Week 3 notes</a></li>
+<li><a href="http://catkang.github.io/2017/06/30/raft-subproblem.html">Raft和它的三个子问题</a></li>
+</ol>
 </blockquote>
 </div>
 
