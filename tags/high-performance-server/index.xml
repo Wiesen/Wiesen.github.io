@@ -26,7 +26,8 @@
       <pubDate>Thu, 24 Nov 2016 21:31:20 +0800</pubDate>
       
       <guid>https://wiesen.github.io/post/io-event-handling-design-patterns/</guid>
-      <description>Introduction System I/O can be blocking, or non-blocking synchronous, or non-blocking asynchronous:
+      <description>[TOC]
+Introduction System I/O can be blocking, or non-blocking synchronous, or non-blocking asynchronous:
  Blocking I/O means that the calling system does not return control to the caller until the operation is finished a non-blocking synchronous call returns control to the caller immediately  I/O multiplexing mechanisms rely on an event demultiplexor: dispatches I/O events from a limited number of sources to the appropriate read/write event handlers.
 There are two non-blocking I/O multiplexing mechanisms: reactor &amp;amp;&amp;amp; proactor.</description>
     </item>

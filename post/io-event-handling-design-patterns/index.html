@@ -139,6 +139,8 @@
 
     <br> <div class="text-justify">
 
+<p>[TOC]</p>
+
 <h2 id="introduction">Introduction</h2>
 
 <p>System I/O can be blocking, or non-blocking synchronous, or non-blocking asynchronous:</p>
@@ -178,13 +180,12 @@
 <ul>
 <li>more difficult to debug than a procedural pattern due to the inverted flow of control</li>
 <li>by only calling event handlers synchronously, it limits maximum concurrency, especially on symmetric multiprocessing hardware</li>
-<li>The scalability of the reactor pattern is limited by event handler and demultiplexer
-<br /></li>
+<li>The scalability of the reactor pattern is limited by event handler and demultiplexer</li>
 </ul></li>
 
 <li><p>Proactor</p>
 
-<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/Proactor.png" alt="proactor" /></p>
+<p><img src="/assets/Proactor.png" alt="proactor" /></p>
 
 <p>In the Proactor pattern, the initiator (event demultiplexor) initiates asynchronous I/O operations. The I/O operation itself is <strong>performed by OS</strong>.</p>
 

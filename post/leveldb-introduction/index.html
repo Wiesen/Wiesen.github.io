@@ -139,11 +139,13 @@
 
     <br> <div class="text-justify">
 
-<p>看了不少 blog 分析 leveldb，但很少看到有人从设计原因和策略上进行总结。所以这个系列对 leveldb 的实现做一点设计分析，争取将内部实现逻辑串联起来，至于源码注释之类的网上一扒拉就有很多啦。</p>
+<p>[TOC]</p>
+
+<p>看了不少 blog 分析 leveldb，但很少看到有人从设计原因和策略上进行总结。所以这个系列对 leveldb 的实现做一点设计分析，争取将内部实现逻辑串联起来。正如<a href="https://segmentfault.com/a/1190000009707717">此文中</a>希望探讨的是对于一般的单机数据存储引擎存在哪些问题，Leveldb作为一个经典实现，其解决方案是出于什么考虑，采用什么策略，如何高效实现病解决问题的，做出了哪些权衡以及如何组织代码和工程。</p>
 
 <h2 id="introduction">Introduction</h2>
 
-<p>Leveldb 库提供持久层 kv 存储，其中 keys 和values 可以是任意字节数组。目前有 C++，golang 的实现。</p>
+<p>Leveldb 库提供持久层 kv 存储，其中 keys 和values 可以是任意字节数组。目前有 C++，golang 的实现。也就是说，Leveldb所处理的每条记录都是一条键值对，由于它基于sequence number提供快照读，准确来说应该是键，序列号，值三元组，由于用户一般关心最新的数据，可以简化为键值对。</p>
 
 <p>作者 Jeff Dean, Sanjay Ghemawat 同时也是设计实现 BigTable 的作者。在 BigTable 中有两个关键部分：master server 和 tablet server。</p>
 
@@ -192,15 +194,15 @@
 
 <p>关于论文的部分分析详见<a href="https://blog.acolyer.org/2014/11/26/the-log-structured-merge-tree-lsm-tree/">链接</a></p>
 
-<div style="text-align: center">
-<img src="http://7vij5d.com1.z0.glb.clouddn.com/memtable.png" width="500"/> <img src="http://7vij5d.com1.z0.glb.clouddn.com/compaction.png" width="500"/>
-</div>
+<p><img src="/assets/memtable.png" alt="memtable" /></p>
 
-<p>LSM tree 针对<strong>写入速度瓶颈问题</strong>而提出的方法，其基本思想是：<strong>将随机写转换为顺序写，交换读和写的随机 IO</strong>。主要组成结构为：MemTable（内存数据组织结构）+ SSTable (Sorted String Table，磁盘数据组织结构)</p>
+<p><img src="/assets/compaction.png" alt="compaction" /></p>
+
+<p>LSM tree 针对<strong>写入速度瓶颈问题</strong>而提出的方法，其基本思想是：<strong>保存多版本数据，将随机写转换为顺序写，交换读和写的随机 IO</strong>。主要组成结构为：MemTable（内存数据组织结构）+ SSTable (Sorted String Table，磁盘数据组织结构)+log（保证可恢复未持久化的数据）。</p>
 
 <p>首先数据更新增量写入 MemTable，其后保存为有序文件 SSTable 到磁盘中（read only），每个文件保存一段时间内的数据更新。为了均衡读写效率，SSTable 文件是一种分层次（level）管理。</p>
 
-<p>LSM Tree 的主要措施有:</p>
+<p>LSM Tree 的主要措施有：</p>
 
 <ul>
 <li>对更新进行批量 &amp; 延时处理 (超过大小阈值后将内存中的数据 dump 到磁盘中)：减少寻道，提高写操作性能；</li>
@@ -219,9 +221,7 @@
 
 <li><p><a href="https://en.wikipedia.org/wiki/Bloom_filter"><strong>Bloom Filter</strong></a></p>
 
-<div style="text-align: center">
-<img src="http://7vij5d.com1.z0.glb.clouddn.com/bloomfilter.png" width="550"/>
-</div>
+<p><img src="/assets/bloomfilter.png" alt="bloomfilter" /></p>
 
 <p>由于 LSM Tree 会产生大量文件，因此 LevelDb 利用 bloomfilter 来避免大量的读操作。</p>
 
@@ -229,7 +229,7 @@
 
 <li><p><a href="https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_Recently_Used_.28LRU.29"><strong>Shard LRU Cache</strong></a></p>
 
-<p>Leveldb 是基于磁盘存储，cache优化是非常自然的想法，主要作用还是在加速读操作。</p>
+<p>Leveldb 是基于磁盘存储的，因此cache优化是非常自然的想法，主要作用还是在加速读操作。</p>
 
 <p>leveldb 中的 cache 分为 Table Cache 和 Block Cache 两种，其中 Table Cache 中缓存的是 sstable 的索引数据，Block Cache 缓存的是 sstable 的 Block 数据（可选打开）。</p>
 
@@ -240,11 +240,9 @@
 
 <h2 id="overall-architecture">Overall Architecture</h2>
 
-<div style="text-align: center">
-<img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb-architecture.png" width="500"/>
-</div>
+<p><img src="/assets/leveldb-architecture.png" alt="leveldb-architecture" /></p>
 
-<p>Leveldb 存储主要分为 SSTable 和 MemTable。前者为不可变且存储于持久设备上，后者位于内存上并且可变。其中有两个 MemTable，一个为当前写入 MemTable，另一个为等待持久化的 Immutable MemTable。此外还有一些辅助文件，后面详述。</p>
+<p>Leveldb 存储主要分为 SSTable 和 MemTable。前者为不可变且存储于持久设备上，后者位于内存上并且可变。其中有两个 MemTable，一个为当前写入 MemTable，另一个为等待持久化的 Immutable MemTable。此外还有一些辅助文件（当前数据库的元数据信息，存放在内存中），后面详述。</p>
 
 <ol>
 <li><p><strong>Write Operation</strong>：当用户需要插入一条 kv 到 Leveldb 中时，首先会被存储到 log 中 <strong>(Write Ahead Log, WAL, 保证数据持久性)</strong>；然后插入到 MemTable 中；当 MemTable 达到一定大小后会转化为 read-only Immutable MemTable，并且创建一个新的 MemTable；同时开启一个新的后台线程将 Immutable MemTable 的内容 dump 到磁盘中，创建一个新的 SSTable。</p></li>
@@ -276,8 +274,9 @@
 <p>解决方法</p>
 
 <ol>
-<li>每个mmtable太小(2M), 存在如下问题:如果写入200G数据, 在db目录下就会有20w个文件, 需要频繁打开/关闭文件, 一个目录里面20w个文件的性能会很差(当然btrfs之类好些）；对于50K的value, 一个文件只能放40个key-value对, 效率很低</li>
-<li>Compaction不可控：不能自定义compaction函数, 如果可以自定义, 则可以在compaction的时候做ttl功能；compaction不能限速.</li>
+<li><p>每个mmtable太小(2M), 存在如下问题:如果写入200G数据, 在db目录下就会有20w个文件, 需要频繁打开/关闭文件, 一个目录里面20w个文件的性能会很差(当然btrfs之类好些）；对于50K的value, 一个文件只能放40个key-value对, 效率很低</p></li>
+
+<li><p>Compaction不可控：不能自定义compaction函数, 如果可以自定义, 则可以在compaction的时候做ttl功能；compaction不能限速</p></li>
 </ol>
 
 <h2 id="file-layout">File Layout</h2>
@@ -286,43 +285,53 @@
 
 <h2 id="source-code-structure">Source Code Structure</h2>
 
-<pre><code>leveldb-1.4.0  
-|
-+--- port           &lt;=== 提供各个平台的基本接口
-|
-+--- util           &lt;=== 提供一些通用工具类
-|
-+--- helpers
-|      |
-|      +--- memenv  &lt;=== Env 的一个具体实现(Env 是 leveldb 封装的运行环境)
-|
-+--- table          &lt;=== sstable 相关的数据格式定义和操作实现
-|
-+--- db             &lt;=== 主要逻辑的实现
-|
-+--- doc
-|     |
-|     +--- table_format.txt   &lt;=== 磁盘文件数据结构说明
-|     |
-|     +--- log_format.txt     &lt;=== 日志文件（用于宕机恢复未刷盘的数据）数据结构说明
-|     |
-|     +--- impl.html          &lt;=== 一些实现
-|     |
-|     +--- index.html         &lt;=== 使用说明
-|     |
-|     +--- bench.html         &lt;=== 测试数据
-|
-+--- include
-     |
-     +--- leveldb           &lt;=== 所有头文件
-</code></pre>
+<p>leveldb的实现大致上可以分成以下几层结构：</p>
 
-<h2 id="reference">Reference：</h2>
+<ul>
+<li>向用户提供的DB类接口及其实现，主要是DB、DbImpl、iter等</li>
+<li>中间概念层的memtable、table、version以及其辅助类，比如对应的iter、builder、VersionEdit等</li>
+<li>更底层的偏向实际的读写辅助类，比如block、BlockBuilder、WritableFile及其实现等</li>
+
+<li><p>最后是它定义的一些辅助类和实现的数据结构比如它用来表示数据的最小单元Slice、操作状态类Status、memtable中用到的SkipList等</p>
+
+<p>leveldb-1.4.0<br />
+|
++&mdash; port           &lt;=== 提供各个平台的基本接口
+|
++&mdash; util           &lt;=== 提供一些通用工具类
+|
++&mdash; helpers
+|      |
+|      +&mdash; memenv  &lt;=== Env 的一个具体实现(Env 是 leveldb 封装的运行环境)
+|
++&mdash; table          &lt;=== sstable 相关的数据格式定义和操作实现
+|
++&mdash; db             &lt;=== 主要逻辑的实现
+|
++&mdash; doc
+|     |
+|     +&mdash; table_format.txt   &lt;=== 磁盘文件数据结构说明
+|     |
+|     +&mdash; log_format.txt     &lt;=== 日志文件（用于宕机恢复未刷盘的数据）数据结构说明
+|     |
+|     +&mdash; impl.html          &lt;=== 一些实现
+|     |
+|     +&mdash; index.html         &lt;=== 使用说明
+|     |
+|     +&mdash; bench.html         &lt;=== 测试数据
+|
++&mdash; include
+​     |
+​     +&mdash; leveldb           &lt;=== 所有头文件</p></li>
+</ul>
+
+<h2 id="reference">Reference</h2>
 
 <ol>
 <li><a href="http://zouzls.github.io/2016/11/23/LevelDB%E4%B9%8BLSM-Tree/">LevelDB 之 LSM-Tree</a></li>
 <li><a href="http://brg-liuwei.github.io/tech/2014/10/15/leveldb-0.html">和我一起学习 leveldb</a></li>
 <li><a href="http://www.open-open.com/lib/view/open1424916275249.html">Log Structured Merge Trees(LSM) 原理</a></li>
+<li><a href="https://segmentfault.com/a/1190000009707717">Leveldb二三事</a></li>
 </ol>
 </div>
 
@@ -356,8 +365,8 @@
     
     
 
-    <h4><a href="/post/leveldb-storage-memtable/">Leveldb: Storage MemTable</a></h4>
-    <h5>January 31, 2017</h5>
+    <h4><a href="/post/leveldb-storage-sstable/">Leveldb: Storage SSTable</a></h4>
+    <h5>February 15, 2017</h5>
      <kbd class="item-tag">Database</kbd>  <kbd class="item-tag">Leveldb</kbd> 
 
 </div>
@@ -370,8 +379,8 @@
     
     
 
-    <h4><a href="/post/leveldb-storage-log/">Leveldb: Log</a></h4>
-    <h5>January 27, 2017</h5>
+    <h4><a href="/post/leveldb-storage-memtable/">Leveldb: Storage MemTable</a></h4>
+    <h5>January 31, 2017</h5>
      <kbd class="item-tag">Database</kbd>  <kbd class="item-tag">Leveldb</kbd> 
 
 </div>

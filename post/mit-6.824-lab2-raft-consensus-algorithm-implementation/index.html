@@ -139,9 +139,11 @@
 
     <br> <div class="text-justify">
 
-<h2 id="分布式一致性协议原理">分布式一致性协议原理</h2>
+<p>[TOC]</p>
 
-<p>分布式一致性协议关注的问题：普通服务器和网络的不可靠，导致分布式系统中的数据不一致</p>
+<h2 id="分布式一致性协议介绍">分布式一致性协议介绍</h2>
+
+<p>分布式一致性协议关注的问题：普通服务器和网络的不可靠，导致分布式系统中的数据不一致。</p>
 
 <p>分布式一致性协议的作用：令一个机器集群可以在部分主机故障或不可用时仍能似单机一样提供正常服务（并不是要求所有节点在任何时刻状态完全一致）</p>
 
@@ -158,7 +160,9 @@
 <li>不依赖时间来确定数据的一致性</li>
 </ol>
 
-<p>Quorum与Paxos，Raft等一致性协议大多使用了Quorum机制，但仅仅依靠 Quorum(R+W&gt;N) 机制无法保证一致性。</p>
+<p>Quorum 与 Paxos，Raft 等一致性协议大多使用了 Quorum 机制，但仅仅依靠 Quorum(R+W&gt;N) 机制无法保证一致性。</p>
+
+<h2 id="raft-原理">Raft 原理</h2>
 
 <p>Raft 基于Quorum机制，将一致性问题分为了三个相对独立的子问题，分别是：</p>
 
@@ -179,9 +183,26 @@
 
 <ol>
 <li>leader election 限制：为了避免数据从 Follower 到 Leader 的反向流动带来的复杂性，Raft 限制新 Leader 一定是当前 Log 最新的节点，即其拥有最多最大 term的 Log Entry</li>
-<li>log replication 限制：Leader 只能对自己本 Term 的 entry 采用统计大多数的方式进行 commit，而旧 Term 的 entry 则利用 “committed entry 之前的所有 Log entry 都已顺序 commit”的机制来提交（归纳法可得）</li>
+<li>log replication 限制：Leader 只能对自己本 Term 的 entry 采用统计大多数的方式进行 commit，而旧 Term 的 entry 则利用 “committed entry 之前的所有 Log entry 都已顺序 commit”的机制来提交（<a href="http://catkang.github.io/2017/11/30/raft-safty.html">Why Raft never commits log entries from previous terms directly</a>）</li>
 </ol></li>
 </ul>
+
+<p>子问题的充分性：通过上述的三个子问题的解决可一个完善的一致性算法，论文中给出了详细严谨的证明，其关键点在于：</p>
+
+<ol>
+<li>Leader Election中要求新Leader获得超过半数的节点投票，Log Replication中每个Commit都有超过半数的节点同意；</li>
+<li>因此这两个大多数中至少存在一个公共节点，这个节点既同意了某个提案的Commit又投票给了新的Leader。</li>
+</ol>
+
+<p>子问题的必要性：是在Raft的框架下，任何一个子问题的缺失都会导致严重的不一致后果：</p>
+
+<ol>
+<li>Leader Election缺失，假设某一时刻有两个节点作为Leader同时接受用户请求，发起提案。整个集群便无法确定这两个提案的前后关系，从而导致冲突。Dynamo虽然使用了Quorum的写入策略却依然需要通过vector clock甚至交给用户来处理冲突。</li>
+<li>Log Replication缺失，假设提案的提交不能保证R + W &gt; N，也就是读写两次提交涉及的节点之间可能没有交集。显而易见的会导致成功提交的请求在后续访问中不可见。</li>
+<li>Safety缺失，假设新Leader不能保证拥有最长的Log，其可能并没有最新的Commit数据，从而导致之前成功的提交不可见；</li>
+</ol>
+
+<h2 id="实现简析">实现简析</h2>
 
 <p>差不多依据上述划分，6.824 中 Raft 的实现指导逻辑还是挺清晰的，其中 safety property 由 Leader election 和 Log replication 共同承担，并且将 Persistence 作为最后一部分。实现过程主要分为：</p>
 
@@ -195,7 +216,7 @@
 
 <h2 id="leader-election-and-heartbeat">Leader Election and Heartbeat</h2>
 
-<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/raft-state.png" alt="raft-state" /></p>
+<p><img src="/assets/raft-state.png" alt="raft-state" /></p>
 
 <p>实现 Leader Election，主要是需要完成以下三个功能：</p>
 
@@ -213,8 +234,7 @@
 <ol>
 <li>收到大多数节点的投票，变成 Leader，并向其他节点发送自己Term的AppendEntry。在一个 Term 里，同一个 Server 只会给出一次投票，先到先得；</li>
 <li>收到相同或更大 Term 的 AppendEntry，承认对方为 Leader，自身变成 Follower；</li>
-<li>超时，重新开始新的选举，通过随机的超时时间（视集群网络状况而定，paper 中建议为 150-300ms）来减少发生选票瓜分的情况
-<br /></li>
+<li>超时，重新开始新的选举，通过随机的超时时间（视集群网络状况而定，paper 中建议为 150-300ms）来减少发生选票瓜分的情况</li>
 </ol></li>
 </ol>
 
@@ -277,8 +297,7 @@
 <ul>
 <li>获得大多数机器的投票 -&gt; 转换为 Leader 状态；</li>
 <li>接受到的 reply 中 <code>term T &gt; currentTerm</code> -&gt; 更新 <code>currentTerm</code>，转换为 Follower 状态；</li>
-<li>election timer 超时 -&gt; 终结当前 election，并且启动新一轮 election，保持 Candidate 状态；
-<br /></li>
+<li>election timer 超时 -&gt; 终结当前 election，并且启动新一轮 election，保持 Candidate 状态；</li>
 </ul>
 
 <p>一个机器接收到 RequstVote RPC，需要决定是否投票：</p>
@@ -287,8 +306,7 @@
 <li>如果 RequstVote RPC 中的 <code>term T &lt; currentTerm</code>，直接返回 false 拒绝投票即可；</li>
 <li>如果 RequstVote RPC 中的 <code>term T &gt; currentTerm</code>，则需要更新 <code>currentTerm</code>，转换为 Follower 状态；</li>
 <li>如果该机器在 <code>currentTerm</code> 已经投票，则直接返回 false 拒绝投票；</li>
-<li>否则在满足 &ldquo;Candidate&rsquo;s log is at least as up-to-date as receiver&rsquo;s log&rdquo; 时返回 true 投票，并且 reset election timeout；
-<br /></li>
+<li>否则在满足 &ldquo;Candidate&rsquo;s log is at least as up-to-date as receiver&rsquo;s log&rdquo; 时返回 true 投票，并且 reset election timeout；</li>
 </ul>
 
 <p>所谓 <strong>“up-to-date”</strong> 简单来说就是：比较两个 log 中的最后一条 entry 的 <code>index</code> 和 <code>term</code>：</p>
@@ -450,7 +468,7 @@ for server := range rf.peers {
 
 <p>Update：处理 log entries array 还是需要注意一下：首先决定是否更新 log table，当满足条件决定更新后，主要存在三种更新情况：（1）更新旧 index；（2）更新旧 index，且添加新 index；（3）仅添加新 index。（如下图）</p>
 
-<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/raft-appendentries.bmp" alt="raft-appendentries" /></p>
+<p><img src="/assets/raft-appendentries.bmp" alt="raft-appendentries" /></p>
 
 <p>本文方法是：首先记录下当前开始处理的 <code>basicIndex := args.PrevLogIndex + 1</code>（即 <code>args.Entry</code> 中的起始 index），然后遍历 <code>args.Entry</code>，一旦 index 已达 logTable 末端或者某个 entry 的 term 不匹配，则清除 logTable 中当前及后续的 entry，并且将 <code>args.Entry</code> 的当前及后续 entry 添加到 logTable中。</p></li>
 
@@ -464,8 +482,7 @@ for server := range rf.peers {
 
 <ul>
 <li><code>len(rf.logTable) &lt;= args.PrevLogIndex</code>：则直接返回 <code>NextIndex = len(rf.logTable)</code> 即可；</li>
-<li><code>rf.logTable[args.PrevLogIndex].Term != args.PrevLogTerm</code>：首先记录 <code>FailTerm</code>，然后从当前 conflicting entry 开始向前扫描，直到 index 为 0 或者 term 不匹配，然后记录下该 term 的第一个 index；
-<br /></li>
+<li><code>rf.logTable[args.PrevLogIndex].Term != args.PrevLogTerm</code>：首先记录 <code>FailTerm</code>，然后从当前 conflicting entry 开始向前扫描，直到 index 为 0 或者 term 不匹配，然后记录下该 term 的第一个 index；</li>
 </ul>
 
 <p>在 sender 的优化如下：当 append 失败时，如果 <code>NextIndex &gt; matchIndex[server]</code>，则 <code>nextIndex[server]</code> 直接退至 <code>NextIndex</code>，减少了需要尝试 append 的 RPC 次数；否则 <code>nextIndex[server]</code> 退回到 <code>matchIndex[server] + 1</code>。</p>
@@ -556,22 +573,17 @@ for server := range rf.peers {
 
 <p>然后发现程序执行慢的原因是：Leader 发送 AppendEntries RPC 每次仅携带一条 log entry，导致 server 无法快速 catch up。所以修改的主要内容就是：AppendEntries RPC 每次携带从 <code>nextIndex</code> 直到最新的 log entries。</p></li>
 
-<li><p><strong>CLIENT READ/WRITE</strong></p>
+<li><p><strong>CLIENT READ/WRITE</strong></p></li>
+</ol>
 
 <p>从 lab3 和lab4 得到的经验体会，整个副本系统最终的一致性并不单单取决于共识算法，Client 访问所遵循的规范也会有决定性的作用：</p>
 
-<ol>
-<li>write：all writes to the replicated log go through Raft</li>
-<li>read：(various trade-offs)  there are 3 different consistency modes for reads
-
-<ol>
-<li>强一致：从 leader 上读，且每次读 leader 都需要向 quorum of peers 确认其 leader 地位；保持一致读但增加延迟</li>
-<li>时间租约：leader 可在该时间窗口内认为其 leader 地位稳定；仅需从leader上读；但当出现网络分区时可能导致 stale read</li>
-<li>任意响应：client 可从任意 server 上读无需考虑是否为leader；读进一步加快但存在 stale read；即使集群不可用仍然响应读
-<br /></li>
-</ol></li>
-</ol></li>
-</ol>
+<pre><code>  1. write：all writes to the replicated log go through Raft
+  2. read：(various trade-offs)  there are 3 different consistency modes for reads
+    1. 强一致：从 leader 上读，且每次读 leader 都需要向 quorum of peers 确认其 leader 地位；保持一致读但增加延迟
+    2. 时间租约：leader 可在该时间窗口内认为其 leader 地位稳定；仅需从leader上读；但当出现网络分区时可能导致 stale read
+    3. 任意响应：client 可从任意 server 上读无需考虑是否为leader；读进一步加快但存在 stale read；即使集群不可用仍然响应读
+</code></pre>
 
 <h2 id="reference">Reference</h2>
 

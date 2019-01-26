@@ -139,15 +139,15 @@
 
     <br> <div class="text-justify">
 
-<p>Leveldb 存储主要分为 SSTable（磁盘） 和 MemTable（内存，包括 MemTable 和 Immutable MemTable），此外还有一些辅助文件:Manifest, Log, Current。</p>
+<p>[TOC]</p>
+
+<p>Leveldb 存储主要分为 SSTable（磁盘） 和 MemTable（内存，包括 MemTable 和 Immutable MemTable），此外还有一些辅助文件（数据库元数据信息）：Manifest, Log, Current。</p>
 
 <p>本篇 blog 主要分析 Memtable：Leveldb一条记录在内存中的形式是什么，记录以怎样的方式被组织。</p>
 
 <h2 id="memtable-db-skiplist-h-db-memtable-h-memtable-cc">Memtable (<code>db/skiplist.h</code>,<code>db/memtable.h &amp; memtable.cc</code>)</h2>
 
-<div style="text-align: center">
-<img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb-architecture.png" width="500"/>
-</div>
+<p><img src="/assets/leveldb-architecture.png" alt="leveldb-architecture" /></p>
 
 <h3 id="introduction">Introduction</h3>
 
@@ -157,9 +157,11 @@
 
 <h3 id="structure-operation">Structure &amp; Operation</h3>
 
-<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_memtable_key.png" alt="leveldb memtable key" /></p>
+<p><img src="/assets/leveldb_memtable_key.png" alt="leveldb_memtable_key" /></p>
 
-<p>memtable key 的组成参照 <strong>Leveldb: Basic Settings</strong>。memtable 存储同一 key 的多个版本的数据。KeyComparator 首先按照递增顺序比较 user key，然后安装递减顺序比较sequence number，这两个足以唯一确定一条 entry。</p>
+<p>memtable key 的组成参照 <strong>Leveldb: Basic Settings</strong>。memtable的键包含四个部分：memtable key = key length + user key + value type + sequence number。</p>
+
+<p>memtable 存储同一 key 的多个版本的数据。KeyComparator 首先按照递增顺序比较 user key，然后安装递减顺序比较sequence number，这两个足以唯一确定一条 entry。把user key放到前面的原因是，这样对同一个user key的操作就可以按照sequence number顺序连续存放了。</p>
 
 <p>MemTable 提供内存中 KV entry 的 Add 和 Get 操作接口。 Memtable 实际上并不存在 Delete 操作，删除某个 Key 的 Value 在 Memtable 内是作为插入一条记录实施的，但是会打上一个 Key 的删除标记，真正的删除操作是 Lazy 的，会在以后的 Compaction 过程中删除这个 KV。</p>
 
@@ -168,29 +170,20 @@
 <h3 id="component">Component</h3>
 
 <ol>
-<li><p>Arena： memtable 内存管理</p>
-
-<ol>
-<li><p>封装内存操作以便进行内存使用统计：memtable 有阈值限制（write buffer size），通过统一的接口来分配不同大小的内存；</p></li>
-
-<li><p>保证内存对齐：Arena 每次按 klockSize(<code>static const int kBlockSize = 4096;</code>)单位向系统申请内存，提供地址对齐内存，方便记录内存的使用并且提高内存使用效率；</p></li>
-
-<li><p>解决频繁分配小块内存降低效率，直接分配大块内存浪费内存的问题，同时避免个别大内存使用影响：当memtable申请内存时，若 <code>size &lt;= kBlockSize / 4</code> 则在当前的内存block中分配，否则直接向系统申请（new）；</p></li>
-
-<li><p>由Arena的析构函数统一释放所有的内存：和 leveldb 特定的应用场景相关的，比如一个memtable使用一个Arena，当memtable被释放时，由Arena统一释放其内存，不需要额外提供内存释放接口。</p></li>
-
-<li><p>Arena 类内存管理方法：</p>
-
-<ol>
-<li><p>采用 vector 来存储每次分配的内存，每一次分配的内存为一个块（block），block默认大小为4096kb；</p></li>
-
-<li><p>当达到阈值时将 dump to disk，完成后由析构函数完成所有内存的一次性释放，由于业务的特殊性因此无需提供内存释放的接口</p></li>
+<li>Arena： memtable 内存管理</li>
 </ol>
 
-<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/arena.png" alt="arena" />)</p></li>
-</ol></li>
+<p><img src="/assets/arena.png" alt="arena" /></p>
 
-<li><p>SkipList：memtable 的实际数据结构</p>
+<ol>
+<li>封装内存操作以便进行内存使用统计：memtable 有阈值限制（write buffer size），通过统一的接口来分配不同大小的内存；</li>
+<li>保证内存对齐：Arena 每次按 klockSize(<code>static const int kBlockSize = 4096;</code>)单位向系统申请内存，提供地址对齐内存，方便记录内存的使用并且提高内存使用效率（采用 vector 来存储每次分配的内存）；</li>
+<li>解决频繁分配小块内存降低效率，直接分配大块内存浪费内存的问题，同时避免个别大内存使用影响：当memtable申请内存时，若 <code>size &lt;= kBlockSize / 4</code> 则在当前的内存block中分配，否则直接向系统申请（new）；</li>
+<li>当达到阈值时将 dump to disk，由Arena的析构函数统一释放所有的内存，没有直接调用delete/free函数：和 leveldb 特定的应用场景相关的，比如一个memtable使用一个Arena，当memtable被释放时，由Arena统一释放其内存，不需要额外提供内存释放接口；</li>
+
+<li><p>leveldb 对于许多类比如 memtable、table、cahe等都加上了引用计数：其实现也非常简单，就是在对象中加入数据域refs。这样在迭代的过程中，已经进入下一个block中了，上一个block理应可以释放了，但它有可能被传递出去提供某些查询服务使用，在其计数不为0时不允许释放，同理对于immutable_memtable，当它持久化完毕时，如果还在为用户提供读服务，也不能释放。</p></li>
+
+<li><p>SkipList：memtable 的实际数据结构，对memtable 的操作基本上是将键值进行编码然后交给 skiplist 处理。</p>
 
 <ol>
 <li>根据上一篇 blog 中 LSM tree 的性质，table 应当保持有序性。而对一个排序结构执行插入操作开销很大（随机写），通常性能瓶颈集中在这里。一些数据结构如链表, AVL 树, B 树, skiplist 等都加速了随机写。leveldb 的 memtable 实现没有使用复杂的 B 树，采用更轻量级的 <a href="https://en.wikipedia.org/wiki/Skip_list">skiplist</a>。</li>
@@ -207,9 +200,9 @@
 
 <h3 id="declaration">Declaration</h3>
 
-<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_memtable.png" alt="memtable" /></p>
+<p><img src="/assets/leveldb_memtable.png" alt="memtable" /></p>
 
-<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_skiplist.png" alt="skiplist" /></p>
+<p><img src="/assets/leveldb_skiplist.png" alt="skiplist" /></p>
 
 <h3 id="coding-function-analysis">Coding &amp; Function Analysis</h3>
 
@@ -237,7 +230,7 @@
 <li><p>没有删除：前面说过，memtable 的 delete 是 lazy 的，实际上是 add 一条 <code>ValueType</code> 为 <code>kTypeDeletion</code> 的记录。</p></li>
 </ol>
 
-<h3 id="reference">Reference</h3>
+<h2 id="reference">Reference</h2>
 
 <ol>
 <li><a href="http://blog.csdn.net/sparkliang/article/details/8567602">Leveldb 源码分析 &ndash;1</a></li>
@@ -278,8 +271,8 @@
     
     
 
-    <h4><a href="/post/leveldb-storage-log/">Leveldb: Log</a></h4>
-    <h5>January 27, 2017</h5>
+    <h4><a href="/post/leveldb-storage-sstable/">Leveldb: Storage SSTable</a></h4>
+    <h5>February 15, 2017</h5>
      <kbd class="item-tag">Database</kbd>  <kbd class="item-tag">Leveldb</kbd> 
 
 </div>
@@ -292,8 +285,8 @@
     
     
 
-    <h4><a href="/post/leveldb-basic-concept/">Leveldb: Basic Settings</a></h4>
-    <h5>November 26, 2016</h5>
+    <h4><a href="/post/leveldb-storage-log/">Leveldb: Log</a></h4>
+    <h5>January 27, 2017</h5>
      <kbd class="item-tag">Database</kbd>  <kbd class="item-tag">Leveldb</kbd> 
 
 </div>

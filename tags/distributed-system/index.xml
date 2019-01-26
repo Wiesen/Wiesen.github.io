@@ -26,7 +26,8 @@
       <pubDate>Tue, 21 Mar 2017 21:31:20 +0800</pubDate>
       
       <guid>https://wiesen.github.io/post/%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1/</guid>
-      <description>Introduction (from Wikipedia)
+      <description>[TOC]
+Introduction (from Wikipedia)
 A distributed transaction is a database transaction in which two or more network hosts are involved.
 Usually, hosts provide transactional resources, while the transaction manager is responsible for creating and managing a global transaction that encompasses all operations against such resources.
 Distributed transactions, as any other transactions, must have all four ACID (atomicity, consistency, isolation, durability) properties, where atomicity guarantees all-or-nothing outcomes for the unit of work (operations bundle).</description>
@@ -38,7 +39,8 @@ Distributed transactions, as any other transactions, must have all four ACID (at
       <pubDate>Fri, 09 Sep 2016 17:32:46 +0800</pubDate>
       
       <guid>https://wiesen.github.io/post/mit-6.824-lab4-sharded-keyvalue-service/</guid>
-      <description>lab4 是基于 lab2 和 lab3 实现的 Raft Consensus Algorithm 之上实现 Sharded KeyValue Service。主要分为两部分：
+      <description>[TOC]
+lab4 是基于 lab2 和 lab3 实现的 Raft Consensus Algorithm 之上实现 Sharded KeyValue Service。主要分为两部分：
  Part A：The Shard Master Part B: Sharded Key/Value Server  除了最后一个 challenge test case TestDelete() 以外，目前代码其余都可以 pass。但偶尔会 fail 在 unreliable test case，目前的定位是 raft 的实现还有点 bug。
 Code Link:
  PART A PART B  Architecture lab4 的架构是典型的 M/S 架构（a configuration service and a set of replica groups)，不过实现十分基础，很多功能没有实现：1) shards 之间的传递很慢并且不允许 concurrent client acess；2) 每个 raft group 中的 member 不会改变。</description>
@@ -50,11 +52,11 @@ Code Link:
       <pubDate>Sat, 06 Aug 2016 17:32:46 +0800</pubDate>
       
       <guid>https://wiesen.github.io/post/mit-6.824-lab3-fault-tolerant-kvservice-implementation/</guid>
-      <description>lab3 是基于 lab2 实现的 Raft Consensus Algorithm 之上实现 KV Service。主要分为两部分：
+      <description>[TOC]
+lab3 是基于 lab2 实现的 Raft Consensus Algorithm 之上实现 KV Service。主要分为两部分：
  Part A：Key/value service without log compaction，即实现基本的分布式存储服务。 Part B: Key/value service with log compaction，即在 Part A 基础上实现 log compaction。  代码分别可以 pass 各个 test case，但所有一起跑时有时会卡在 TestPersistPartition() 这里，初步猜测是 raft 的实现还有点 bug。
 Code Link
-Part A：Key/value service  KV Database Client API
-key/value database 的 client API 必须满足以下要求：
+Part A：Key/value service  KV Database Client API  key/value database 的 client API 必须满足以下要求：
  保证仅执行一次(at most once semantics)：API 必须为每个 Client 及 每个 Request 赋予唯一的 id； 必须向使用该 API 的应用提供 sequential consistency：对于每个 Client，仅有一条 Request RPC 在显式执行(利用 lock 实现)；  此外，API 应当一直尝试向 key/value server 发起 RPC 直到收到 positive reply；并且记住 leader id，从而尽可能避免失败次数。</description>
     </item>
     
@@ -64,12 +66,13 @@ key/value database 的 client API 必须满足以下要求：
       <pubDate>Fri, 10 Jun 2016 21:32:46 +0800</pubDate>
       
       <guid>https://wiesen.github.io/post/mit-6.824-lab2-raft-consensus-algorithm-implementation/</guid>
-      <description>分布式一致性协议原理 分布式一致性协议关注的问题：普通服务器和网络的不可靠，导致分布式系统中的数据不一致
+      <description>[TOC]
+分布式一致性协议介绍 分布式一致性协议关注的问题：普通服务器和网络的不可靠，导致分布式系统中的数据不一致。
 分布式一致性协议的作用：令一个机器集群可以在部分主机故障或不可用时仍能似单机一样提供正常服务（并不是要求所有节点在任何时刻状态完全一致）
  强调在网络分区或节点异常时，是因为如果不考虑这种异常状况，一致性是非常容易保证的，单节点即可。而一致性协议所要做的就是在容忍异常的情况下保证一致。 这里的一致是对集群外部使用者而言的，将整个集群看做一个整体。  分布式一致性协议的优点：
- 保证在非拜占庭环境下的可靠性和一致性 只要大多数主机正常并能互相通信则能提供正常服务 不依赖时间来确定数据的一致性  Quorum与Paxos，Raft等一致性协议大多使用了Quorum机制，但仅仅依靠 Quorum(R+W&amp;gt;N) 机制无法保证一致性。
-Raft 基于Quorum机制，将一致性问题分为了三个相对独立的子问题，分别是：
- Leader election：组成一个 Raft 集群至少需要三台机器，并限制每一时刻最多只能有一个节点可以发起 entry，即为 leader，以简化了一致性的实现。当前 leader 崩溃时，集群中必须选举出一个新的 leader 才能继续发起 entry。该子问题需要解决以下两个问题：  如何保证任何时候最多只有一个 leader 节点； 当 leader 节点异常时如何尽快的选择出新的 leader 节点；  Log replication：leader 必须接受来自 clients 的 log entries，并且将其 replicate 到集群机器中，强制其余 logs 与其保持一致，以保证后续 Leader 节点变化后依然能够使得整个集群对外保持一致。该子问题需要解决以下两个问题：  Follower 以与 Leader 节点相同的顺序依次执行每个 committed entry； 每个 committed entry 必须有足够多的成功副本，来保证后续的访问一致；  Safety：Raft 中最关键的 safety property 是 State Machine Safety Property，亦即是，当任一机器 apply 了某一特定 log entry 到其 state machine 中，则其余服务器都不可能 apply 了一个 index 相同但 command 不同的 log。具体来说即添加了以下两个限制：  leader election 限制：为了避免数据从 Follower 到 Leader 的反向流动带来的复杂性，Raft 限制新 Leader 一定是当前 Log 最新的节点，即其拥有最多最大 term的 Log Entry log replication 限制：Leader 只能对自己本 Term 的 entry 采用统计大多数的方式进行 commit，而旧 Term 的 entry 则利用 “committed entry 之前的所有 Log entry 都已顺序 commit”的机制来提交（归纳法可得）   差不多依据上述划分，6.</description>
+ 保证在非拜占庭环境下的可靠性和一致性 只要大多数主机正常并能互相通信则能提供正常服务 不依赖时间来确定数据的一致性  Quorum 与 Paxos，Raft 等一致性协议大多使用了 Quorum 机制，但仅仅依靠 Quorum(R+W&amp;gt;N) 机制无法保证一致性。
+Raft 原理 Raft 基于Quorum机制，将一致性问题分为了三个相对独立的子问题，分别是：
+ Leader election：组成一个 Raft 集群至少需要三台机器，并限制每一时刻最多只能有一个节点可以发起 entry，即为 leader，以简化了一致性的实现。当前 leader 崩溃时，集群中必须选举出一个新的 leader 才能继续发起 entry。该子问题需要解决以下两个问题：  如何保证任何时候最多只有一个 leader 节点； 当 leader 节点异常时如何尽快的选择出新的 leader 节点；  Log replication：leader 必须接受来自 clients 的 log entries，并且将其 replicate 到集群机器中，强制其余 logs 与其保持一致，以保证后续 Leader 节点变化后依然能够使得整个集群对外保持一致。该子问题需要解决以下两个问题：  Follower 以与 Leader 节点相同的顺序依次执行每个 committed entry； 每个 committed entry 必须有足够多的成功副本，来保证后续的访问一致；  Safety：Raft 中最关键的 safety property 是 State Machine Safety Property，亦即是，当任一机器 apply 了某一特定 log entry 到其 state machine 中，则其余服务器都不可能 apply 了一个 index 相同但 command 不同的 log。具体来说即添加了以下两个限制：  leader election 限制：为了避免数据从 Follower 到 Leader 的反向流动带来的复杂性，Raft 限制新 Leader 一定是当前 Log 最新的节点，即其拥有最多最大 term的 Log Entry log replication 限制：Leader 只能对自己本 Term 的 entry 采用统计大多数的方式进行 commit，而旧 Term 的 entry 则利用 “committed entry 之前的所有 Log entry 都已顺序 commit”的机制来提交（Why Raft never commits log entries from previous terms directly）   子问题的充分性：通过上述的三个子问题的解决可一个完善的一致性算法，论文中给出了详细严谨的证明，其关键点在于：</description>
     </item>
     
     <item>
@@ -78,7 +81,8 @@ Raft 基于Quorum机制，将一致性问题分为了三个相对独立的子�
       <pubDate>Wed, 30 Mar 2016 21:33:37 +0800</pubDate>
       
       <guid>https://wiesen.github.io/post/flat-datacenter-storage-paper-review/</guid>
-      <description>A review for paper Nightingale E B, Elson J, Fan J, et al. Flat datacenter storage[C]//Presented as part of the 10th USENIX Symposium on Operating Systems Design and Implementation (OSDI 12). 2012: 1-15.
+      <description>[TOC]
+A review for paper Nightingale E B, Elson J, Fan J, et al. Flat datacenter storage[C]//Presented as part of the 10th USENIX Symposium on Operating Systems Design and Implementation (OSDI 12). 2012: 1-15.
 Introduction What is FDS?
  Flat Datacenter Storage (FDS) is a high-performance, fault-tolerant, large-scale, locality-oblivious blob store. Using a novel combination of full bisection bandwidth networks, data and metadata striping, and** flow control**, FDS multiplexes an application’s large-scale I/O across the available throughput and latency budget of every disk in a cluster.</description>
     </item>
@@ -89,7 +93,8 @@ Introduction What is FDS?
       <pubDate>Sat, 19 Mar 2016 21:33:09 +0800</pubDate>
       
       <guid>https://wiesen.github.io/post/chain-replication-paper-review/</guid>
-      <description>本文是读完 Van Renesse R, Schneider F B. Chain Replication for Supporting High Throughput and Availability[C]//OSDI. 2004. 的总结。
+      <description>[TOC]
+本文是读完 Van Renesse R, Schneider F B. Chain Replication for Supporting High Throughput and Availability[C]//OSDI. 2004. 的总结。
 Summary Chain replication is a new approach to coordinating clusters of fail-stop storage servers.
 Chain replication 采用 ROWAA (read one, write all available) 方法, 具有良好的 Scalability.
 该方法目的是, 不以牺牲强一致性为代价来实现高吞吐和高可用, 从而提供分布式存储服务.

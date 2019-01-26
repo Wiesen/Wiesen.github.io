@@ -139,6 +139,8 @@
 
     <br> <div class="text-justify">
 
+<p>[TOC]</p>
+
 <p>lab3 是基于 lab2 实现的 Raft Consensus Algorithm 之上实现 KV Service。主要分为两部分：</p>
 
 <ol>
@@ -153,7 +155,8 @@
 <h2 id="part-a-key-value-service">Part A：Key/value service</h2>
 
 <ol>
-<li><p><strong>KV Database Client API</strong></p>
+<li><strong>KV Database Client API</strong></li>
+</ol>
 
 <p>key/value database 的 client API 必须满足以下要求：</p>
 
@@ -162,9 +165,11 @@
 <li>必须向使用该 API 的应用提供 sequential consistency：对于每个 Client，仅有一条 Request RPC 在显式执行(利用 lock 实现)；</li>
 </ul>
 
-<p>此外，API 应当一直尝试向 key/value server 发起 RPC 直到收到 positive reply；并且记住 leader id，从而尽可能避免失败次数。</p></li>
+<p>此外，API 应当一直尝试向 key/value server 发起 RPC 直到收到 positive reply；并且记住 leader id，从而尽可能避免失败次数。</p>
 
-<li><p><strong>Raft Handler</strong></p>
+<ol>
+<li><strong>Raft Handler</strong></li>
+</ol>
 
 <p>Raft Server Handler 需要满足以下要求：</p>
 
@@ -182,9 +187,11 @@
     kv.ack[clientId] = requestId
     return false
  }
-</code></pre></li>
+</code></pre>
 
-<li><p>在向 raft 添加等待结果的同时，需要一直监听返回管道 <code>applyCh</code> ，以接收已经达成一致的 entry；</p>
+<ul>
+<li>在向 raft 添加等待结果的同时，需要一直监听返回管道 <code>applyCh</code> ，以接收已经达成一致的 entry；</li>
+</ul>
 
 <p>我们开一个 goroutine <code>update()</code> 一直监听 <code>applyCh</code>，并且基于 entry 的 index 各维护一个管道 (<code>map[int]chan Result</code>)，存放在 raft servers 间达成一致的 entry，等待 handler 的读取或者直接丢弃。</p>
 
@@ -212,13 +219,12 @@
     }
     kv.messages[index] &lt;- result
  }
-</code></pre>
 
-<p>key/value server 向 raft 添加一个 entry 后，阻塞读取其 index 对应的管道，直到接收到结果或者超时（本文设置为 1s）。当接收到的结果 clientId 或者 requestId 不一致时，表明 leader 已经发生了更替，由 Client 重新向 server 发起 RPC。</p></li>
+key/value server 向 raft 添加一个 entry 后，阻塞读取其 index 对应的管道，直到接收到结果或者超时（本文设置为 1s）。当接收到的结果 clientId 或者 requestId 不一致时，表明 leader 已经发生了更替，由 Client 重新向 server 发起 RPC。
+</code></pre></li>
 
 <li><p>有一个需要注意的地方是，<strong>必须利用 <code>gob.Register()</code> 注册需要通过 RPC 发送的结构体</strong>，这样结构体才能够被解析，否则发送过去就是一个 <code>nil</code>。</p></li>
-</ul></li>
-</ol>
+</ul>
 
 <h2 id="part-b-log-compaction">Part B: log compaction</h2>
 
@@ -227,7 +233,8 @@
 <p>这部分主要有以下实现点：</p>
 
 <ol>
-<li><p><strong>Take snapshots independently</strong></p>
+<li><strong>Take snapshots independently</strong></li>
+</ol>
 
 <p>这里各个 raft server 各自独立进行 snapshot，而这并不会影响 raft 的一致性。因为数据始终从 leader 流向 follower，各个 raft server 只是将数据重新组织而已。</p>
 
@@ -236,8 +243,7 @@
 <ul>
 <li><strong>(When)</strong> 什么时候进行 snapshot：由 key/value server 检测所连接的 raft server 存储大小是否即将超过阈值，然后通知该 raft server 进行 snapshot；</li>
 <li><strong>(What)</strong> 在 snapshot 中存储什么信息：如 raft-extended paper Figure 12 里的描述，主要包括当前 <code>LastIncludedIndex</code>, <code>LastIncludedTerm</code> 以及 <code>data</code>，其中 <code>data</code> 是状态机状态，来自于 key/value server。一点需要注意的是，必须保存用于检测 duplicate client requests 的数据，因此 <code>data</code> 在这里包括整个数据库和检测重复的 map；</li>
-<li><strong>(How)</strong> 如何令 raft 在仅有最新一部分 log 的情况下保持正常运行：主要是将 <code>rf.logTable[0]</code> 作为起始 entry，一旦有 follower 请求更老的 entries，则应该发送 InstallSnapshot RPC；
-<br /></li>
+<li><strong>(How)</strong> 如何令 raft 在仅有最新一部分 log 的情况下保持正常运行：主要是将 <code>rf.logTable[0]</code> 作为起始 entry，一旦有 follower 请求更老的 entries，则应该发送 InstallSnapshot RPC；</li>
 </ul>
 
 <p>需要增加和修改的地方如下：</p>
@@ -246,9 +252,11 @@
 <li><code>update()</code>： 在每次接收到 raft server 返回的 entry 时，检测 raft state size，若临近阈值则将封装 <code>data</code>，然后通知 raft 从 <code>entry.index</code> 开始 snapshotting；</li>
 <li><code>StartSnapshot(data []byte, index int)</code>：删除 log table 中序号小于 <code>index</code> 的 entries，并且在 <code>data</code> 后添加最后包括的 entry 的相关数据，最后持久化保存；</li>
 <li>其余琐碎并且细节的修改还包括：对 entry 增加一个字段 <code>index</code>，记录其在所在 <code>term</code> 的序号，在需要对 log table 进行操作地方（尤其是涉及对 entry 在 table 中的位置），注意 log table 中的起始序号：<code>baseLogIndex := rf.logTable[0].Index</code> 再进行处理；</li>
-</ul></li>
+</ul>
 
-<li><p><strong>InstallSnapshot RPC</strong></p>
+<ol>
+<li><strong>InstallSnapshot RPC</strong></li>
+</ol>
 
 <p>当一个 follower 远远落后于 leader（即无法在 log table 中找到匹配的 entry），则应该发送 InstallSnapshot RPC。我们参考 raft-extended paper Figure 13 设置数据结构，但有所简化：由于 lab 里的 Snapshot 不大，因此没有设置 chunk，也就是不需要对 snapshot 进行切分。</p>
 
@@ -288,8 +296,7 @@
 <li>然后更新自身的 log table，把 LastIncluded entry 前的丢弃；</li>
 <li>最后将 snapshot 发送给 key/value server，以重置数据库数据，更新状态。</li>
 </ul></li>
-</ul></li>
-</ol>
+</ul>
 
 <h2 id="最后">最后</h2>
 

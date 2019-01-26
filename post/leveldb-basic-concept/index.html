@@ -217,7 +217,7 @@
     private:
         std::string rep_;
 }
-
+    
 struct ParsedInternalKey { 
     Slice user_key; 
     SequenceNumber sequence; 
@@ -225,48 +225,71 @@ struct ParsedInternalKey {
 };
 </code></pre></li>
 
-<li><p>LookupKey(<code>db/dbformat.h</code>)</p></li>
-</ol>
-
-<p>db 内部为查找 memtable/sstable 方便而设置的类：</p>
-
-<pre><code>   class LookupKey { 
-       … 
-       private: 
-           const char* start_;
-           const char* kstart_;
-           const char* end_;
-   };
-</code></pre>
-
-<p>| start_            |              kstart_ - end_              |
-   | &mdash;&mdash;&mdash;&mdash;&mdash;&ndash; | :&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;: |
-   | internal_key_size | internal_key: userkey_data + SequenceNumber |
-   | (varint32)        |   (InternalKey_size: char[] + uint64)    |</p>
-
-<p>对 memtable lookup 时使用 <code>memtable_key</code> [<code>start_</code>,<code>end_</code>], 对 sstable lookup 时使用 <code>internal_key</code> [<code>kstart_</code>, <code>end_</code>]。</p>
+<li><p>LookupKey(<code>db/dbformat.h</code>)</p>
 
 <p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_key.png" width="450"/></p>
 
-<ol>
-<li>memtable entry</li>
+<p>db 内部为查找 memtable/sstable 方便而设置的类：</p>
+
+<pre><code>class LookupKey { 
+    … 
+    private: 
+        const char* start_;
+        const char* kstart_;
+        const char* end_;
+};
+</code></pre>
+
+<table>
+<thead>
+<tr>
+<th>start_</th>
+<th align="center">kstart_ - end_</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>internal_key_size</td>
+<td align="center">internal_key: userkey_data + SequenceNumber</td>
+</tr>
+
+<tr>
+<td>(varint32)</td>
+<td align="center">(InternalKey_size: char[] + uint64)</td>
+</tr>
+</tbody>
+</table>
+
+<p>对 memtable lookup 时使用 <code>memtable_key</code> [<code>start_</code>,<code>end_</code>], 对 sstable lookup 时使用 <code>internal_key</code> [<code>kstart_</code>, <code>end_</code>]。</p></li>
+
+<li><p>memtable entry</p></li>
 </ol>
+
+<p><img src="/assets/leveldb_memtable_entry.png" alt="raft-appendentries" /></p>
 
 <p>MemTable 中 entry 存储格式（实际上是字符串）：</p>
 
-<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_memtable_entry.png" width="600"/></p>
-
 <ol>
-<li>Comparator(<code>include/leveldb/comparator.h</code> <code>util/comparator.cc</code>)</li>
-<li>InternalKeyComparator(<code>db/dbformat.h</code>)</li>
-<li>WriteBatch(<code>db/write_batch.cc</code>)</li>
-<li>FileMetaData(<code>db/version_edit.h</code>)</li>
-<li>block(<code>table/block.cc</code>)</li>
-<li>BlockHandle(<code>table/dbformat.h</code>)</li>
-<li>FileNumber(<code>db/dbformat.h</code>)</li>
-<li>filename(<code>db/dbformat.cc</code>)</li>
-<li>Compact(<code>db/db_impl.cc</code> <code>db/version_set.cc</code>)</li>
-<li>Iterator(<code>include/leveldb/iterator.h</code>)</li>
+<li><p>Comparator(<code>include/leveldb/comparator.h</code> <code>util/comparator.cc</code>)</p></li>
+
+<li><p>InternalKeyComparator(<code>db/dbformat.h</code>)</p></li>
+
+<li><p>WriteBatch(<code>db/write_batch.cc</code>)</p></li>
+
+<li><p>FileMetaData(<code>db/version_edit.h</code>)</p></li>
+
+<li><p>block(<code>table/block.cc</code>)</p></li>
+
+<li><p>BlockHandle(<code>table/dbformat.h</code>)</p></li>
+
+<li><p>FileNumber(<code>db/dbformat.h</code>)</p></li>
+
+<li><p>filename(<code>db/dbformat.cc</code>)</p></li>
+
+<li><p>Compact(<code>db/db_impl.cc</code> <code>db/version_set.cc</code>)</p></li>
+
+<li><p>Iterator(<code>include/leveldb/iterator.h</code>)</p></li>
 </ol>
 
 <h2 id="reference">Reference</h2>
@@ -307,8 +330,8 @@ struct ParsedInternalKey {
     
     
 
-    <h4><a href="/post/leveldb-storage-memtable/">Leveldb: Storage MemTable</a></h4>
-    <h5>January 31, 2017</h5>
+    <h4><a href="/post/leveldb-storage-sstable/">Leveldb: Storage SSTable</a></h4>
+    <h5>February 15, 2017</h5>
      <kbd class="item-tag">Database</kbd>  <kbd class="item-tag">Leveldb</kbd> 
 
 </div>
@@ -321,8 +344,8 @@ struct ParsedInternalKey {
     
     
 
-    <h4><a href="/post/leveldb-storage-log/">Leveldb: Log</a></h4>
-    <h5>January 27, 2017</h5>
+    <h4><a href="/post/leveldb-storage-memtable/">Leveldb: Storage MemTable</a></h4>
+    <h5>January 31, 2017</h5>
      <kbd class="item-tag">Database</kbd>  <kbd class="item-tag">Leveldb</kbd> 
 
 </div>

@@ -139,13 +139,15 @@
 
     <br> <div class="text-justify">
 
-<p>Leveldb 存储主要分为 SSTable（磁盘） 和 MemTable（内存，包括 MemTable 和 Immutable MemTable），此外还有一些辅助文件:Manifest, Log, Current。</p>
+<p>[TOC]</p>
+
+<p>Leveldb 存储主要分为 SSTable（磁盘） 和 MemTable（内存，包括 MemTable 和 Immutable MemTable），此外还有一些辅助文件（数据库元数据信息）：Manifest, Log, Current。</p>
 
 <p>本篇 blog 主要分析 Log：log 在 Leveldb 中的作用，一条log 在内存中的形式是什么，以怎样的方式被组织。</p>
 
 <h2 id="log-db-log-format-h-cc-db-log-writer-h-cc-db-log-reader-h-cc">Log (<code>db/log_format.h&amp;cc</code>,<code>db/log_writer.h&amp;.cc</code>,<code>db/log_reader.h&amp;.cc</code>)</h2>
 
-<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_log_commit.png" alt="log commit" /></p>
+<p><img src="/assets/leveldb_log_commit.png" alt="log commit" /></p>
 
 <h3 id="introduction">Introduction</h3>
 
@@ -160,13 +162,13 @@
 
 <h3 id="format-http-www-cnblogs-com-cobbliu-p-6243550-html"><a href="http://www.cnblogs.com/cobbliu/p/6243550.html">Format</a></h3>
 
-<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_log.png" alt="log format" /></p>
+<p><img src="/assets/leveldb_log.png" alt="log format" /></p>
 
 <p>log record 以 block 为单位组织（32k）。写日志时，一致性考虑，并没有以 block 为单位写，而是每次更新均对 log 文件进行 IO，根据 WriteOption::sync 决定是否做强制 sync。读取时以 block 为单位做 IO 以及校验。log 的写入是顺序写，读取只会在启动时发生，不会是性能的瓶颈。</p>
 
 <p>Log  entry header 包含三个字段，checksum 是对“类型”和“数据”字段的校验码，为了避免处理不完整或者是被破坏的数据，当 leveldb 读取记录数据时候会对数据进行校验，如果 checksum 相同则说明数据完整无破坏，可以继续后续流程。length 表示 payload 长度，type 字段则指出了每条 log record 和 log block 之间的结构关系，主要有五种类型：ZERO/FULL/FIRST/MIDDLE/LAST，具体结构关系如上图所示。</p>
 
-<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_log_payload.png" alt="log record payload" /></p>
+<p><img src="/assets/leveldb_log_payload.png" alt="log record payload" /></p>
 
 <p>上图为 log record payload 的具体结构，主要为 PUT_OP 和 DELETE_OP 两种操作，读操作不写 log。</p>
 
@@ -174,9 +176,9 @@
 
 <h3 id="declaration">Declaration</h3>
 
-<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_log_reader.png" alt="log reader" /></p>
+<p><img src="/assets/leveldb_log_reader.png" alt="log reader" /></p>
 
-<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/leveldb_log_writer.png" alt="log writer" /></p>
+<p><img src="/assets/leveldb_log_writer.png" alt="log writer" /></p>
 
 <h3 id="analysis">Analysis</h3>
 
@@ -205,7 +207,7 @@
 </ol></li>
 </ol>
 
-<h3 id="reference">Reference</h3>
+<h2 id="reference">Reference</h2>
 
 <ol>
 <li><a href="http://luodw.cc/2015/10/18/leveldb-08/">leveldb源码分析之读写log文件</a></li>
@@ -245,8 +247,8 @@
     
     
 
-    <h4><a href="/post/leveldb-storage-memtable/">Leveldb: Storage MemTable</a></h4>
-    <h5>January 31, 2017</h5>
+    <h4><a href="/post/leveldb-storage-sstable/">Leveldb: Storage SSTable</a></h4>
+    <h5>February 15, 2017</h5>
      <kbd class="item-tag">Database</kbd>  <kbd class="item-tag">Leveldb</kbd> 
 
 </div>
@@ -259,8 +261,8 @@
     
     
 
-    <h4><a href="/post/leveldb-basic-concept/">Leveldb: Basic Settings</a></h4>
-    <h5>November 26, 2016</h5>
+    <h4><a href="/post/leveldb-storage-memtable/">Leveldb: Storage MemTable</a></h4>
+    <h5>January 31, 2017</h5>
      <kbd class="item-tag">Database</kbd>  <kbd class="item-tag">Leveldb</kbd> 
 
 </div>

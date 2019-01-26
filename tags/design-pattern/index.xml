@@ -17,13 +17,14 @@
       <pubDate>Sun, 18 Feb 2018 21:31:20 +0800</pubDate>
       
       <guid>https://wiesen.github.io/post/%E7%8A%B6%E6%80%81%E6%9C%BA%E4%BA%8B%E4%BB%B6%E9%A9%B1%E5%8A%A8eventloop/</guid>
-      <description>状态机编程思想：“致人 而不致于人” 1. 有限状态机 Difination: 有限状态机（finite-state machine）又称有限状态自动机，简称状态机，是表示有限个状态以及在这些状态之间的转移和动作等行为的数学模型。
+      <description>[TOC]
+状态机编程思想：“致人 而不致于人” 1. 有限状态机 Difination: 有限状态机（finite-state machine）又称有限状态自动机，简称状态机，是表示有限个状态以及在这些状态之间的转移和动作等行为的数学模型。
 Application:
  自然语言处理：okenizer、parser、regexp 网络协议 游戏设计 自动客服  2. 事件驱动与状态模式 状态模式：
  motivation： 一个业务如果包含多个阶段，而各个阶段之间又并非顺序执行，可能存在复杂的条件跳转。此时，运用状态模式可以帮助我们理清业务逻辑，并发现一些逻辑缺陷。 定义：状态模式（State Pattern）中，类的行为是基于它的状态改变的。这种类型的设计模式属于行为型模式。 意图：允许对象在内部状态发生改变时改变它的行为，对象看起来好像修改了它的类。 主要解决：对象的行为依赖于它的状态（属性），并且可以根据它的状态改变而改变它的相关行为。 何时使用：代码中包含大量与对象状态有关的条件语句。 如何解决：将各种具体的状态类抽象出来。  状态模式包含三个角色：
  Context：环境类又称为上下文类，它是拥有状态的对象，在环境类中维护一个抽象状态类State的实例，这个实例定义当前状态，在具体实现时，它是一个State子类的对象，可以定义初始状态； State：抽象状态类，用于定义一个接口以封装与环境类的一个特定状态相关的行为； ConcreteState：具体状态类是抽象状态类的子类，每一个子类实现一个与环境类的一个状态相关的行为，每一个具体状态类对应环境的一个具体状态，不同的具体状态类其行为有所不同。  事件驱动下的状态模式:
  基于事件驱动的模型，可以使得系统按照预先定义的方式，在状态机中扭转（进入某个状态时，触发什么事件）。 一个完整的业务处理过程包含多个状态迁移。这就需要一个驱动器来管理每一次的状态迁移。 由于状态的迁移是事件驱动的，于是很容易想到运用观察者模式来设计这样一个驱动器。于是，状态是Observable，由许多个Observer订阅，而每个Observer的任务是，当状态机因为某个事件而跳转到某个状态时，向状态机发送下一个事件的通知，直到状态机到达一个终止状态（在这一模型中，终止状态就是没有任何Observer订阅的状态）。  eventloop difination:
- the event loop, message dispatcher, message loop, message pump, or run loop is a programming construct that waits for and dispatches events or messages in a program. It works by making a request to some internal or external &amp;ldquo;event provider&amp;rdquo; (that generally blocks the request until an event has arrived), and then it calls the relevant event handler (&amp;ldquo;dispatches the event&amp;rdquo;).</description>
+ the event loop, message dispatcher, message loop, message pump, or run loop is a programming construct that waits for and dispatches events or messages in a program.</description>
     </item>
     
   </channel>

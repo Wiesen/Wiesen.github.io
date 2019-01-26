@@ -139,7 +139,9 @@
 
     <br> <div class="text-justify">
 
-<h3 id="introduction">Introduction</h3>
+<p>[TOC]</p>
+
+<h2 id="introduction">Introduction</h2>
 
 <p>(from Wikipedia)</p>
 
@@ -153,12 +155,12 @@
 
 <p>柔性事务满足 BASE 理论（基本可用，最终一致）, 刚性事务满足 ACID 理论</p>
 
-<h3 id="solution">Solution</h3>
+<h2 id="solution">Solution</h2>
 
 <ol>
 <li><p>2PC (XA、JTA/JTS)</p>
 
-<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/2pc.png" alt="2pc" /></p>
+<p><img src="/assets/2pc.png" alt="2pc" /></p>
 
 <p>Idea:</p>
 
@@ -172,8 +174,7 @@
 <ul>
 <li>slow because of multiple phases / message exchanges</li>
 <li>locks are held over the prepare/commit exchanges; blocks other transactions</li>
-<li>TC crash can cause <strong>indefinite blocking</strong>, with locks held
-<br /></li>
+<li>TC crash can cause <strong>indefinite blocking</strong>, with locks held</li>
 </ul>
 
 <p>Conclusion:
@@ -183,7 +184,7 @@
 
 <li><p>3PC</p>
 
-<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/Three-phase_commit_diagram.png" alt="3pc" /></p>
+<p><img src="/assets/Three-phase_commit_diagram.png" alt="3pc" /></p>
 
 <p>Improvement:</p>
 
@@ -206,7 +207,7 @@
 <p><a href="https://github.com/liuyangming/ByteTCC">ByteTCC</a></p></li>
 </ol>
 
-<h3 id="reference">Reference</h3>
+<h2 id="reference">Reference</h2>
 
 <ol>
 <li><a href="https://en.wikipedia.org/wiki/Distributed_transaction">Distributed transaction</a></li>

@@ -139,6 +139,8 @@
 
     <br> <div class="text-justify">
 
+<p>[TOC]</p>
+
 <p>快排最引人注目的特点是原地排序（只需要一个很小的辅助栈），且将长度为 <em>N</em> 的数组排序所需的时间和 <em>NlgN</em> 成正比。
 而快排的主要缺点是非常脆弱，在实现时必须非常小心才能避免性能低下。</p>
 
@@ -158,11 +160,10 @@
 <ul>
 <li>对于某个 <code>key</code>，<code>a[key]</code> 已经排定；</li>
 <li><code>[low,key)</code> 中所有元素都不大于 <code>a[key]</code>；</li>
-<li><code>[key,high)</code> 中所有元素都不小于 <code>a[key]</code>。
-<br /></li>
+<li><code>[key,high)</code> 中所有元素都不小于 <code>a[key]</code>。</li>
 </ul>
 
-<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/quick.png" alt="quick" /></p>
+<p><img src="/assets/quick.png" alt="quick" /></p>
 
 <p>据此，快排的基本思想是:</p>
 
@@ -199,16 +200,17 @@
 
 <pre><code>void NormalQuick(std::vector&lt;T&gt; &amp;vec, int low, int high) {
     // Terminate the recursive
-    if (high - low &lt;= 1){
-        Insertion(vec, low, high);
-        return;
-    }
-    int nCut = Partition(vec, low, high);
-    // Detail: Use range[low, high)
-    NormalQuick(vec, low, nCut);
-    NormalQuick(vec, nCut + 1, high);
-｝
-</code></pre></li>
+</code></pre>
+
+<p>​      if (high - low &lt;= 1){
+            Insertion(vec, low, high);
+            return;
+        }
+        int nCut = Partition(vec, low, high);
+        // Detail: Use range[low, high)
+        NormalQuick(vec, low, nCut);
+        NormalQuick(vec, nCut + 1, high);
+    ｝</p></li>
 </ul>
 
 <h2 id="算法改进">算法改进</h2>
@@ -232,7 +234,8 @@
 
 <li><p><strong>熵最优快排——三向切分</strong></p>
 
-<p>所谓的“熵最优”是指：对于任意分布的输入，最优的基于比较的排序算法平均所需的比较次数与三向切分快排平均所需的比较次数相比，处于常数因子范围之内。当然前提是需要将数组进行随机化。</p>
+<p>所谓的“熵最优”是指：对于任意分布的输入，最优的基于比较的排序算法平均所需的比较次数与三向切分快排平均所需的比较次数相比，处于常数因子范围之内。当然前提是需要将数组进行随机化。</p></li>
+</ol>
 
 <p>进一步使用信息论来解释快排性能可参考 Algs4 中的快排章节，Mackayd的<a href="http://users.aims.ac.za/~mackay/sorting/sorting.html">Heapsort, Quicksort, and Entropy</a>。刘未鹏的<a href="http://mindhacks.cn/2008/06/13/why-is-quicksort-so-quick/">数学之美番外篇：快排为什么那样快</a>也值得一看，浅显易懂。</p>
 
@@ -251,7 +254,7 @@
 <li>余下 <code>[nMid, right)</code> 中的元素尚未排定。</li>
 </ul>
 
-<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/3-wayquick.png" alt="3wayquick" /></p>
+<p><img src="/assets/3-wayquick.png" alt="3-wayquick" /></p>
 
 <pre><code>void OptimalQuick(std::vector&lt;T&gt; &amp;vec, int low, int high) {
     if (high - low &lt;= CUTOFF){
@@ -287,7 +290,7 @@
 <li>在切分循环结束后将和 <code>key</code> 相等的元素交换到正确的位置上。</li>
 </ul>
 
-<p><img src="http://7vij5d.com1.z0.glb.clouddn.com/bmquick.png" alt="quickX" /></p>
+<p><img src="/assets/bmquick.png" alt="bmquick" /></p>
 
 <pre><code>void QuickX(std::vector&lt;T&gt; &amp;vec, int low, int high) {
     if (high - low &lt;= CUTOFF){
@@ -316,9 +319,8 @@
     // recursive
     QuickX(vec, low, j + 1);
     QuickX(vec, i, high);
-}
-</code></pre></li>
-</ol>
+}   
+</code></pre>
 
 <hr />
 

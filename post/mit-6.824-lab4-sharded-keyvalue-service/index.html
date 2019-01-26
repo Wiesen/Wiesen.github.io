@@ -139,6 +139,8 @@
 
     <br> <div class="text-justify">
 
+<p>[TOC]</p>
+
 <p>lab4 是基于 lab2 和 lab3 实现的 Raft Consensus Algorithm 之上实现 Sharded KeyValue Service。主要分为两部分：</p>
 
 <ul>
@@ -179,7 +181,8 @@
 <h2 id="part-a-the-shard-master">Part A：The Shard Master</h2>
 
 <ol>
-<li><p><strong>RPC Join/leave/Move/Query</strong></p>
+<li><strong>RPC Join/leave/Move/Query</strong></li>
+</ol>
 
 <p>Client:</p>
 
@@ -193,8 +196,9 @@
 <ul>
 <li>异步：开一个 goroutine 来监听和处理 accept entry，与各 RPC 中的 start entry 分离，利用 channel 进行同步和通信；</li>
 <li>at most once semantics：主要针对写操作，本文在 accept operation 处进行 duplicated check (也可以在 start operation 处再加一层)，对于重复的 request，仅向 client 回复操作结果；</li>
-</ul></li>
+</ul>
 
+<ol>
 <li><p><strong>Rebanlancing</strong></p>
 
 <p>lab4 对 shards 分配的要求是: divide the shards as evenly as possible among the groups, and should move as few shards as possible to achieve that goal.</p>
@@ -243,8 +247,7 @@
 <li><strong>Detect</strong>: 开一个 goroutine 来周期性地向 shardmaster query 最新的 configuration (由 group leader 完成)，当发现 configuration 更新时 (one by one in order)，即向其余 group 获取需要的 shards (migrating shard)；</li>
 <li><strong>When to reconfigurate</strong>: Reconfiguration operation 仅仅是 group leader 从 shardmaster 获取到了 operation proposal，然而新的 configuration 什么时候生效是由各个 group 自行决定。本文的实现是当 group 获取到需要的 shards 后再进行 reconfiguration update。因此会出现当 client 根据新的 configuration 向 shardkv 发起 request 时，各个 group 都还没完成 configuration update。不过这并没什么影响，我们可以让 client 一直 loop 向每个 replica group 发起 request (当然是一直被拒)，直到目标 group 完成 reconfiguration update;</li>
 <li><strong>Consistency</strong>: Reconfiguration operation 会影响到 PutAPpend/Get，因此同样需要利用 raft 保证 group 内的一致性，确保集群内完成了之前的操作后同时进行 Reconfiguration；</li>
-<li><strong>Replace What</strong>: 包括 config，StoreShard (data) 以及 Ack (duplicate detection)，其中 Ack 不是 replace entirely，仅当 kv.ack[clientId] &lt; migration.Ack[clientId] 才更新；
-<br /></li>
+<li><strong>Replace What</strong>: 包括 config，StoreShard (data) 以及 Ack (duplicate detection)，其中 Ack 不是 replace entirely，仅当 kv.ack[clientId] &lt; migration.Ack[clientId] 才更新；</li>
 </ul></li>
 </ol>
 
@@ -255,6 +258,8 @@
 
 <p><a href="https://github.com/bluesea147/6.824/blob/master/src/shardkv/server.go">bluesea147/6.824/shardkv</a></p>
 </blockquote>
+
+<p>​</p>
 </div>
 
     

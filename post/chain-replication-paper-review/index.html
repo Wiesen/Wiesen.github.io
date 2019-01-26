@@ -139,6 +139,8 @@
 
     <br> <div class="text-justify">
 
+<p>[TOC]</p>
+
 <p>本文是读完 Van Renesse R, Schneider F B. Chain Replication for Supporting High Throughput and Availability[C]//OSDI. 2004. 的总结。</p>
 
 <h2 id="summary">Summary</h2>
@@ -162,25 +164,24 @@
 <li><code>update(objId, newVal, opts) -&gt; value</code>: update <em>opts</em> of <em>objId</em> with <em>newVal</em></li>
 </ul>
 
-<p>Client&rsquo;s view of an object:</p>
-
-<pre><code>State is:
-    Hist[objId]: history of all updates to objId
-    Pending[objId]: set of pending requests for objId
-Transitions are:
-    T1: Client request r arrives: 
-        Pending[objId] += {r}
-    // 一个 client request 接收失败 = server 忽略了该 client request
-    T2: Client request r ∈ Pending[objId] ignored: 
-        Pending[objId] -= {r}
-    T3: Client request r ∈ Pending[objId] processed: 
-        Pending[objId] -= {r}
-        if r = query(objId, opts) then 
-            reply according options opts based on Hist[objId]
-        else if r = update(objId, newVal, opts) then
-            Hist[objId] := Hist[objId] · r
-            reply according options opts based on Hist[objId]
-</code></pre>
+<p>Client&rsquo;s view of an object:
+​<br />
+​    State is:
+​       Hist[objId]: history of all updates to objId
+​       Pending[objId]: set of pending requests for objId
+​    Transitions are:
+​       T1: Client request r arrives:
+​           Pending[objId] += {r}
+​       // 一个 client request 接收失败 = server 忽略了该 client request
+​       T2: Client request r ∈ Pending[objId] ignored:
+​           Pending[objId] -= {r}
+​       T3: Client request r ∈ Pending[objId] processed:
+​           Pending[objId] -= {r}
+​           if r = query(objId, opts) then
+​               reply according options opts based on Hist[objId]
+​           else if r = update(objId, newVal, opts) then
+​               Hist[objId] := Hist[objId] · r
+​               reply according options opts based on Hist[objId]</p>
 
 <h2 id="chain-replication-protocol">Chain Replication Protocol</h2>
 
@@ -194,13 +195,12 @@ Transitions are:
 <p><strong>2. Protocol Details</strong></p>
 
 <p>在 chain replication 中, 所有 servers 根据 <em>objID</em> 线性排列从而组成一个链表.
-<img src="http://7vij5d.com1.z0.glb.clouddn.com/the%20chain.png" width="400"/></p>
+<img src="../assets/the chain-6262094.png" alt="the chain" /></p>
 
 <ul>
 <li>所有 update 操作由 HEAD 结点接收并开始处理, 然后按照FIFO顺序向链表中的下一个节点传递, 直到该 update 操作被 TAIL 节点处理.</li>
 <li>所有 query 操作由 TAIL 结点接收并处理.</li>
-<li>所有 query 操作 / update 操作的确认由 TAIL 结点处理 (即发送 reply 给 client).
-<br /></li>
+<li>所有 query 操作 / update 操作的确认由 TAIL 结点处理 (即发送 reply 给 client).</li>
 </ul>
 
 <p><strong>3. Coping with Server Failures</strong></p>
