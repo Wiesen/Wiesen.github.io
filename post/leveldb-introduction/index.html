@@ -198,15 +198,17 @@
 
 <p><img src="/assets/compaction.png" alt="compaction" /></p>
 
-<p>LSM tree 针对<strong>写入速度瓶颈问题</strong>而提出的方法，其基本思想是：<strong>保存多版本数据，将随机写转换为顺序写，交换读和写的随机 IO</strong>。主要组成结构为：MemTable（内存数据组织结构）+ SSTable (Sorted String Table，磁盘数据组织结构)+log（保证可恢复未持久化的数据）。</p>
+<p>LSM tree 针对<strong>写入速度瓶颈问题</strong>而提出的方法，其基本思想是：<strong>保存多版本数据，将随机写转换为顺序写，交换读和写的随机 IO</strong>。 LSM-Tree的思路是将索引树结构拆成一大一小两颗树，较小的一个常驻内存（MemTable），较大的一个持久化到磁盘（SSTable），他们共同维护一个有序的key空间。</p>
 
-<p>首先数据更新增量写入 MemTable，其后保存为有序文件 SSTable 到磁盘中（read only），每个文件保存一段时间内的数据更新。为了均衡读写效率，SSTable 文件是一种分层次（level）管理。</p>
+<p>首先数据更新增量写入 MemTable，达到设定阈值大小后保存为有序文件 SSTable 到磁盘中（read only），每个文件保存一段时间内的数据更新。随着数据的不断写入 SSTable 会不断膨胀，为了均衡读写效率，SSTable 文件是一种分层次（level）管理，LevelDB将磁盘中的数据又拆分成多层，每一层的数据达到一定容量后会触发向下一层的归并操作，每一层的数据量比其上一层成倍增长。</p>
+
+<p>LSM tree 主要组成结构为：MemTable（内存数据组织结构）+ SSTable (Sorted String Table，磁盘数据组织结构)+log（保证可恢复未持久化的数据）。</p>
 
 <p>LSM Tree 的主要措施有：</p>
 
 <ul>
 <li>对更新进行批量 &amp; 延时处理 (超过大小阈值后将内存中的数据 dump 到磁盘中)：减少寻道，提高写操作性能；</li>
-<li>周期性地利用归并排序对磁盘文件执行合并操作 (compaction)：移除已删除和冗余数据，减少文件个数，保证读操作性能。</li>
+<li>周期性地利用归并排序对磁盘文件执行合并操作 (compaction)：<strong>移除已删除和冗余数据，减少文件个数</strong>，保证读操作性能。</li>
 </ul></li>
 </ol>
 
@@ -332,6 +334,7 @@
 <li><a href="http://brg-liuwei.github.io/tech/2014/10/15/leveldb-0.html">和我一起学习 leveldb</a></li>
 <li><a href="http://www.open-open.com/lib/view/open1424916275249.html">Log Structured Merge Trees(LSM) 原理</a></li>
 <li><a href="https://segmentfault.com/a/1190000009707717">Leveldb二三事</a></li>
+<li><a href="http://catkang.github.io/2017/01/07/leveldb-summary.html">庖丁解LevelDB之概览</a></li>
 </ol>
 </div>
 
@@ -343,6 +346,20 @@
         <h4 class="page-header">Related</h4>
 
          <div class="item">
+
+    
+    
+    
+
+    
+    
+
+    <h4><a href="/post/leveldb-compaction/">Leveldb: Compaction</a></h4>
+    <h5>July 14, 2019</h5>
+     <kbd class="item-tag">Database</kbd>  <kbd class="item-tag">Leveldb</kbd> 
+
+</div>
+  <div class="item">
 
     
     
@@ -367,20 +384,6 @@
 
     <h4><a href="/post/leveldb-storage-sstable/">Leveldb: Storage SSTable</a></h4>
     <h5>February 15, 2017</h5>
-     <kbd class="item-tag">Database</kbd>  <kbd class="item-tag">Leveldb</kbd> 
-
-</div>
-  <div class="item">
-
-    
-    
-    
-
-    
-    
-
-    <h4><a href="/post/leveldb-storage-memtable/">Leveldb: Storage MemTable</a></h4>
-    <h5>January 31, 2017</h5>
      <kbd class="item-tag">Database</kbd>  <kbd class="item-tag">Leveldb</kbd> 
 
 </div>

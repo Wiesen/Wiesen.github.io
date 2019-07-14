@@ -6,10 +6,23 @@
     <description>Recent content in Database on Wiesen&#39;s Blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Sat, 25 Feb 2017 21:31:20 +0800</lastBuildDate>
+    <lastBuildDate>Sun, 14 Jul 2019 21:31:20 +0800</lastBuildDate>
     
 	<atom:link href="https://wiesen.github.io/tags/database/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>Leveldb: Compaction</title>
+      <link>https://wiesen.github.io/post/leveldb-compaction/</link>
+      <pubDate>Sun, 14 Jul 2019 21:31:20 +0800</pubDate>
+      
+      <guid>https://wiesen.github.io/post/leveldb-compaction/</guid>
+      <description>[TOC]
+LevelDb通过周期性地利用归并排序对磁盘文件执行合并操作 (compaction)：移除已删除和冗余数据，减少文件个数，保证读操作性能。
+LevelDB中，Compaction分成两种，就如同Linux操作系统中的page fault分成minor和major一样：
+ minor compaction：在合适的时机，将Immutable MemTable dump到磁盘，形成SSTable major compaction：文件数目过多或者某个level的文件总大小过大，引起compacction  compaction 整体流程 Compaction操作入口实际由DBImpl::MaybeScheduleCompaction控制。追踪该函数的调用场景，就可以知道触发Compaction的时机。 整体流程如下所示：
+void DBImpl::MaybeScheduleCompaction() { mutex_.AssertHeld(); if (bg_compaction_scheduled_) { // Already scheduled } else if (shutting_down_.Acquire_Load()) { // DB is being deleted; no more background compactions } else if (!bg_error_.ok()) { // Already got an error; no more changes } else if (imm_ == NULL &amp;amp;&amp;amp; manual_compaction_ == NULL &amp;amp;&amp;amp; !versions_-&amp;gt;NeedsCompaction()) { /*防止无限递归，会判断需不需要再次Compaction，如果不需要就返回了*/ // No work to be done } else { bg_compaction_scheduled_ = true; env_-&amp;gt;Schedule(&amp;amp;DBImpl::BGWork, this); } }  从这段代码可以看出发起Compction需要的条件，三个条件满足一个即可发起Compaction：</description>
+    </item>
     
     <item>
       <title>Leveldb: Block Cache</title>
